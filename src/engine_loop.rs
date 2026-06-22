@@ -56,7 +56,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::transport::{
@@ -90,8 +90,10 @@ pub struct EngineConfig {
     pub recv_buffer_size: usize,
     /// Half-life for gradient weight decay (ms)
     pub gradient_half_life_ms: f32,
-    /// Local peers to bootstrap into DHT routing table
+    /// Pre-seeded peer addresses for DHT bootstrapping.
     pub local_peers: Vec<SocketAddr>,
+    /// Shared pointer so external watchers can read live stats.
+    pub shared_stats: Option<Arc<Mutex<EngineStats>>>,
 }
 
 impl Default for EngineConfig {
@@ -105,6 +107,7 @@ impl Default for EngineConfig {
             recv_buffer_size: 65535,
             gradient_half_life_ms: 100.0,
             local_peers: Vec::new(),
+            shared_stats: None,
         }
     }
 }
@@ -184,6 +187,8 @@ pub struct EngineStats {
     pub bytes_sent: u64,
     /// Total retransmissions
     pub retransmissions: u64,
+    /// Current number of known peers
+    pub peer_count: usize,
     /// Current outbound queue depth
     pub outbound_queue_depth: usize,
     /// Current reliable queue depth
@@ -582,8 +587,10 @@ impl EngineLoop {
     // ─── Stats ──────────────────────────────────────────────────
 
     fn update_stats(&mut self) {
+        self.stats.peer_count = self.peer_rtt.len();
         self.stats.outbound_queue_depth = 0; // we drained the channel each tick
         self.stats.reliable_queue_depth = self.transport.reliable_queue.pending_count();
+        self.sync_stats();
 
         let elapsed = self.last_stats_time.elapsed().as_secs_f64();
         if elapsed > 0.0 {
@@ -614,6 +621,15 @@ impl EngineLoop {
     /// Get the engine stats
     pub fn stats(&self) -> &EngineStats {
         &self.stats
+    }
+
+    /// Sync live stats to shared pointer so external watchers see them.
+    fn sync_stats(&self) {
+        if let Some(ref shared) = self.config.shared_stats {
+            if let Ok(mut s) = shared.lock() {
+                *s = self.stats.clone();
+            }
+        }
     }
 
     /// Get peer RTT estimates

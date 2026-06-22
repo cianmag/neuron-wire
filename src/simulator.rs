@@ -41,7 +41,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::engine_loop::{spawn_engine, EngineConfig};
+use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
 
 // ─── Simulation Configuration ──────────────────────────────────
 
@@ -171,6 +171,8 @@ struct SimulatedNode {
     shutdown: Arc<AtomicBool>,
     handle: Option<std::thread::JoinHandle<()>>,
     metrics: Arc<Mutex<Vec<NodeMetrics>>>,
+    /// Shared engine stats pointer — populated by the engine thread.
+    engine_stats: Arc<Mutex<EngineStats>>,
 }
 
 // ─── Simulator ────────────────────────────────────────────────
@@ -227,6 +229,8 @@ impl Simulator {
         for i in 0..node_count {
             let port = ports[i as usize];
             let shutdown = Arc::new(AtomicBool::new(false));
+            // Shared stats pointer so the simulator can read engine metrics
+            let engine_stats = Arc::new(Mutex::new(EngineStats::default()));
 
             // Build list of other node addresses for DHT bootstrapping
             let local_peers: Vec<SocketAddr> = node_addrs.iter()
@@ -246,6 +250,7 @@ impl Simulator {
                 recv_buffer_size: 65535,
                 gradient_half_life_ms: self.config.gradient_half_life_ms as f32,
                 local_peers,
+                shared_stats: Some(engine_stats.clone()),
             };
 
             // Clone shared shutdown flag
@@ -262,6 +267,7 @@ impl Simulator {
                         shutdown,
                         handle: Some(handle),
                         metrics: Arc::new(Mutex::new(Vec::new())),
+                        engine_stats,
                     });
                 }
                 Err(e) => {
@@ -311,19 +317,19 @@ impl Simulator {
                 tick_counter = elapsed.as_millis() as u64 / self.config.tick_interval_ms as u64;
 
                 for node in &self.nodes {
-                    // Read engine stats from the engine loop's shared state
-                    // For now, approximate: collect from the engine thread if it exposes stats
+                    // Read real engine stats from the engine thread via shared pointer
+                    let s = node.engine_stats.lock().ok().map(|g| g.clone()).unwrap_or_default();
                     let metrics = NodeMetrics {
                         tick: tick_counter,
-                        packets_recv: 0,
-                        packets_sent: 0,
-                        bytes_recv: 0,
-                        bytes_sent: 0,
-                        peer_count: 0,
-                        reliable_queue_depth: 0,
+                        packets_recv: s.packets_recv,
+                        packets_sent: s.packets_sent,
+                        bytes_recv: s.bytes_recv,
+                        bytes_sent: s.bytes_sent,
+                        peer_count: s.peer_count,
+                        reliable_queue_depth: s.reliable_queue_depth,
                         apoptosis_deaths: 0,
-                        idle_ticks: 0,
-                        busy_ticks: 0,
+                        idle_ticks: s.idle_ticks,
+                        busy_ticks: s.busy_ticks,
                     };
                     // Store the sample
                     if let Ok(mut store) = self.metrics_store.lock() {
@@ -343,10 +349,16 @@ impl Simulator {
         let elapsed_secs = self.start_time.unwrap().elapsed().as_secs_f64();
 
         let store = self.metrics_store.lock().map_err(|e| e.to_string())?;
-        let total_pkts_recv: u64 = 0;
-        let total_pkts_sent: u64 = 0;
-        let total_bytes_r: u64 = 0;
-        let total_bytes_s: u64 = 0;
+        let total_pkts_recv: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.packets_recv).sum();
+        let total_pkts_sent: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.packets_sent).sum();
+        let total_bytes_r: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.bytes_recv).sum();
+        let total_bytes_s: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.bytes_sent).sum();
+
+        let sample_count: usize = store.values().map(|v| v.len()).sum();
+        let avg_peers: f64 = if sample_count > 0 {
+            store.values().flat_map(|v| v.iter()).map(|m| m.peer_count as f64).sum::<f64>() / sample_count as f64
+        } else { 0.0 };
+        let max_peers: usize = store.values().flat_map(|v| v.iter()).map(|m| m.peer_count).max().unwrap_or(0);
 
         // For now, return a basic result
         Ok(TrialResult {
@@ -359,9 +371,9 @@ impl Simulator {
             total_packets_sent: total_pkts_sent,
             total_bytes_recv: total_bytes_r,
             total_bytes_sent: total_bytes_s,
-            bandwidth_kbps: 0.0,
-            avg_peers: 0.0,
-            max_peers: 0,
+            bandwidth_kbps: if elapsed_secs > 0.0 { (total_bytes_r + total_bytes_s) as f64 * 8.0 / 1000.0 / elapsed_secs } else { 0.0 },
+            avg_peers,
+            max_peers,
             total_apoptosis_deaths: 0,
             converged: false,
             convergence_time_secs: None,
