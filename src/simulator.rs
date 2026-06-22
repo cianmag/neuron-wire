@@ -360,6 +360,26 @@ impl Simulator {
         } else { 0.0 };
         let max_peers: usize = store.values().flat_map(|v| v.iter()).map(|m| m.peer_count).max().unwrap_or(0);
 
+        // Convergence detection: first sample where ALL nodes know ALL other nodes
+        let total_known = self.config.node_count as usize - 1;
+        let min_samples = store.values().map(|v| v.len()).min().unwrap_or(0);
+        let (converged, convergence_time_secs) = {
+            let mut conv = false;
+            let mut conv_time = None;
+            for si in 0..min_samples {
+                let all_connected = store.iter().all(|(_, samples)| {
+                    samples.get(si).map(|m| m.peer_count >= total_known).unwrap_or(false)
+                });
+                if all_connected {
+                    conv = true;
+                    // Sample interval is 1000ms; si is 0-indexed
+                    conv_time = Some((si as u64 * 1000) as f64 / 1000.0);
+                    break;
+                }
+            }
+            (conv, conv_time)
+        };
+
         // For now, return a basic result
         Ok(TrialResult {
             trial_index: 0,
@@ -375,8 +395,8 @@ impl Simulator {
             avg_peers,
             max_peers,
             total_apoptosis_deaths: 0,
-            converged: false,
-            convergence_time_secs: None,
+            converged,
+            convergence_time_secs,
         })
     }
 
@@ -428,6 +448,39 @@ impl Simulator {
         let mut wtr = csv::Writer::from_path(&summary_path).map_err(|e| e.to_string())?;
         wtr.serialize(trial).map_err(|e| e.to_string())?;
         wtr.flush().map_err(|e| e.to_string())?;
+
+        // Write per-sample convergence data (one row per sample, one col per node)
+        if let Ok(store) = self.metrics_store.lock() {
+            let conv_path = output_dir.join("convergence.csv");
+            if let Ok(mut cwtr) = csv::Writer::from_path(&conv_path) {
+                // Header: tick,node_0_peers,node_1_peers,...
+                let mut header = vec!["tick".to_string()];
+                for i in 0..self.config.node_count {
+                    header.push(format!("node_{}_peers", i));
+                }
+                let _ = cwtr.write_record(&header);
+
+                let node_count = self.config.node_count as usize;
+                let num_samples = store.values().map(|v| v.len()).max().unwrap_or(0);
+                for si in 0..num_samples {
+                    // tick value from first node's sample
+                    let tick = store.get(&0)
+                        .and_then(|s| s.get(si))
+                        .map(|m| m.tick.to_string())
+                        .unwrap_or_else(|| (si as u64 * 1000).to_string());
+                    let mut row = vec![tick];
+                    for ni in 0..node_count {
+                        let peers = store.get(&(ni as u32))
+                            .and_then(|s| s.get(si))
+                            .map(|m| m.peer_count.to_string())
+                            .unwrap_or_else(|| "0".to_string());
+                        row.push(peers);
+                    }
+                    let _ = cwtr.write_record(&row);
+                }
+                let _ = cwtr.flush();
+            }
+        }
 
         eprintln!("[SIM] Results written to {}", output_dir.display());
         Ok(())
