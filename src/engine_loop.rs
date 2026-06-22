@@ -216,8 +216,8 @@ pub struct EngineLoop {
     transport: UdpTransport,
     /// Channel: other components enqueue packets to send
     outbound_rx: Receiver<OutgoingPacket>,
-    /// Channel: engine dispatches received events
-    events_tx: Sender<IngressEvent>,
+    /// Channel: engine dispatches received events (None = no subscriber)
+    events_tx: Option<Sender<IngressEvent>>,
     /// DHT handler for peer discovery (optional — attach after construction)
     pub dht_handler: Option<DhtHandler>,
     /// Apoptosis garbage collector
@@ -265,7 +265,7 @@ impl EngineLoop {
             config,
             transport,
             outbound_rx,
-            events_tx,
+            events_tx: Some(events_tx),
             dht_handler: None,
             apoptosis_system: ApoptosisSystem::new(),
             shutdown: Arc::new(AtomicBool::new(false)),
@@ -575,10 +575,9 @@ impl EngineLoop {
             gradient_weight,
         };
 
-        // Non-blocking send — if the channel is full, drop the event
-        // (backpressure: the subscriber must keep up or lose events)
-        if let Err(e) = self.events_tx.send(event) {
-            eprintln!("[ENGINE] event channel full, dropping: {}", e);
+        // Non-blocking send — if no subscriber, silently drop
+        if let Some(tx) = &self.events_tx {
+            let _ = tx.send(event);
         }
 
         Ok(())
@@ -661,7 +660,7 @@ pub fn spawn_engine(
                 config,
                 transport,
                 outbound_rx,
-                events_tx,
+                events_tx: Some(events_tx),
                 dht_handler,
                 apoptosis_system: ApoptosisSystem::new(),
                 shutdown: shutdown.clone(),
