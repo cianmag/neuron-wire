@@ -1,0 +1,18 @@
+node_count = 3
+duration_secs = 10
+seed = 0
+bind_prefix = "127.0.0.1"
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+paper_mode = false
+
+[convergence]
+edge_weight_stability_stdev = 0.0010000000474974513
+edge_weight_stability_window = 100
+prediction_error_delta = 0.009999999776482582
+prediction_error_window = 50
+task_accuracy_plateau_improvement = 0.0010000000474974513
+task_accuracy_plateau_window = 10
