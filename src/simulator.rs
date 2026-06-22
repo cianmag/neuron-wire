@@ -218,9 +218,22 @@ impl Simulator {
         let node_count = self.config.node_count;
         self.nodes.reserve(node_count as usize);
 
+        // Pre-compute all ports so each node knows its peers
+        let ports: Vec<u16> = (0..node_count).map(|i| self.find_free_port(i as u16)).collect();
+        let node_addrs: Vec<SocketAddr> = ports.iter().map(|p| {
+            format!("127.0.0.1:{}", p).parse().unwrap()
+        }).collect();
+
         for i in 0..node_count {
-            let port = self.find_free_port(i as u16);
+            let port = ports[i as usize];
             let shutdown = Arc::new(AtomicBool::new(false));
+
+            // Build list of other node addresses for DHT bootstrapping
+            let local_peers: Vec<SocketAddr> = node_addrs.iter()
+                .enumerate()
+                .filter(|(j, _)| *j as u32 != i)
+                .map(|(_, addr)| *addr)
+                .collect();
 
             let bind_addr = format!("{}:{}", self.config.bind_prefix, port);
 
@@ -232,20 +245,20 @@ impl Simulator {
                 max_outbound_queue: 10000,
                 recv_buffer_size: 65535,
                 gradient_half_life_ms: self.config.gradient_half_life_ms as f32,
+                local_peers,
             };
 
             // Clone shared shutdown flag
             let node_shutdown = shutdown.clone();
 
-            // Spawn the engine (no DHT handler for initial iteration)
+            // Spawn the engine (no DHT handler — spawn_engine auto-creates one from local_peers)
             let result = spawn_engine(engine_cfg, None, node_shutdown);
             match result {
                 Ok((_outbound_tx, _events_rx, handle)) => {
-                    let addr: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
                     self.nodes.push(SimulatedNode {
                         node_id: i,
                         port,
-                        engine_addr: addr,
+                        engine_addr: node_addrs[i as usize],
                         shutdown,
                         handle: Some(handle),
                         metrics: Arc::new(Mutex::new(Vec::new())),
@@ -298,6 +311,8 @@ impl Simulator {
                 tick_counter = elapsed.as_millis() as u64 / self.config.tick_interval_ms as u64;
 
                 for node in &self.nodes {
+                    // Read engine stats from the engine loop's shared state
+                    // For now, approximate: collect from the engine thread if it exposes stats
                     let metrics = NodeMetrics {
                         tick: tick_counter,
                         packets_recv: 0,
@@ -312,7 +327,10 @@ impl Simulator {
                     };
                     // Store the sample
                     if let Ok(mut store) = self.metrics_store.lock() {
-                        store.entry(node.node_id).or_insert_with(Vec::new).push(metrics);
+                        store
+                            .entry(node.node_id)
+                            .or_insert_with(Vec::new)
+                            .push(metrics);
                     }
                 }
             }

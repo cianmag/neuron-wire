@@ -66,7 +66,7 @@ use crate::transport::{
 };
 use crate::apoptosis::ApoptosisSystem;
 use crate::components::{ActivationMap, EntityId, SynapseMap};
-use crate::dht::DhtHandler;
+use crate::dht::{DhtHandler, NodeEntry, NodeId, NodeType};
 use crate::forward_pass::ForwardPassSystem;
 use crate::hebbian::HebbianLearningSystem;
 use crate::neurogenesis::NeurogenesisSystem;
@@ -90,6 +90,8 @@ pub struct EngineConfig {
     pub recv_buffer_size: usize,
     /// Half-life for gradient weight decay (ms)
     pub gradient_half_life_ms: f32,
+    /// Local peers to bootstrap into DHT routing table
+    pub local_peers: Vec<SocketAddr>,
 }
 
 impl Default for EngineConfig {
@@ -102,6 +104,7 @@ impl Default for EngineConfig {
             max_outbound_queue: 10_000,
             recv_buffer_size: 65535,
             gradient_half_life_ms: 100.0,
+            local_peers: Vec::new(),
         }
     }
 }
@@ -661,6 +664,43 @@ pub fn spawn_engine(
                 outbound_tx: outbound_tx.clone(),
                 brain_attached: false,
             };
+
+            // Auto-create DHT handler if local peers configured but no handler given
+            if engine.dht_handler.is_none() && !engine.config.local_peers.is_empty() {
+                use rand::Rng;
+                let mut local_id = [0u8; 32];
+                rand::thread_rng().fill(&mut local_id);
+                let dht = DhtHandler::new(
+                    NodeId::new(local_id),
+                    engine.config.bind_addr.parse().unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap()),
+                    NodeType::General,
+                    outbound_tx.clone(),
+                    None,
+                    "local".to_string(),
+                );
+                engine.dht_handler = Some(dht);
+            }
+
+            // Bootstrap: inject local peers into DHT routing table
+            if let Some(ref mut dht) = engine.dht_handler {
+                for peer_addr in &engine.config.local_peers {
+                    use rand::Rng;
+                    let mut id_bytes = [0u8; 32];
+                    rand::thread_rng().fill(&mut id_bytes);
+                    let entry = NodeEntry::new(
+                        NodeId::new(id_bytes),
+                        *peer_addr,
+                        NodeType::General,
+                    );
+                    dht.routing_table.insert(entry);
+                    dht.ping_node(*peer_addr);
+                }
+                dht.bootstrap();
+                eprintln!(
+                    "[ENGINE] Bootstrapped {} local peers",
+                    engine.config.local_peers.len()
+                );
+            }
 
             // Set 1ms read timeout
             let _ = engine.transport.socket.set_read_timeout(Some(Duration::from_millis(engine.config.tick_interval_ms)));
