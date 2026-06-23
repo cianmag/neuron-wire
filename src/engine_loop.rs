@@ -563,13 +563,16 @@ impl EngineLoop {
         let rtt_samples = self.peer_rtt.entry(src).or_insert(age_ms as f32);
         *rtt_samples = *rtt_samples * 0.9 + age_ms as f32 * 0.1;
 
-        // The payload is everything after the 16-byte transport header
-        let payload = &data[TransportHeader::SIZE..];
+        // The payload is everything after the 16-byte transport header.
+        // build_frame() prepends a 4-byte total-length prefix before the
+        // MessageHeader — strip it so nwp_payload starts at MessageHeader.
+        let raw = &data[TransportHeader::SIZE..];
+        let nwp_payload: &[u8] = if raw.len() >= 4 { &raw[4..] } else { &[] };
 
         // Dispatch the event
         let event = IngressEvent {
             transport_header: *header,
-            nwp_payload: payload.to_vec(),
+            nwp_payload: nwp_payload.to_vec(),
             src,
             recv_timestamp: now_ms,
             gradient_weight,
@@ -577,7 +580,12 @@ impl EngineLoop {
 
         // Non-blocking send — if no subscriber, silently drop
         if let Some(tx) = &self.events_tx {
-            let _ = tx.send(event);
+            let _ = tx.send(event.clone());
+        }
+
+        // Dispatch to DHT handler for inline processing (PING/PONG/FIND_NODE/NODES)
+        if let Some(ref mut dht) = self.dht_handler {
+            dht.handle_event(&event);
         }
 
         Ok(())

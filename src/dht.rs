@@ -318,11 +318,14 @@ pub mod dht_fields {
     use crate::HEADER_SIZE;
     pub const SENDER_ID: usize     = HEADER_SIZE;
     pub const SENDER_ID_END: usize = HEADER_SIZE + 32;
-    pub const NODE_TYPE: usize     = HEADER_SIZE + 42;
-    pub const LATENCY_MS: usize    = HEADER_SIZE + 44;
-    pub const PING_SEQ: usize      = HEADER_SIZE + 48;
-    pub const PING_BODY_SIZE: usize = 52;
-    pub const PONG_BODY_SIZE: usize = 52;
+    // encode_addr produces 7 bytes for IPv4 (1+4+2), so NODE_TYPE is at
+    // body offset 32+7 = 39, LATENCY_MS at 40, PING_SEQ at 44.
+    // For IPv6 (1+16+2 = 19 body bytes) these will need revisiting.
+    pub const NODE_TYPE: usize     = HEADER_SIZE + 39;
+    pub const LATENCY_MS: usize    = HEADER_SIZE + 40;
+    pub const PING_SEQ: usize      = HEADER_SIZE + 44;
+    pub const PING_BODY_SIZE: usize = 48;
+    pub const PONG_BODY_SIZE: usize = 48;
     pub const TARGET_ID: usize     = HEADER_SIZE;
     pub const FIND_BODY_SIZE: usize = 32;
 }
@@ -507,7 +510,7 @@ impl DhtHandler {
         self.send_pong(event.src, seq);
     }
 
-    fn handle_pong(&mut self, _event: &IngressEvent, payload: &[u8]) {
+    fn handle_pong(&mut self, event: &IngressEvent, payload: &[u8]) {
         if payload.len() < dht_fields::PONG_BODY_SIZE { return; }
         let mut sid = [0u8; 32];
         sid.copy_from_slice(&payload[dht_fields::SENDER_ID..dht_fields::SENDER_ID_END]);
@@ -522,7 +525,22 @@ impl DhtHandler {
             .map(|t| t.elapsed().as_millis() as f32)
             .unwrap_or(100.0);
 
-        self.routing_table.record_latency(&sender, rtt);
+        // If sender not yet in the routing table (e.g. bootstrap used a
+        // random-ID placeholder), insert the entry with the real ID.
+        // Otherwise just update the latency.
+        {
+            let mut found = false;
+            if let Some((_, bucket)) = self.routing_table.bucket_mut(&sender) {
+                found = bucket.find(&sender).is_some();
+            }
+            if found {
+                self.routing_table.record_latency(&sender, rtt);
+            } else {
+                let mut entry = NodeEntry::new(sender, event.src, NodeType::General);
+                entry.latency_ms = rtt;
+                self.routing_table.insert(entry);
+            }
+        }
     }
 
     fn handle_find_node(&mut self, event: &IngressEvent, payload: &[u8]) {
