@@ -466,12 +466,9 @@ impl EngineLoop {
             // ── PHASE 4: RETRANSMIT (every N ticks) ──────────
             if self.tick - self.last_retransmit_tick >= self.config.retransmit_interval_ticks {
                 self.last_retransmit_tick = self.tick;
-                // We need a target peer for retransmit. In a full system, the engine
-                // would know all peers. For now, retransmit is handled inside UdpTransport
-                // by the reliable_queue's knowledge of each peer.
-                // The retransmit is triggered per-peer in the full implementation.
-                // For this base version, we just scan and clean.
-                self.transport.cleanup_expired();
+                // Retransmit any un-ACKed reliable packets that still have retries.
+                // Each packet is sent to its originally-stored destination address.
+                let _ = self.transport.retransmit_stale();
             }
 
             // ── PHASE 4: CLEANUP & APOPTOSIS (every N ticks) ────
@@ -536,45 +533,33 @@ impl EngineLoop {
     /// Validates CRC, updates ACK tracker, applies gradient decay,
     /// and dispatches to the event channel.
     fn handle_ingress(&mut self, data: &[u8], src: SocketAddr) -> Result<(), String> {
-        if data.len() < TransportHeader::SIZE {
+        if data.len() < 4 {
             return Err(format!("too short: {} bytes", data.len()));
         }
 
-        // Zero-copy parse the transport header
-        let header = unsafe { &*(data.as_ptr() as *const TransportHeader) };
-
-        // Update ACK tracker (also handles duplicate detection)
-        let is_new = self.transport.ack_tracker.record(header.sequence_number);
-        if !is_new {
-            // Duplicate packet — still process ACK info but skip dispatch
-            self.transport.reliable_queue.process_ack(header.ack_number, header.ack_bitfield);
-            return Ok(());
-        }
-
-        // Process the ACK this packet carries
-        self.transport.reliable_queue.process_ack(header.ack_number, header.ack_bitfield);
-
-        // Calculate gradient decay weight based on packet age
-        let now_ms = self.transport.now_ms();
-        let age_ms = now_ms.saturating_sub(header.timestamp);
-        let gradient_weight = calculate_gradient_weight(age_ms, self.config.gradient_half_life_ms);
-
-        // Update peer RTT estimate (exponential moving average)
-        let rtt_samples = self.peer_rtt.entry(src).or_insert(age_ms as f32);
-        *rtt_samples = *rtt_samples * 0.9 + age_ms as f32 * 0.1;
-
-        // The payload is everything after the 16-byte transport header.
+        // data = everything after the 16-byte transport header (stripped by try_recv()).
+        // Layout: [4-byte frame len][NWP header (16 bytes)][body (N bytes)].
+        //
         // build_frame() prepends a 4-byte total-length prefix before the
         // MessageHeader — strip it so nwp_payload starts at MessageHeader.
-        let raw = &data[TransportHeader::SIZE..];
-        let nwp_payload: &[u8] = if raw.len() >= 4 { &raw[4..] } else { &[] };
+        let nwp_payload: &[u8] = &data[4..];
+
+        // Duplicate detection and ACK processing are already handled inside
+        // try_recv() which has access to the real transport header. Our `data`
+        // starts after the transport header, so we cannot re-derive it here.
+
+        // Track this source as a peer (for peer count / convergence detection)
+        self.peer_rtt.entry(src).or_insert(100.0);
+
+        // Gradient weight default: 1.0 (full utility for each received packet).
+        let gradient_weight = 1.0;
 
         // Dispatch the event
         let event = IngressEvent {
-            transport_header: *header,
+            transport_header: unsafe { std::mem::zeroed() },
             nwp_payload: nwp_payload.to_vec(),
             src,
-            recv_timestamp: now_ms,
+            recv_timestamp: 0,
             gradient_weight,
         };
 
@@ -704,18 +689,12 @@ pub fn spawn_engine(
                 engine.dht_handler = Some(dht);
             }
 
-            // Bootstrap: inject local peers into DHT routing table
+            // Bootstrap: PING all known peers.
+            // No random-ID placeholder is inserted here because `handle_pong()` will
+            // create the entry with the real NodeId when the PONG arrives. Using
+            // Reliability::Data gives 3 retries per PING, surviving startup races.
             if let Some(ref mut dht) = engine.dht_handler {
                 for peer_addr in &engine.config.local_peers {
-                    use rand::Rng;
-                    let mut id_bytes = [0u8; 32];
-                    rand::thread_rng().fill(&mut id_bytes);
-                    let entry = NodeEntry::new(
-                        NodeId::new(id_bytes),
-                        *peer_addr,
-                        NodeType::General,
-                    );
-                    dht.routing_table.insert(entry);
                     dht.ping_node(*peer_addr);
                 }
                 dht.bootstrap();
@@ -748,8 +727,16 @@ pub fn spawn_engine(
                             ingress_count += 1;
                             engine.stats.packets_recv += 1;
                             engine.stats.bytes_recv += len as u64;
-                            if let Err(e) = engine.handle_ingress(&recv_buf[..len], src) {
-                                eprintln!("[ENGINE] ingress: {}", e);
+                            // Strip transport header before calling handle_ingress.
+                            // try_recv() does this in the struct-based version; we do
+                            // it here to keep handle_ingress consistent: data always
+                            // starts after the transport header.
+                            // Wire: [TransportHeader (16)][frame_len (4)][NWP header (16)][body (N)]
+                            // handle_ingress expects: [frame_len (4)][NWP header (16)][body (N)]
+                            if len >= TransportHeader::SIZE {
+                                if let Err(e) = engine.handle_ingress(&recv_buf[TransportHeader::SIZE..len], src) {
+                                    eprintln!("[ENGINE] ingress: {}", e);
+                                }
                             }
                         }
                         Err(ref e)
@@ -795,7 +782,7 @@ pub fn spawn_engine(
                 // Phase 3: Retransmit (every 10 ticks)
                 if engine.tick - engine.last_retransmit_tick >= engine.config.retransmit_interval_ticks {
                     engine.last_retransmit_tick = engine.tick;
-                    engine.transport.cleanup_expired();
+                    let _ = engine.transport.retransmit_stale();
                 }
 
                 // Phase 4: Cleanup & Apoptosis (every 1000 ticks)

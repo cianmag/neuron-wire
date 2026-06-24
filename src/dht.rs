@@ -235,8 +235,24 @@ impl RoutingTable {
             None => return false,
         };
         let ok = self.buckets[idx].remove(id);
-        if ok { self.total_nodes = self.buckets.iter().map(|b| b.len()).sum(); }
+        if ok {
+            self.total_nodes = self.buckets.iter().map(|b| b.len()).sum();
+        }
         ok
+    }
+
+    /// Remove any entry with this address (used to clean up ghost entries
+    /// after a PONG confirms the real NodeId).
+    pub fn remove_by_addr(&mut self, addr: &SocketAddr) -> bool {
+        for b in &mut self.buckets {
+            let before = b.len();
+            b.entries.retain(|e| e.addr != *addr);
+            if b.len() != before {
+                self.total_nodes = self.buckets.iter().map(|b| b.len()).sum();
+                return true;
+            }
+        }
+        false
     }
 
     fn bucket_mut(&mut self, id: &NodeId) -> Option<(usize, &mut KBucket)> {
@@ -536,6 +552,9 @@ impl DhtHandler {
             if found {
                 self.routing_table.record_latency(&sender, rtt);
             } else {
+                // Remove any ghost entry with the same address but different ID
+                // (e.g. random-ID placeholder from a prior bootstrap round)
+                self.routing_table.remove_by_addr(&event.src);
                 let mut entry = NodeEntry::new(sender, event.src, NodeType::General);
                 entry.latency_ms = rtt;
                 self.routing_table.insert(entry);
@@ -593,7 +612,7 @@ impl DhtHandler {
 
         let frame = header::build_frame(dht_msg_type::PING, body, 0);
         let _ = self.outbound_tx.send(OutgoingPacket {
-            payload: frame, dst, mode: Reliability::BestEffort,
+            payload: frame, dst, mode: Reliability::Data,
         });
     }
 
@@ -607,7 +626,7 @@ impl DhtHandler {
 
         let frame = header::build_frame(dht_msg_type::PONG, body, 0);
         let _ = self.outbound_tx.send(OutgoingPacket {
-            payload: frame, dst, mode: Reliability::BestEffort,
+            payload: frame, dst, mode: Reliability::Data,
         });
     }
 

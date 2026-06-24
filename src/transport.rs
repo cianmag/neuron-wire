@@ -35,7 +35,7 @@
 //! | GOSSIP | Never (next cycle) | Best-effort |
 
 use std::collections::HashMap;
-use std::net::UdpSocket;
+use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Instant;
 
@@ -199,6 +199,8 @@ impl AckTracker {
 struct ReliablePacket {
     /// The raw bytes to send (transport header + NWP message)
     data: Vec<u8>,
+    /// Destination address
+    dst: SocketAddr,
     /// When this packet was first sent
     first_sent: Instant,
     /// Number of times we've retransmitted
@@ -222,9 +224,10 @@ impl ReliableQueue {
     }
 
     /// Enqueue a packet for reliable delivery
-    pub fn enqueue(&mut self, seq: u32, data: Vec<u8>, max_retries: u32, half_life_ms: f32) {
+    pub fn enqueue(&mut self, seq: u32, data: Vec<u8>, dst: SocketAddr, max_retries: u32, half_life_ms: f32) {
         self.packets.insert(seq, ReliablePacket {
             data,
+            dst,
             first_sent: Instant::now(),
             retries: 0,
             max_retries,
@@ -252,12 +255,13 @@ impl ReliableQueue {
     }
 
     /// Get packets that need retransmission (not expired, retries remaining)
-    pub fn get_retransmit_batch(&mut self, now_ms: u32) -> Vec<(u32, Vec<u8>)> {
+    /// Returns (seq, data, dst) for each stale packet.
+    pub fn get_retransmit_batch(&mut self, now_ms: u32) -> Vec<(u32, Vec<u8>, SocketAddr)> {
         let mut batch = Vec::new();
         let mut to_remove = Vec::new();
 
         for (&seq, packet) in &mut self.packets {
-            let age_ms = now_ms.saturating_sub(packet.first_sent.elapsed().as_millis() as u32);
+            let age_ms = packet.first_sent.elapsed().as_millis() as u32;
 
             // Calculate gradient weight — if effectively 0, drop it
             let weight = calculate_gradient_weight(age_ms, packet.half_life_ms);
@@ -268,7 +272,7 @@ impl ReliableQueue {
 
             if packet.retries < packet.max_retries {
                 packet.retries += 1;
-                batch.push((seq, packet.data.clone()));
+                batch.push((seq, packet.data.clone(), packet.dst));
             } else {
                 to_remove.push(seq);
             }
@@ -290,7 +294,7 @@ impl ReliableQueue {
     pub fn cleanup(&mut self, now_ms: u32) {
         let mut to_remove = Vec::new();
         for (&seq, packet) in &self.packets {
-            let age_ms = now_ms.saturating_sub(packet.first_sent.elapsed().as_millis() as u32);
+            let age_ms = packet.first_sent.elapsed().as_millis() as u32;
             if calculate_gradient_weight(age_ms, packet.half_life_ms) < 0.001 {
                 to_remove.push(seq);
             }
@@ -416,7 +420,7 @@ impl UdpTransport {
         self.packets_sent += 1;
 
         // Enqueue for retransmission
-        self.reliable_queue.enqueue(seq, datagram, max_retries, half_life_ms);
+        self.reliable_queue.enqueue(seq, datagram, *dst, max_retries, half_life_ms);
 
         Ok(seq)
     }
@@ -460,11 +464,12 @@ impl UdpTransport {
 
     /// Retransmit any un-ACKed reliable packets that still have retries remaining
     /// and haven't hit 0% utility. Call this periodically (~100ms).
-    pub fn retransmit_stale(&mut self, dst: &std::net::SocketAddr) -> std::io::Result<u32> {
+    /// Each packet is sent to its originally-stored destination address.
+    pub fn retransmit_stale(&mut self) -> std::io::Result<u32> {
         let now_ms = self.now_ms();
         let batch = self.reliable_queue.get_retransmit_batch(now_ms);
         let count = batch.len() as u32;
-        for (_seq, data) in batch {
+        for (_seq, data, dst) in batch {
             self.socket.send_to(&data, dst)?;
             self.packets_sent += 1;
             self.bytes_sent += data.len() as u64;
@@ -565,9 +570,10 @@ mod tests {
     #[test]
     fn test_reliable_queue_ack() {
         let mut queue = ReliableQueue::new();
-        queue.enqueue(1, vec![1, 2, 3], 3, 100.0);
-        queue.enqueue(2, vec![4, 5, 6], 3, 100.0);
-        queue.enqueue(5, vec![7, 8, 9], 3, 100.0);
+        let dst: SocketAddr = "127.0.0.1:9001".parse().unwrap();
+        queue.enqueue(1, vec![1, 2, 3], dst, 3, 100.0);
+        queue.enqueue(2, vec![4, 5, 6], dst, 3, 100.0);
+        queue.enqueue(5, vec![7, 8, 9], dst, 3, 100.0);
 
         // ACK up to 2
         let acked = queue.process_ack(2, 0);
@@ -580,7 +586,8 @@ mod tests {
     #[test]
     fn test_reliable_queue_retransmit() {
         let mut queue = ReliableQueue::new();
-        queue.enqueue(1, vec![1, 2, 3], 2, 1000.0);
+        let dst: SocketAddr = "127.0.0.1:9001".parse().unwrap();
+        queue.enqueue(1, vec![1, 2, 3], dst, 2, 1000.0);
 
         // First retransmit batch
         let batch = queue.get_retransmit_batch(0);
