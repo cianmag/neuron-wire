@@ -1,0 +1,2 @@
+trial_index,seed,node_count,duration_secs,total_ticks,total_packets_recv,total_packets_sent,total_bytes_recv,total_bytes_sent,bandwidth_kbps,avg_peers,max_peers,total_apoptosis_deaths,converged,convergence_time_secs
+0,42,25,30.0184575,29098,324000,81000,27216000,5508000,8721.034383595494,21.6,24,0,true,3.0

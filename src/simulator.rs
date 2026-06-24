@@ -545,6 +545,9 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
                 i += 1;
                 // Handled by main, not config
             }
+            "--trials" | "--stale-ping-secs" => {
+                i += 1; // Handled by main
+            }
             _ => {
                 return Err(format!("Unknown argument: {}", args[i]));
             }
