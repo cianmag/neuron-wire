@@ -6,6 +6,7 @@
 [![Tests](https://img.shields.io/badge/tests-60%2F60-brightgreen)](#)
 [![Lines of Rust](https://img.shields.io/badge/rust-6%2C656%20LOC-blue)](#)
 [![Crates.io](https://img.shields.io/badge/crate-v0.2.0-blue)](#)
+[![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 
 ---
 
