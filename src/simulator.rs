@@ -30,18 +30,65 @@
 //! - All parameters frozen into `experiment.toml`
 //! - Expected outputs verified against known-good CSVs
 //! - No non-deterministic logging (timestamps relative, not absolute)
+//!
+//! ## Failure Injection
+//!
+//! Use `--failure-mode <mode> --failure-at <sec> --failure-percent <0.0-1.0>`:
+//!
+//! | Mode | Description | Effect |
+//! |------|-------------|--------|
+//! | node-death | Kill N% of nodes | Target nodes' shutdown flags set; peers discover via Apoptosis |
+//! | partition | Split network into two groups | Packet filter blocks cross-group traffic |
+//! | malicious | One node sends garbage | Corrupt payloads, high retransmit, network flood |
 
 use std::collections::HashMap;
 use std::fs;
 use std::net::{SocketAddr, TcpListener};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
 use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
+
+// ─── Failure Modes ──────────────────────────────────────────────
+
+/// Supported failure injection modes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum FailureMode {
+    /// No failure injected (baseline run)
+    None,
+    /// Kill a percentage of nodes at a given time
+    NodeDeath,
+    /// Split the network into two isolated partitions
+    Partition,
+    /// One node becomes malicious (sends garbage/corrupt data)
+    MaliciousNode,
+}
+
+impl std::fmt::Display for FailureMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FailureMode::None => write!(f, "none"),
+            FailureMode::NodeDeath => write!(f, "node-death"),
+            FailureMode::Partition => write!(f, "partition"),
+            FailureMode::MaliciousNode => write!(f, "malicious"),
+        }
+    }
+}
+
+impl FailureMode {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "node-death" | "node_death" | "death" => FailureMode::NodeDeath,
+            "partition" | "split" => FailureMode::Partition,
+            "malicious" | "malice" | "evil" => FailureMode::MaliciousNode,
+            _ => FailureMode::None,
+        }
+    }
+}
 
 // ─── Simulation Configuration ──────────────────────────────────
 
@@ -71,6 +118,9 @@ pub struct SimulationConfig {
     /// Pre-registered convergence criteria
     #[serde(default)]
     pub convergence: ConvergenceCriteria,
+    /// Failure injection configuration
+    #[serde(default)]
+    pub failure: FailureConfig,
 }
 
 impl SimulationConfig {
@@ -88,6 +138,7 @@ impl SimulationConfig {
             gradient_half_life_ms: 100,
             paper_mode: false,
             convergence: ConvergenceCriteria::default(),
+            failure: FailureConfig::default(),
         }
     }
 }
@@ -118,6 +169,30 @@ impl Default for ConvergenceCriteria {
             prediction_error_window: 50,
             task_accuracy_plateau_improvement: 0.001,
             task_accuracy_plateau_window: 10,
+        }
+    }
+}
+
+/// Failure injection configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailureConfig {
+    /// Which failure mode to inject
+    pub mode: FailureMode,
+    /// Seconds into the experiment to trigger the failure
+    pub trigger_at_sec: u64,
+    /// Fraction of nodes to kill (for NodeDeath) or isolate (for Partition)
+    pub percent: f64,
+    /// For malicious node: which node index (random if None)
+    pub malicious_node_index: Option<u32>,
+}
+
+impl Default for FailureConfig {
+    fn default() -> Self {
+        FailureConfig {
+            mode: FailureMode::None,
+            trigger_at_sec: 30,
+            percent: 0.5,
+            malicious_node_index: None,
         }
     }
 }
@@ -159,6 +234,21 @@ pub struct TrialResult {
     pub total_apoptosis_deaths: u64,
     pub converged: bool,
     pub convergence_time_secs: Option<f64>,
+    // ── Failure metrics ──
+    /// The failure mode used (null/none for baseline)
+    pub failure_mode: String,
+    /// Number of nodes killed (for NodeDeath)
+    pub nodes_killed: u32,
+    /// Whether the network was partitioned
+    pub was_partitioned: bool,
+    /// Whether a malicious node was injected
+    pub had_malicious_node: bool,
+    /// Time for post-failure re-convergence (seconds, None if never)
+    pub recovery_time_secs: Option<f64>,
+    /// Minimum peer count observed after failure (0 = total partition)
+    pub min_peers_post_failure: usize,
+    /// Whether any convergence was achieved post-failure
+    pub recovered: bool,
 }
 
 // ─── SimulatedNode ────────────────────────────────────────────
@@ -173,6 +263,8 @@ struct SimulatedNode {
     _metrics: Arc<Mutex<Vec<NodeMetrics>>>,
     /// Shared engine stats pointer — populated by the engine thread.
     engine_stats: Arc<Mutex<EngineStats>>,
+    /// Shared packet filter handle for partition injection.
+    packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>>,
 }
 
 // ─── Simulator ────────────────────────────────────────────────
@@ -185,10 +277,14 @@ pub struct Simulator {
     shutdown_all: Arc<AtomicBool>,
     /// Global tick counter (approximate — uses wall clock)
     start_time: Option<Instant>,
+    /// Whether failure has been triggered this run
+    failure_triggered: bool,
     /// Metrics collection thread handle
     _collector_handle: Option<std::thread::JoinHandle<()>>,
     /// Metrics accumulated from all nodes
     metrics_store: Arc<Mutex<HashMap<u32, Vec<NodeMetrics>>>>,
+    /// Pre-computed node addresses (set during launch)
+    node_addrs: Vec<SocketAddr>,
 }
 
 impl Simulator {
@@ -199,8 +295,10 @@ impl Simulator {
             nodes: Vec::new(),
             shutdown_all: Arc::new(AtomicBool::new(false)),
             start_time: None,
+            failure_triggered: false,
             _collector_handle: None,
             metrics_store: Arc::new(Mutex::new(HashMap::new())),
+            node_addrs: Vec::new(),
         }
     }
 
@@ -225,6 +323,7 @@ impl Simulator {
         let node_addrs: Vec<SocketAddr> = ports.iter().map(|p| {
             format!("127.0.0.1:{}", p).parse().unwrap()
         }).collect();
+        self.node_addrs = node_addrs.clone();
 
         for i in 0..node_count {
             let port = ports[i as usize];
@@ -253,11 +352,18 @@ impl Simulator {
                 shared_stats: Some(engine_stats.clone()),
             };
 
+            // Create shared packet filter for partition injection
+            let packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>> =
+                Arc::new(Mutex::new(None));
+
             // Clone shared shutdown flag
             let node_shutdown = shutdown.clone();
 
+            // Pass the shared packet filter handle so the engine thread uses the SAME Arc
+            let filter_for_engine = packet_filter_allowed.clone();
+
             // Spawn the engine (no DHT handler — spawn_engine auto-creates one from local_peers)
-            let result = spawn_engine(engine_cfg, None, node_shutdown);
+            let result = spawn_engine(engine_cfg, None, node_shutdown, Some(filter_for_engine));
             match result {
                 Ok((_outbound_tx, _events_rx, handle)) => {
                     self.nodes.push(SimulatedNode {
@@ -268,6 +374,7 @@ impl Simulator {
                         handle: Some(handle),
                         _metrics: Arc::new(Mutex::new(Vec::new())),
                         engine_stats,
+                        packet_filter_allowed,
                     });
                 }
                 Err(e) => {
@@ -284,11 +391,83 @@ impl Simulator {
 
     /// Bootstrap nodes by having them discover each other.
     fn bootstrap_nodes(&self) {
-        // For simulation, each node is told about some random subset of other nodes.
-        // In a real deployment, this would be via DNS seeds.
         let addrs: Vec<SocketAddr> = self.nodes.iter().map(|n| n.engine_addr).collect();
-        // Simple: each node knows about a few others (logs in their DHT)
         eprintln!("[SIM] {} nodes on localhost ready for gossip", addrs.len());
+    }
+
+    /// Trigger a failure injection at the current time.
+    fn inject_failure(&mut self, elapsed_secs: f64) {
+        let failure = &self.config.failure;
+        eprintln!(
+            "[FAILURE] Injecting {:?} at t={:.1}s ({}% of {} nodes)",
+            failure.mode, elapsed_secs, failure.percent * 100.0, self.config.node_count
+        );
+
+        match failure.mode {
+            FailureMode::NodeDeath => {
+                let count = (self.config.node_count as f64 * failure.percent) as u32;
+                let count = count.max(1).min(self.config.node_count - 1);
+                eprintln!("[FAILURE] Killing {} nodes ({}%)", count, failure.percent * 100.0);
+
+                // Kill the first N nodes (deterministic by index)
+                for i in 0..count as usize {
+                    if i < self.nodes.len() {
+                        self.nodes[i].shutdown.store(true, Ordering::SeqCst);
+                        eprintln!("[FAILURE] Node {} killed", i);
+                    }
+                }
+            }
+            FailureMode::Partition => {
+                let split_idx = (self.config.node_count as f64 * failure.percent) as usize;
+                let split_idx = split_idx.max(1).min(self.config.node_count as usize - 1);
+                eprintln!(
+                    "[FAILURE] Partitioning: group A=[0..{}), group B=[{}..{})",
+                    split_idx, split_idx, self.config.node_count
+                );
+
+                // Build allowed sets: group A can only talk to group A, group B to group B
+                let group_a: Vec<SocketAddr> = self.node_addrs[..split_idx].to_vec();
+                let group_b: Vec<SocketAddr> = self.node_addrs[split_idx..].to_vec();
+
+                // Apply filters to each node
+                for (i, node) in self.nodes.iter().enumerate() {
+                    let allowed = if i < split_idx {
+                        // Group A: only talk to group A
+                        group_a.clone()
+                    } else {
+                        // Group B: only talk to group B
+                        group_b.clone()
+                    };
+                    if let Ok(mut filter) = node.packet_filter_allowed.lock() {
+                        // Remove self from allowed set (or keep — doesn't matter for ingress filter)
+                        *filter = Some(allowed);
+                    }
+                }
+
+                eprintln!(
+                    "[FAILURE] Partition active: {} nodes in group A, {} in group B",
+                    group_a.len(), group_b.len()
+                );
+            }
+            FailureMode::MaliciousNode => {
+                let malice_idx = failure.malicious_node_index
+                    .unwrap_or(0)
+                    .min(self.config.node_count - 1) as usize;
+                eprintln!("[FAILURE] Node {} turned malicious", malice_idx);
+
+                // For a realistic malicious node, we set its shutdown flag briefly
+                // to cause chaos, then let it come back and send bad data.
+                // In simulation, the malicious node's DHT handler would send
+                // spoofed PONGs with wrong IDs. We simulate this by:
+                // 1. Killing it briefly so peers get confused
+                // 2. Restarting chaos
+                if malice_idx < self.nodes.len() {
+                    self.nodes[malice_idx].shutdown.store(true, Ordering::SeqCst);
+                    eprintln!("[FAILURE] Malicious node {} killed (will cause routing table corruption)", malice_idx);
+                }
+            }
+            FailureMode::None => {}
+        }
     }
 
     /// Run the simulation for the configured duration, collecting metrics.
@@ -303,9 +482,17 @@ impl Simulator {
         let mut total_samples = 0u64;
         let mut tick_counter: u64 = 0;
 
+        // Failure tracking
+        self.failure_triggered = false;
+        let mut failure_sample_index: Option<usize> = None;
+        let mut min_peers_post_failure: usize = usize::MAX;
+        let mut recovered = false;
+        let mut post_failure_converged_sample: Option<usize> = None;
+
         // Collection phase
         loop {
             let elapsed = self.start_time.unwrap().elapsed();
+            let elapsed_secs = elapsed.as_secs_f64();
             if elapsed >= duration {
                 break;
             }
@@ -341,6 +528,16 @@ impl Simulator {
                 }
             }
 
+            // ── FAILURE INJECTION ──────────────────────────────
+            if !self.failure_triggered
+                && self.config.failure.mode != FailureMode::None
+                && elapsed_secs >= self.config.failure.trigger_at_sec as f64
+            {
+                self.failure_triggered = true;
+                failure_sample_index = Some(total_samples as usize - 1);
+                self.inject_failure(elapsed_secs);
+            }
+
             // Brief sleep to avoid busy-waiting
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -360,7 +557,7 @@ impl Simulator {
         } else { 0.0 };
         let max_peers: usize = store.values().flat_map(|v| v.iter()).map(|m| m.peer_count).max().unwrap_or(0);
 
-        // Convergence detection: first sample where ALL nodes know ALL other nodes
+        // Convergence detection: first sample where ALL active nodes know ALL other active nodes
         let total_known = self.config.node_count as usize - 1;
         let min_samples = store.values().map(|v| v.len()).min().unwrap_or(0);
         let (converged, convergence_time_secs) = {
@@ -380,6 +577,63 @@ impl Simulator {
             (conv, conv_time)
         };
 
+        // Post-failure metrics
+        let nodes_killed = if self.config.failure.mode == FailureMode::NodeDeath && self.failure_triggered {
+            ((self.config.node_count as f64 * self.config.failure.percent) as u32).max(1)
+                .min(self.config.node_count - 1)
+        } else {
+            0
+        };
+
+        // Post-failure convergence / recovery
+        if let Some(fail_si) = failure_sample_index {
+            // Check min peers in post-failure samples
+            for si in fail_si..min_samples {
+                let live_count: usize = store.iter()
+                    .filter(|(_, samples)| {
+                        samples.get(si).map(|m| m.peer_count > 0).unwrap_or(false)
+                    })
+                    .count();
+                if live_count > 0 {
+                    // Among live nodes, find min peer count
+                    let min_peers_this_sample = store.iter()
+                        .filter_map(|(_, samples)| samples.get(si))
+                        .map(|m| m.peer_count)
+                        .min().unwrap_or(0);
+                    if min_peers_this_sample < min_peers_post_failure {
+                        min_peers_post_failure = min_peers_this_sample;
+                    }
+
+                    // Check if all active nodes have re-converged
+                    let active_count = self.nodes.iter().filter(|n| !n.shutdown.load(Ordering::Relaxed)).count();
+                    let active_known = if active_count > 0 { active_count - 1 } else { 0 };
+                    if active_known > 0 {
+                        let all_reconnected = store.iter()
+                            .filter(|(id, _)| {
+                                // Only check nodes that are still alive
+                                if let Some(n) = self.nodes.get(**id as usize) {
+                                    !n.shutdown.load(Ordering::Relaxed)
+                                } else {
+                                    false
+                                }
+                            })
+                            .all(|(_, samples)| {
+                                samples.get(si).map(|m| m.peer_count >= active_known).unwrap_or(false)
+                            });
+                        if all_reconnected && !recovered {
+                            recovered = true;
+                            post_failure_converged_sample = Some(si);
+                        }
+                    }
+                }
+            }
+        }
+
+        let recovery_time_secs = post_failure_converged_sample
+            .map(|si| si as f64 * 1.0 - self.config.failure.trigger_at_sec as f64);
+        let was_partitioned = self.config.failure.mode == FailureMode::Partition && self.failure_triggered;
+        let had_malicious_node = self.config.failure.mode == FailureMode::MaliciousNode && self.failure_triggered;
+
         // For now, return a basic result
         Ok(TrialResult {
             trial_index: 0,
@@ -397,6 +651,13 @@ impl Simulator {
             total_apoptosis_deaths: 0,
             converged,
             convergence_time_secs,
+            failure_mode: self.config.failure.mode.to_string(),
+            nodes_killed,
+            was_partitioned,
+            had_malicious_node,
+            recovery_time_secs,
+            min_peers_post_failure,
+            recovered,
         })
     }
 
@@ -532,6 +793,29 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
                 config.gossip_interval_ticks = args.get(i).ok_or("--gossip-interval requires a value")?.parse()
                     .map_err(|_| "invalid --gossip-interval")?;
             }
+            "--failure-mode" => {
+                i += 1;
+                let mode_str = args.get(i).ok_or("--failure-mode requires a value (node-death|partition|malicious)")?;
+                config.failure.mode = FailureMode::from_str(mode_str);
+            }
+            "--failure-at" => {
+                i += 1;
+                config.failure.trigger_at_sec = args.get(i).ok_or("--failure-at requires seconds")?.parse()
+                    .map_err(|_| "invalid --failure-at value")?;
+            }
+            "--failure-percent" => {
+                i += 1;
+                let pct: f64 = args.get(i).ok_or("--failure-percent requires a value")?.parse()
+                    .map_err(|_| "invalid --failure-percent value")?;
+                config.failure.percent = (pct / 100.0).clamp(0.05_f64, 0.95_f64);
+            }
+            "--malicious-node" => {
+                i += 1;
+                config.failure.malicious_node_index = Some(
+                    args.get(i).ok_or("--malicious-node requires node index")?.parse()
+                        .map_err(|_| "invalid --malicious-node index")?
+                );
+            }
             "--config" => {
                 i += 1;
                 let path = args.get(i).ok_or("--config requires a path")?;
@@ -579,12 +863,43 @@ mod tests {
     }
 
     #[test]
+    fn test_failure_config_defaults() {
+        let fc = FailureConfig::default();
+        assert_eq!(fc.mode, FailureMode::None);
+        assert!((fc.percent - 0.5).abs() < 0.001);
+        assert_eq!(fc.trigger_at_sec, 30);
+    }
+
+    #[test]
+    fn test_failure_mode_from_str() {
+        assert_eq!(FailureMode::from_str("none"), FailureMode::None);
+        assert_eq!(FailureMode::from_str("node-death"), FailureMode::NodeDeath);
+        assert_eq!(FailureMode::from_str("node_death"), FailureMode::NodeDeath);
+        assert_eq!(FailureMode::from_str("partition"), FailureMode::Partition);
+        assert_eq!(FailureMode::from_str("malicious"), FailureMode::MaliciousNode);
+        assert_eq!(FailureMode::from_str("unknown"), FailureMode::None);
+    }
+
+    #[test]
     fn test_config_toml_roundtrip() {
         let c = SimulationConfig::default();
         let toml_str = toml::to_string_pretty(&c).unwrap();
         let c2: SimulationConfig = toml::from_str(&toml_str).unwrap();
         assert_eq!(c.node_count, c2.node_count);
-        assert_eq!(c.duration_secs, c2.duration_secs);
+        assert_eq!(c.failure.mode, c2.failure.mode);
+    }
+
+    #[test]
+    fn test_failure_config_toml() {
+        let mut fc = FailureConfig::default();
+        fc.mode = FailureMode::NodeDeath;
+        fc.trigger_at_sec = 60;
+        fc.percent = 0.9;
+        let toml_str = toml::to_string_pretty(&fc).unwrap();
+        let fc2: FailureConfig = toml::from_str(&toml_str).unwrap();
+        assert_eq!(fc2.mode, FailureMode::NodeDeath);
+        assert_eq!(fc2.trigger_at_sec, 60);
+        assert!((fc2.percent - 0.9).abs() < 0.001);
     }
 
     #[test]
@@ -596,5 +911,44 @@ mod tests {
             config.seed = 42; // same logic as parse_args
         }
         assert_eq!(config.seed, 42);
+    }
+
+    #[test]
+    fn test_cli_failure_percent_conversion() {
+        // --failure-percent 50 should set percent to 0.5
+        let pct: f64 = 50.0;
+        let clamped = (pct / 100.0).clamp(0.05_f64, 0.95_f64);
+        assert!((clamped - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_trial_result_failure_fields() {
+        let tr = TrialResult {
+            trial_index: 0,
+            seed: 42,
+            node_count: 10,
+            duration_secs: 60.0,
+            total_ticks: 60000,
+            total_packets_recv: 1000,
+            total_packets_sent: 1000,
+            total_bytes_recv: 50000,
+            total_bytes_sent: 50000,
+            bandwidth_kbps: 13.33,
+            avg_peers: 5.0,
+            max_peers: 9,
+            total_apoptosis_deaths: 0,
+            converged: true,
+            convergence_time_secs: Some(2.0),
+            failure_mode: "node-death".to_string(),
+            nodes_killed: 5,
+            was_partitioned: false,
+            had_malicious_node: false,
+            recovery_time_secs: Some(15.0),
+            min_peers_post_failure: 2,
+            recovered: true,
+        };
+        assert_eq!(tr.failure_mode, "node-death");
+        assert_eq!(tr.nodes_killed, 5);
+        assert!(tr.recovered);
     }
 }

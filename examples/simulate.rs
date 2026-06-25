@@ -134,6 +134,13 @@ fn main() {
                             total_apoptosis_deaths: 0,
                             converged: false,
                             convergence_time_secs: None,
+                            failure_mode: "none".to_string(),
+                            nodes_killed: 0,
+                            was_partitioned: false,
+                            had_malicious_node: false,
+                            recovery_time_secs: None,
+                            min_peers_post_failure: 0,
+                            recovered: false,
                         });
                     }
                 }

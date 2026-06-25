@@ -54,9 +54,10 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use crate::transport::{TransportHeader, UdpTransport};
@@ -247,6 +248,11 @@ pub struct EngineLoop {
     outbound_tx: Sender<OutgoingPacket>,
     /// Whether the brain is attached and should tick
     brain_attached: bool,
+    /// Shared packet filter for failure injection (partition simulation).
+    /// When `Some(allowed)`, only packets from addresses in the set are processed.
+    /// When `None`, all packets are accepted (normal operation).
+    /// Uses Arc<Mutex<>> so the simulator thread can inject filters post-spawn.
+    pub packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>>,
 }
 
 impl EngineLoop {
@@ -280,6 +286,7 @@ impl EngineLoop {
             local_id: EntityId([0u8; 32]),
             outbound_tx: outbound_tx.clone(),
             brain_attached: false,
+            packet_filter_allowed: Arc::new(Mutex::new(None)),
         };
 
         Ok((engine, outbound_tx, events_rx))
@@ -529,6 +536,17 @@ impl EngineLoop {
     /// Validates CRC, updates ACK tracker, applies gradient decay,
     /// and dispatches to the event channel.
     fn handle_ingress(&mut self, data: &[u8], src: SocketAddr) -> Result<(), String> {
+        // Packet filter for failure injection (partition simulation).
+        // When packet_filter_allowed is Some, only packets from those addresses are processed.
+        {
+            let allowed = self.packet_filter_allowed.lock().map_err(|e| e.to_string())?;
+            if let Some(ref allowed_set) = *allowed {
+                if !allowed_set.contains(&src) {
+                    return Ok(()); // silently drop
+                }
+            }
+        }
+
         // data = full UDP datagram: [16-byte transport header][NWP frame]
         // NWP frame layout: [4-byte frame_len][16-byte MessageHeader][body]
         if data.len() < TransportHeader::SIZE + 4 {
@@ -640,11 +658,18 @@ impl EngineLoop {
 
 /// Run the engine in a background thread.
 /// Returns (outbound_tx, events_rx, join_handle).
+/// Optional `packet_filter_allowed` — when provided, the engine uses this shared
+/// filter for partition simulation instead of creating a private one.
 pub fn spawn_engine(
     config: EngineConfig,
     dht_handler: Option<DhtHandler>,
     shutdown: Arc<AtomicBool>,
-) -> std::io::Result<(Sender<OutgoingPacket>, Receiver<IngressEvent>, std::thread::JoinHandle<()>)> {
+    packet_filter_allowed: Option<Arc<Mutex<Option<Vec<SocketAddr>>>>>,
+) -> std::io::Result<(
+    Sender<OutgoingPacket>,
+    Receiver<IngressEvent>,
+    std::thread::JoinHandle<()>,
+)> {
     let (outbound_tx, outbound_rx) = mpsc::channel();
     let (events_tx, events_rx) = mpsc::channel();
 
@@ -677,6 +702,7 @@ pub fn spawn_engine(
                 local_id: EntityId([0u8; 32]),
                 outbound_tx: outbound_tx.clone(),
                 brain_attached: false,
+                packet_filter_allowed: packet_filter_allowed.unwrap_or_else(|| Arc::new(Mutex::new(None))),
             };
 
             // Auto-create DHT handler if local peers configured but no handler given

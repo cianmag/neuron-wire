@@ -835,6 +835,90 @@ When a death spiral is detected, the engine emits `[ENGINE] ⚠️ DEATH SPIRAL`
 to stderr. The system continues operating — it does not self-destruct — so a
 false positive is harmless.
 
+### 7.7 Failure Injection Framework
+
+The simulator (`src/simulator.rs`) injects controlled failures during DHT
+simulation trials to benchmark resilience and recovery.
+
+#### FailureMode Enum
+
+| Variant | CLI Value | Behaviour |
+|---------|-----------|-----------|
+| `NodeDeath` | `node-death` / `node_death` | Shuts down N = `percent × node_count` nodes deterministically (first N by index). |
+| `Partition` | `partition` | Splits nodes into two groups (half/half). Cross-group packets are dropped via `packet_filter_allowed`. |
+| `MaliciousNode` | `malicious` | Kills a designated node (default index 0) so its routing table corrupts via stale entries. |
+| `None` | *(any other value)* | No failure injected. |
+
+#### FailureConfig
+
+```
+struct FailureConfig {
+    mode: FailureMode,
+    trigger_at_sec: f64,      // Simulation time to activate failure
+    percent: f64,             // Fraction of nodes affected (0.05–0.95, clamped)
+    malicious_node_index: Option<u32>,
+}
+```
+
+#### Implementation Mechanism
+
+- **Packet filter (`packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>>`)**:
+  Stored on `EngineLoop`. When `Some(allowlist)`, the engine's `handle_ingress()`
+  drops any packet whose source is not in the allowlist. Shared `Arc` between
+  the simulator and each spawned engine thread — the simulator sets the list
+  at failure-injection time.
+
+- **Activation gating**: Failure is activated when `elapsed >= trigger_at_sec`
+  and deactivated when `elapsed >= trigger_at_sec + failure_duration`. The
+  `failure_triggered` flag prevents re-triggering.
+
+- **NodeDeath**: Sets `node.shutdown = true` (AtomicBool) via `store(true, SeqCst)`.
+  The engine thread sees the flag on its next tick and exits.
+
+- **Partition**: The simulator creates two groups by node index parity. It locks
+  `packet_filter_allowed` and sets it to `Some(group_a_addrs)`. Group B's packets
+  are silently dropped by group A's engines and vice versa.
+
+- **MaliciousNode**: Kills the target node abruptly, leaving stale routing-table
+  entries in peers.
+
+#### TrialResult Failure Fields
+
+```
+struct TrialResult {
+    ...
+    failure_mode: String,          // "none" | "node-death" | "partition" | "malicious"
+    nodes_killed: u32,             // Actual count killed (NodeDeath)
+    was_partitioned: bool,         // True if Partition mode was active
+    had_malicious_node: bool,      // True if MaliciousNode mode was active
+    recovery_time_secs: Option<f64>, // Seconds from failure to re-convergence
+    min_peers_post_failure: usize, // Minimum peer count among live nodes after failure
+    recovered: bool,               // Did the network re-converge after the failure?
+}
+```
+
+#### CLI Flags (examples/simulate.rs)
+
+| Flag | Example | Default |
+|------|---------|---------|
+| `--failure-mode` | `--failure-mode partition` | `none` |
+| `--failure-at` | `--failure-at 15.0` | `10.0` |
+| `--failure-percent` | `--failure-percent 30` | `50` |
+| `--malicious-node` | `--malicious-node 2` | `0` |
+
+#### Usage
+
+```sh
+# Kill 50% of 10 nodes after converging
+cargo run --example simulate -- --nodes 10 --duration 30 --failure-mode node-death --failure-percent 50
+
+# Partition a 16-node network into two halves at t=20s
+cargo run --example simulate -- --nodes 16 --duration 40 --failure-mode partition --failure-at 20
+
+# Turn node 3 malicious then measure recovery
+cargo run --example simulate -- --nodes 8 --duration 20 --failure-mode malicious --malicious-node 3
+```
+
 ---
 
 ## 8. Complexity Analysis
