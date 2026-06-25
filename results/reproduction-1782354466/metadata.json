@@ -1,0 +1,27 @@
+{
+  "git_commit": "unknown",
+  "os": "Windows 10",
+  "parameters": {
+    "bind_prefix": "127.0.0.1",
+    "cleanup_interval_ticks": 1000,
+    "convergence": {
+      "edge_weight_stability_stdev": 0.0010000000474974513,
+      "edge_weight_stability_window": 100,
+      "prediction_error_delta": 0.009999999776482582,
+      "prediction_error_window": 50,
+      "task_accuracy_plateau_improvement": 0.0010000000474974513,
+      "task_accuracy_plateau_window": 10
+    },
+    "duration_secs": 10,
+    "gossip_interval_ticks": 500,
+    "gradient_half_life_ms": 100,
+    "max_retries": 3,
+    "node_count": 3,
+    "paper_mode": true,
+    "seed": 42,
+    "tick_interval_ms": 1
+  },
+  "rustc_version": "unknown",
+  "target_triple": "x86_64-pc-windows-msvc",
+  "timestamp": "1782354476"
+}

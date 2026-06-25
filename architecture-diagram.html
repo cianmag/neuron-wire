@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neuron-Wire Protocol Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'JetBrains Mono',monospace;background:#020617;min-height:100vh;padding:2rem;color:white}
+    .container{max-width:1400px;margin:0 auto}
+    .header{margin-bottom:2rem}
+    .header-row{display:flex;align-items:center;gap:1rem;margin-bottom:0.5rem}
+    .pulse-dot{width:12px;height:12px;background:#22d3ee;border-radius:50%;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+    h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.025em}
+    .subtitle{color:#94a3b8;font-size:0.875rem;margin-left:1.75rem}
+    .diagram-container{background:rgba(15,23,42,0.5);border-radius:1rem;border:1px solid #1e293b;padding:1.5rem;overflow-x:auto}
+    svg{width:100%;min-width:960px;display:block}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:2rem}
+    .card{background:rgba(15,23,42,0.5);border-radius:0.75rem;border:1px solid #1e293b;padding:1.25rem}
+    .card-header{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem}
+    .card-dot{width:8px;height:8px;border-radius:50%}
+    .card-dot.cyan{background:#22d3ee}
+    .card-dot.emerald{background:#34d399}
+    .card-dot.violet{background:#a78bfa}
+    .card-dot.amber{background:#fbbf24}
+    .card-dot.rose{background:#fb7185}
+    .card-dot.orange{background:#fb923c}
+    .card h3{font-size:0.875rem;font-weight:600}
+    .card ul{list-style:none;color:#94a3b8;font-size:0.75rem}
+    .card li{margin-bottom:0.375rem}
+    .footer{text-align:center;margin-top:1.5rem;color:#475569;font-size:0.75rem}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Neuron-Wire Protocol · Architecture</h1>
+      </div>
+      <p class="subtitle">Six-layer protocol stack · Single-thread event engine · Zero-copy wire format</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1300 900">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrowhead-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrowhead-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <marker id="arrowhead-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ═══════════════════════════════════════════════════════════
+             LAYER 6: NEURAL COMPUTATION (top)
+             ═══════════════════════════════════════════════════════════ -->
+        
+        <!-- Layer boundary -->
+        <rect x="300" y="30" width="670" height="170" rx="10" fill="rgba(8, 51, 68, 0.2)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="310" y="50" fill="#22d3ee" font-size="9" font-weight="600">LAYER 6: NEURAL COMPUTATION</text>
+
+        <!-- Forward Pass -->
+        <rect x="320" y="60" width="180" height="65" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="410" y="82" fill="white" font-size="11" font-weight="600" text-anchor="middle">Forward Pass</text>
+        <text x="410" y="98" fill="#94a3b8" font-size="8" text-anchor="middle">Activation Propagation</text>
+        <text x="410" y="112" fill="#94a3b8" font-size="8" text-anchor="middle">Prediction → Surprise</text>
+
+        <!-- Hebbian STDP -->
+        <rect x="540" y="60" width="180" height="65" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="630" height="82" fill="white" font-size="11" font-weight="600" text-anchor="middle">Hebbian STDP</text>
+        <text x="630" y="98" fill="#94a3b8" font-size="8" text-anchor="middle">Δw = η(pre×post − λw)</text>
+        <text x="630" y="112" fill="#94a3b8" font-size="8" text-anchor="middle">Micro-pruning · Gossip</text>
+
+        <!-- Neurogenesis -->
+        <rect x="320" y="135" width="180" height="55" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="410" y="157" fill="white" font-size="11" font-weight="600" text-anchor="middle">Neurogenesis</text>
+        <text x="410" y="173" fill="#94a3b8" font-size="8" text-anchor="middle">Surprise → Neuron Birth</text>
+
+        <!-- Apoptosis -->
+        <rect x="540" y="135" width="180" height="55" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="630" y="157" fill="white" font-size="11" font-weight="600" text-anchor="middle">Apoptosis</text>
+        <text x="630" y="173" fill="#94a3b8" font-size="8" text-anchor="middle">Programmed Cell Death</text>
+
+        <!-- Arrow: Forward → Hebbian -->
+        <line x1="500" y1="92" x2="538" y2="92" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+
+        <!-- Arrow: Neurogenesis → Apoptosis -->
+        <line x1="500" y1="162" x2="538" y2="162" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+
+        <!-- Activation/Synapse Maps -->
+        <rect x="760" y="80" width="190" height="90" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="855" y="102" fill="white" font-size="11" font-weight="600" text-anchor="middle">State Store</text>
+        <text x="855" y="120" fill="#94a3b8" font-size="8" text-anchor="middle">ActivationMap</text>
+        <text x="855" y="135" fill="#94a3b8" font-size="8" text-anchor="middle">SynapseMap</text>
+        <text x="855" y="155" fill="#a78bfa" font-size="8" text-anchor="middle">HashMap&lt;EntityId, f32&gt;</text>
+
+        <!-- Arrow: Maps ↔ Forward -->
+        <line x1="760" y1="105" x2="720" y2="92" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-violet)"/>
+        <line x1="720" y1="105" x2="760" y2="105" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Arrow: Maps ↔ Hebbian -->
+        <line x1="760" y1="130" x2="720" y2="155" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             LAYER 5: ENGINE LOOP (middle)
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- Layer boundary -->
+        <rect x="40" y="220" width="1220" height="420" rx="10" fill="rgba(6, 78, 59, 0.08)" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="50" y="240" fill="#34d399" font-size="9" font-weight="600">LAYER 5: ENGINE LOOP (single-thread, ~1ms tick)</text>
+
+        <!-- Engine Loop box - 6 phases -->
+        <rect x="60" y="250" width="600" height="370" rx="8" fill="rgba(6, 78, 59, 0.15)" stroke="#34d399" stroke-width="1"/>
+        <text x="360" y="270" fill="#34d399" font-size="10" font-weight="600" text-anchor="middle">EngineLoop::run() — Six Phases per Tick</text>
+
+        <!-- Phase 1 -->
+        <rect x="80" y="282" width="260" height="40" rx="4" fill="rgba(6, 78, 59, 0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="210" y="299" fill="white" font-size="9" font-weight="600" text-anchor="middle">Phase 1: Drain UDP Socket</text>
+        <text x="210" y="313" fill="#94a3b8" font-size="8" text-anchor="middle">recv_from() loop · Non-blocking</text>
+
+        <!-- Phase 2 -->
+        <rect x="370" y="282" width="270" height="40" rx="4" fill="rgba(6, 78, 59, 0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="505" y="299" fill="white" font-size="9" font-weight="600" text-anchor="middle">Phase 2: Drain Outbound mpsc</text>
+        <text x="505" y="313" fill="#94a3b8" font-size="8" text-anchor="middle">send() reliable/best-effort</text>
+
+        <!-- Arrow 1→2 -->
+        <line x1="340" y1="302" x2="368" y2="302" stroke="#34d399" stroke-width="1" marker-end="url(#arrowhead-emerald)"/>
+
+        <!-- Phase 3 -->
+        <rect x="80" y="335" width="560" height="55" rx="4" fill="rgba(8, 51, 68, 0.3)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="360" y="352" fill="white" font-size="9" font-weight="600" text-anchor="middle">Phase 3: Neural Computation</text>
+        <text x="360" y="368" fill="#94a3b8" font-size="8" text-anchor="middle">ForwardPass.tick() → Hebbian.tick()</text>
+        <text x="360" y="381" fill="#94a3b8" font-size="7" text-anchor="middle">(only when brain_attached = true)</text>
+
+        <!-- Phase 4 -->
+        <rect x="80" y="400" width="260" height="40" rx="4" fill="rgba(6, 78, 59, 0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="210" y="417" fill="white" font-size="9" font-weight="600" text-anchor="middle">Phase 4: Retransmit Stale</text>
+        <text x="210" y="431" fill="#94a3b8" font-size="8" text-anchor="middle">Every 10 ticks · ReliableQueue</text>
+
+        <!-- Phase 5 -->
+        <rect x="370" y="400" width="270" height="40" rx="4" fill="rgba(136, 19, 55, 0.3)" stroke="#fb7185" stroke-width="1"/>
+        <text x="505" y="417" fill="white" font-size="9" font-weight="600" text-anchor="middle">Phase 5: Cleanup + Apoptosis</text>
+        <text x="505" y="431" fill="#94a3b8" font-size="8" text-anchor="middle">Every 1000 ticks · Eviction sweep</text>
+
+        <!-- Arrow 4→5 -->
+        <line x1="340" y1="420" x2="368" y2="420" stroke="#34d399" stroke-width="1" marker-end="url(#arrowhead-emerald)"/>
+
+        <!-- Phase 6 -->
+        <rect x="80" y="455" width="560" height="35" rx="4" fill="rgba(6, 78, 59, 0.3)" stroke="#34d399" stroke-width="1"/>
+        <text x="360" y="476" fill="white" font-size="9" font-weight="600" text-anchor="middle">Phase 6: Yield if busy (ingress_count > 100)</text>
+
+        <!-- Vertical flow arrows -->
+        <line x1="360" y1="322" x2="360" y2="333" stroke="#34d399" stroke-width="1" marker-end="url(#arrowhead-emerald)"/>
+        <line x1="360" y1="390" x2="360" y2="398" stroke="#34d399" stroke-width="1" marker-end="url(#arrowhead-emerald)"/>
+        <line x1="360" y1="440" x2="360" y2="453" stroke="#34d399" stroke-width="1" marker-end="url(#arrowhead-emerald)"/>
+
+        <!-- Shutdown check note -->
+        <text x="360" y="510" fill="#64748b" font-size="8" text-anchor="middle">Shutdown check at tick head: if AtomicBool true → return</text>
+
+        <!-- Thread model -->
+        <rect x="680" y="255" width="190" height="60" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="775" y="275" fill="white" font-size="10" font-weight="600" text-anchor="middle">Thread Model</text>
+        <text x="775" y="292" fill="#94a3b8" font-size="8" text-anchor="middle">1 OS thread per node</text>
+        <text x="775" y="305" fill="#94a3b8" font-size="8" text-anchor="middle">~400 KHz–1 MHz tick rate</text>
+
+        <!-- Channel diagram -->
+        <rect x="900" y="255" width="330" height="150" rx="8" fill="rgba(251, 146, 60, 0.12)" stroke="#fb923c" stroke-width="1"/>
+        <text x="1065" y="275" fill="#fb923c" font-size="10" font-weight="600" text-anchor="middle">Message Channels (mpsc)</text>
+
+        <rect x="920" y="290" width="140" height="40" rx="4" fill="rgba(251, 146, 60, 0.2)" stroke="#fb923c" stroke-width="1"/>
+        <text x="990" y="307" fill="white" font-size="8" font-weight="600" text-anchor="middle">outbound_tx</text>
+        <text x="990" y="321" fill="#94a3b8" font-size="7" text-anchor="middle">bounded: 10,000</text>
+
+        <rect x="1090" y="290" width="120" height="40" rx="4" fill="rgba(251, 146, 60, 0.2)" stroke="#fb923c" stroke-width="1"/>
+        <text x="1150" y="307" fill="white" font-size="8" font-weight="600" text-anchor="middle">events_tx</text>
+        <text x="1150" y="321" fill="#94a3b8" font-size="7" text-anchor="middle">IngressEvent</text>
+
+        <!-- Channel flow arrows (to/from engine) -->
+        <line x1="680" y1="280" x2="898" y2="305" stroke="#fb923c" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowhead)"/>
+        <text x="785" y="295" fill="#fb923c" font-size="7">OutgoingPacket</text>
+
+        <line x1="1090" y1="320" x2="680" y2="360" stroke="#fb923c" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="875" y="350" fill="#fb923c" font-size="7">IngressEvent → DHT + subscribers</text>
+
+        <!-- Engine Stats -->
+        <rect x="900" y="420" width="330" height="100" rx="6" fill="rgba(76, 29, 149, 0.2)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="1065" y="440" fill="#a78bfa" font-size="10" font-weight="600" text-anchor="middle">EngineStats (shared state)</text>
+        <text x="1065" y="458" fill="#94a3b8" font-size="8" text-anchor="middle">packets_recv/sent · bytes_recv/sent</text>
+        <text x="1065" y="473" fill="#94a3b8" font-size="8" text-anchor="middle">retransmissions · peer_count</text>
+        <text x="1065" y="488" fill="#94a3b8" font-size="8" text-anchor="middle">idle_ticks · busy_ticks · tick_rate_hz</text>
+        <text x="1065" y="505" fill="#a78bfa" font-size="7" text-anchor="middle">Arc&lt;Mutex&lt;EngineStats&gt;&gt;</text>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             LAYERS 3-2: DHT + TRANSPORT (bottom section)
+             ═══════════════════════════════════════════════════════════ -->
+
+        <!-- Layer boundary -->
+        <rect x="40" y="660" width="1220" height="220" rx="10" fill="rgba(251, 191, 36, 0.04)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="50" y="680" fill="#fbbf24" font-size="9" font-weight="600">LAYERS 3-2: DHT ROUTING + UDP TRANSPORT</text>
+
+        <!-- DHT Handler -->
+        <rect x="60" y="692" width="550" height="170" rx="6" fill="rgba(120, 53, 15, 0.15)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="335" y="712" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">DHT Handler — Kademlia Hybrid</text>
+
+        <!-- Routing Table -->
+        <rect x="80" y="725" width="200" height="120" rx="4" fill="rgba(120, 53, 15, 0.25)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="180" y="745" fill="white" font-size="9" font-weight="600" text-anchor="middle">Routing Table</text>
+        <text x="180" y="762" fill="#94a3b8" font-size="8" text-anchor="middle">256 k-buckets · K=20</text>
+        <text x="180" y="778" fill="#94a3b8" font-size="8" text-anchor="middle">XOR distance bucket idx</text>
+        <text x="180" y="794" fill="#94a3b8" font-size="8" text-anchor="middle">Latency-ranked eviction</text>
+        <text x="180" y="810" fill="#fbbf24" font-size="7" text-anchor="middle">NodeEntry: id, addr, type, latency, fail</text>
+        <text x="180" y="825" fill="#fbbf24" font-size="7" text-anchor="middle">EMA smoothing: α=0.7·old + 0.3·sample</text>
+
+        <!-- Bootstrap -->
+        <rect x="310" y="725" width="130" height="120" rx="4" fill="rgba(120, 53, 15, 0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="375" y="745" fill="white" font-size="9" font-weight="600" text-anchor="middle">Bootstrap</text>
+        <text x="375" y="762" fill="#94a3b8" font-size="8" text-anchor="middle">1. Peer cache</text>
+        <text x="375" y="778" fill="#94a3b8" font-size="8" text-anchor="middle">2. DNS seeds</text>
+        <text x="375" y="794" fill="#94a3b8" font-size="8" text-anchor="middle">3. Hardcoded seeds</text>
+        <text x="375" y="810" fill="#94a3b8" font-size="8" text-anchor="middle">4. Passive listen</text>
+
+        <!-- Message handlers -->
+        <rect x="460" y="725" width="130" height="120" rx="4" fill="rgba(120, 53, 15, 0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="525" y="745" fill="white" font-size="9" font-weight="600" text-anchor="middle">Handlers</text>
+        <text x="525" y="762" fill="#94a3b8" font-size="8" text-anchor="middle">PING → PONG</text>
+        <text x="525" y="778" fill="#94a3b8" font-size="8" text-anchor="middle">PONG → update RTT</text>
+        <text x="525" y="794" fill="#94a3b8" font-size="8" text-anchor="middle">FIND_NODE → NODES</text>
+        <text x="525" y="810" fill="#94a3b8" font-size="8" text-anchor="middle">NODES → insert</text>
+
+        <!-- UDP Transport -->
+        <rect x="690" y="692" width="550" height="170" rx="6" fill="rgba(120, 53, 15, 0.15)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="965" y="712" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">UDP Transport Layer</text>
+
+        <!-- Transport Header -->
+        <rect x="710" y="725" width="180" height="80" rx="4" fill="rgba(120, 53, 15, 0.25)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="800" y="742" fill="white" font-size="9" font-weight="600" text-anchor="middle">Datagram Format</text>
+        <text x="800" y="758" fill="#94a3b8" font-size="7" text-anchor="middle">[0..4) seq_num: u32</text>
+        <text x="800" y="772" fill="#94a3b8" font-size="7" text-anchor="middle">[4..8) ack_num: u32</text>
+        <text x="800" y="786" fill="#94a3b8" font-size="7" text-anchor="middle">[8..12) ack_bitfield: u32</text>
+        <text x="800" y="800" fill="#94a3b8" font-size="7" text-anchor="middle">[12..16) timestamp: u32</text>
+
+        <!-- ACK Tracker -->
+        <rect x="910" y="725" width="150" height="80" rx="4" fill="rgba(120, 53, 15, 0.2)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="985" y="742" fill="white" font-size="9" font-weight="600" text-anchor="middle">ACK Tracker</text>
+        <text x="985" y="758" fill="#94a3b8" font-size="8" text-anchor="middle">Sliding window</text>
+        <text x="985" y="774" fill="#94a3b8" font-size="8" text-anchor="middle">Covers 33 seqs</text>
+        <text x="985" y="790" fill="#94a3b8" font-size="8" text-anchor="middle">Duplicate detection</text>
+
+        <!-- Reliable Queue -->
+        <rect x="1080" y="725" width="140" height="80" rx="4" fill="rgba(136, 19, 55, 0.25)" stroke="#fb7185" stroke-width="1"/>
+        <text x="1150" y="742" fill="white" font-size="9" font-weight="600" text-anchor="middle">ReliableQueue</text>
+        <text x="1150" y="758" fill="#94a3b8" font-size="8" text-anchor="middle">HashMap&lt;seq, packet&gt;</text>
+        <text x="1150" y="774" fill="#94a3b8" font-size="8" text-anchor="middle">Gradient weight decay</text>
+        <text x="1150" y="790" fill="#fb7185" font-size="7" text-anchor="middle">BestEffort/Data/Consensus</text>
+
+        <!-- Reliability table -->
+        <rect x="710" y="815" width="510" height="30" rx="4" fill="rgba(120, 53, 15, 0.1)" stroke="#fbbf24" stroke-width="0.5"/>
+        <text x="965" y="834" fill="#94a3b8" font-size="7" text-anchor="middle">Reliability: BestEffort(0 retry) · Data(3) · Consensus(5) · weight = e^(−ln(2)·age/HL)</text>
+
+        <!-- Channels between DHT and Transport -->
+        <line x1="610" y1="760" x2="688" y2="760" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="649" y="754" fill="#94a3b8" font-size="7" text-anchor="middle">UDP datagrams</text>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             LEGEND
+             ═══════════════════════════════════════════════════════════ -->
+        <text x="50" y="900" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="50" y="912" width="14" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="70" y="920" fill="#94a3b8" font-size="8">Neural Computing</text>
+
+        <rect x="160" y="912" width="14" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="180" y="920" fill="#94a3b8" font-size="8">Engine Loop</text>
+
+        <rect x="260" y="912" width="14" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="280" y="920" fill="#94a3b8" font-size="8">DHT / Transport</text>
+
+        <rect x="380" y="912" width="14" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="400" y="920" fill="#94a3b8" font-size="8">State Store</text>
+
+        <rect x="480" y="912" width="14" height="10" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="500" y="920" fill="#94a3b8" font-size="8">Apoptosis / Security</text>
+
+        <rect x="590" y="912" width="14" height="10" rx="2" fill="rgba(251, 146, 60, 0.3)" stroke="#fb923c" stroke-width="1"/>
+        <text x="610" y="920" fill="#94a3b8" font-size="8">Channels (mpsc)</text>
+
+        <line x1="700" y1="917" x2="720" y2="917" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="726" y="920" fill="#94a3b8" font-size="8">Data Flow</text>
+
+        <line x1="800" y1="917" x2="820" y2="917" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="826" y="920" fill="#94a3b8" font-size="8">Read/Write</text>
+
+        <!-- Annotations -->
+        <text x="1120" y="900" fill="#475569" font-size="7" text-anchor="end">NWP v2 · Deterministic · Zero-copy · 60/60 tests · Reproducible</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>Neural Computation</h3>
+        </div>
+        <ul>
+          <li>• Forward Pass: activation propagation + surprise computation</li>
+          <li>• Hebbian STDP: Δw = η(pre×post − λw), micro-prune at |w|&lt;0.001</li>
+          <li>• Neurogenesis: spawn neuron when surprise accumulator ≥ 0.2</li>
+          <li>• Apoptosis: evict stale/failed DHT entries, frames, pings</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Engine Loop</h3>
+        </div>
+        <ul>
+          <li>• 6-phase tick: Recv → Send → Compute → Retransmit → Cleanup → Yield</li>
+          <li>• Single-thread, non-blocking, ~1ms tick via UDP read timeout</li>
+          <li>• 0% CPU idle: OS blocks the thread when no data</li>
+          <li>• Channels: outbound_tx (10K cap) + events_tx (unbounded)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>DHT + Transport</h3>
+        </div>
+        <ul>
+          <li>• 256 k-buckets, XOR distance, K=20, latency-ranked eviction</li>
+          <li>• 4-tier bootstrap: cache → DNS → hardcoded → passive</li>
+          <li>• 16-byte transport header with 33-seq ACK window</li>
+          <li>• 3 reliability classes: BestEffort, Data (3×), Consensus (5×)</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      Neuron-Wire Protocol v2 · 6,656 LoC Rust · 60 unit tests · Reproducible benchmark · ARCHITECTURE.md
+    </p>
+  </div>
+</body>
+</html>

@@ -8,6 +8,7 @@
 [![Crates.io](https://img.shields.io/badge/crate-v0.2.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 [![Reproducible](https://img.shields.io/badge/reproducible-yes-brightgreen)](REPRODUCIBILITY.md)
+[![Architecture](https://img.shields.io/badge/architecture-formal-7c3aed)](ARCHITECTURE.md)
 
 ---
 
