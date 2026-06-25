@@ -1,0 +1,2 @@
+nodes,seed,trials,converged,conv_time_s,max_peers,avg_peers,bw_kbps,pkts_recv
+5,42,1,True,3.0,4,3.52,283.4,8800

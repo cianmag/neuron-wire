@@ -7,6 +7,7 @@
 [![Lines of Rust](https://img.shields.io/badge/rust-6%2C656%20LOC-blue)](#)
 [![Crates.io](https://img.shields.io/badge/crate-v0.2.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
+[![Reproducible](https://img.shields.io/badge/reproducible-yes-brightgreen)](REPRODUCIBILITY.md)
 
 ---
 
@@ -269,6 +270,10 @@ Apoptosis runs every ~1 s during Phase 5. It enforces four pruning criteria:
 ---
 
 ## Reproducibility
+
+> 🔬 Full guide: [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md)  
+> 🚀 One-command reproduction: `bash scripts/repro.sh`  
+> 📊 Live dashboard: [`neuron-wire-dashboard.vercel.app`](https://neuron-wire-dashboard.vercel.app)
 
 Every result from this codebase is traceable to a specific execution environment.
 
