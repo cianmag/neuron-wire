@@ -4,8 +4,9 @@
 
 **A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
 
-*Document version 2.0 — June 2026*
-*Corresponding code: `https://github.com/cianmag/neuron-wire` (commit `8c46715`)*
+*Document version 2.1 — June 2026*
+*Corresponding code: `https://github.com/cianmag/neuron-wire` (commit `5dabe67`)*
+*Rendered architecture diagram: `architecture-diagram.html` (see [Figure 1](#11-overview))*
 
 ---
 
@@ -52,6 +53,8 @@ communicates with adjacent layers through message passing over Rust `mpsc`
 channels. There are no shared locks in the hot path; all cross-component
 communication is message-passing with bounded queues.
 
+**Figure 1: NWP Layer Architecture** *(also available as rendered HTML at `architecture-diagram.html`)*
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     NEURAL COMPUTATION                       │
@@ -96,10 +99,13 @@ communication is message-passing with bounded queues.
 
 All cross-thread communication uses bounded `mpsc` channels:
 
-| Channel | Direction | Capacity | Contents |
-|---------|-----------|----------|----------|
-| `outbound_tx` → `outbound_rx` | Any → Engine | 10,000 | `OutgoingPacket { payload, dst, mode }` |
-| `events_tx` → `events_rx` | Engine → Subscribers | Unbounded | `IngressEvent { transport_hdr, nwp_payload, src, timestamp, weight }` |
+| Channel | Direction | Capacity | Rust Type | Contents |
+|---------|-----------|----------|----------|----------|
+| `outbound_tx` → `outbound_rx` | Any → Engine | 10,000 | `Sender<OutgoingPacket>` / `Receiver<OutgoingPacket>` | `OutgoingPacket { payload: Vec<u8>, dst: SocketAddr, mode: Reliability }` |
+| `events_tx` → `events_rx` | Engine → Subscribers | Unbounded | `Sender<IngressEvent>` / `Receiver<IngressEvent>` | `IngressEvent { transport_header: TransportHeader, nwp_payload: Vec<u8>, src: SocketAddr, timestamp: u32, weight: f32 }` |
+
+> **Source:** `src/engine_loop.rs` — `EngineLoop::new()` at line ~252 constructs both channels.
+> `OutgoingPacket` is defined at line ~156; `IngressEvent` at line ~160; `Reliability` enum at line ~136.
 
 ### 1.3 Thread Model
 
@@ -279,58 +285,45 @@ record(seq):
 
 ### 3.3 Reliability Classes
 
-| Class | Max Retries | Gradient Decay | Use Case |
-|-------|-------------|----------------|----------|
-| `BestEffort` | 0 | None | SPIKE, COMMAND, READINESS, GOSSIP |
-| `Data` | 3 | Exponential | DATA gradients |
-| `Consensus` | 5 | Exponential | CONSENSUS votes |
+| Class | Max Retries | Gradient Decay | Rust Variant | Use Case |
+|-------|-------------|----------------|--------------|----------|
+| `BestEffort` | 0 | None | `Reliability::BestEffort` | SPIKE, COMMAND, READINESS, GOSSIP |
+| `Data` | 3 | Exponential | `Reliability::Data` | DATA gradients |
+| `Consensus` | 5 | Exponential | `Reliability::Consensus` | CONSENSUS votes |
+
+> **Source:** `src/engine_loop.rs` line ~136 — `enum Reliability { BestEffort, Data, Consensus }`
 
 ### 3.4 Gradient Weight Decay
 
 Reliable packets carry a *gradient weight* that decays exponentially with age:
 
-```
-weight(age_ms, half_life_ms) = e^(-ln(2) × age_ms / half_life_ms)
-```
+$$w(t) = e^{-\frac{\ln 2 \cdot t}{t_{1/2}}}$$
 
-- At `age = half_life`: weight = 0.5
-- At `age = 10 × half_life`: weight ≈ 0.001
+where $t$ = age in ms and $t_{1/2}$ = `gradient_half_life_ms` (default 100ms).
 
-Packets with weight < 0.001 are dropped from the reliable queue. This prevents
+| Age | Weight |
+|-----|--------|
+| $t = t_{1/2}$ | $w = 0.5$ |
+| $t = 5 \times t_{1/2}$ | $w \approx 0.031$ |
+| $t = 10 \times t_{1/2}$ | $w \approx 0.001$ |
+
+Packets with $w < 0.001$ are dropped from the reliable queue. This prevents
 the queue from accumulating stale packets while still giving fresh packets
 meaningful retransmission opportunity.
 
 ### 3.5 Retransmission State Machine
 
-```
-         ┌──────────┐
-         │  SEND    │
-         │  (seq=N) │
-         └────┬─────┘
-              │
-              ▼
-     ┌────────────────┐
-     │  WAITING_ACK   │
-     │  enqueued in   │──── ACK received ──► ┌──────────┐
-     │  ReliableQueue │                      │  DONE    │
-     └───────┬────────┘                     │ (remove) │
-              │                              └──────────┘
-              │ retransmit interval (10ms)
-              │ AND retries < max_retries
-              ▼
-     ┌────────────────┐
-     │  RETRANSMIT    │
-     │  resend packet │
-     │  retries++     │
-     └───────┬────────┘
-              │
-              │ retries >= max_retries
-              │ OR weight < 0.001
-              ▼
-     ┌──────────────┐
-     │  EXPIRED/DROP│
-     │  (remove)    │
-     └──────────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> SEND : payload enqueued
+    SEND --> WAITING_ACK : seq=N sent
+    WAITING_ACK --> DONE : ACK received
+    WAITING_ACK --> RETRANSMIT : timeout (10ms) ∧ retries < max
+    RETRANSMIT --> WAITING_ACK : resend, retries++
+    WAITING_ACK --> EXPIRED : retries >= max_retries
+    WAITING_ACK --> EXPIRED : gradient weight < 0.001
+    EXPIRED --> [*] : removed from queue
+    DONE --> [*] : removed from queue
 ```
 
 ### 3.6 Gradient-Weighted Skiplist
@@ -350,8 +343,8 @@ sustain ~10,000 concurrent reliable packets before retransmit overhead exceeds
 
 ### 4.1 Node Identity
 
-Each node has a **256-bit NodeId** (`NodeId(pub [u8; 32])`). IDs are randomly
-generated at startup (via `rand::thread_rng`). XOR distance determines bucket
+Each node has a **256-bit NodeId** (`NodeId(pub [u8; 32])` in `src/dht.rs` line ~16).
+IDs are randomly generated at startup (via `rand::thread_rng`). XOR distance determines bucket
 placement, guaranteeing:
 - **Global reachability:** any NodeId can be found by XOR-walking toward it
 - **Sybil resistance:** an attacker cannot choose their NodeId prefix
@@ -464,39 +457,54 @@ bootstrap() [runs once at startup]:
 
 ### 4.7 DHT Message Handling State Machine
 
-```
-handle_event(event):
-    msg_type = event.nwp_payload[5]   // offset in NWP header
-    switch msg_type:
-        7 (PING) → handle_ping(event)
-        8 (PONG) → handle_pong(event, payload)
-        9 (FIND_NODE) → handle_find_node(event, payload)
-        10 (NODES) → handle_nodes(payload)
-        default → ignore
-```
+```mermaid
+stateDiagram-v2
+    state \"Handle Ingress Event\" as HANDLE_EVENT
+    [*] --> HANDLE_EVENT : nwp_payload received
 
-**PING handler:**
-```
-handle_ping(event):
-    1. Parse sender NodeId from body[0..32]
-    2. Insert/update routing table entry
-    3. Extract ping_seq from body[44..48]
-    4. Send PONG back with same ping_seq
-```
+    HANDLE_EVENT --> HANDLE_PING : msg_type == 7 (PING)
+    HANDLE_EVENT --> HANDLE_PONG : msg_type == 8 (PONG)
+    HANDLE_EVENT --> HANDLE_FIND_NODE : msg_type == 9 (FIND_NODE)
+    HANDLE_EVENT --> HANDLE_NODES : msg_type == 10 (NODES)
+    HANDLE_EVENT --> IGNORE : otherwise
 
-**PONG handler:**
-```
-handle_pong(event, payload):
-    1. Parse sender NodeId from body
-    2. Extract ping_seq from body
-    3. lookup pending_pings[ping_seq]:
-       - If found: calculate RTT = elapsed_ms
-       - If not found: use default 100ms
-    4. If sender already in routing table:
-         update latency with EMA
-       Else:
-         remove_by_addr(event.src)  // ghost cleanup
-         insert new entry
+    state \"handle_ping(event)\" as HANDLE_PING {
+        [*] --> Parse_sender_id : body[0..32]
+        Parse_sender_id --> Upsert_routing : valid NodeId
+        Upsert_routing --> Extract_ping_seq : body[44..48]
+        Extract_ping_seq --> Send_PONG : same ping_seq echoed
+        Send_PONG --> [*]
+    }
+
+    state \"handle_pong(event, payload)\" as HANDLE_PONG {
+        [*] --> Parse_sender : body[0..32]
+        Parse_sender --> Extract_seq : body[44..48]
+        Extract_seq --> Lookup_pending : ping_seq
+        Lookup_pending --> Calculate_RTT : pending[seq] found
+        Lookup_pending --> Default_100ms : not found
+        Calculate_RTT --> Update_Entry
+        Default_100ms --> Update_Entry
+        Update_Entry --> [*] : EMA latency | insert
+    }
+
+    state \"handle_find_node(event, payload)\" as HANDLE_FIND_NODE {
+        [*] --> Parse_target : body[0..32]
+        Parse_target --> Nearest_K : routing_table.nearest_nodes(target, K)
+        Nearest_K --> Send_NODES_response
+        Send_NODES_response --> [*]
+    }
+
+    state \"handle_nodes(payload)\" as HANDLE_NODES {
+        [*] --> Parse_target_id : body[0..32]
+        Parse_target_id --> For_each_entry : entries[N]
+        For_each_entry --> Upsert_entry : insert/update routing
+        Upsert_entry --> For_each_entry : next
+        For_each_entry --> [*] : all processed
+    }
+
+    state \"ignore\" as IGNORE {
+        [*] --> [*]
+    }
 ```
 
 **FIND_NODE handler:**
@@ -526,62 +534,92 @@ periodic_maintenance() [runs every ~1s]:
 The engine loop is a single-threaded, non-blocking event loop that executes
 exactly six phases per tick:
 
-```
-EngineLoop.run():
-    self.tick += 1
-    if shutdown: return
+```mermaid
+flowchart TD
+    TICK["tick += 1"] --> SHUTDOWN{"shutdown flag set?"}
+    SHUTDOWN -->|yes| EXIT["return"]
+    SHUTDOWN -->|no| PHASE1
 
-    ── PHASE 1: DRAIN UDP SOCKET ──
-    loop:
-        match recv_from(buf):
-            Ok((len, src)) → handle_ingress(&buf[..len], src)
-            WouldBlock/TimedOut → break
-            Error → break
-        if ingress_count > 10_000: break    // flood protection
+    subgraph PHASE1["Phase 1: Drain UDP Socket"]
+        direction LR
+        RECV["recv_from(buf)"] --> ERR{"Ok?"}
+        ERR -->|WouldBlock/TimedOut| P1DONE[""]
+        ERR -->|Error| P1DONE
+        ERR -->|Ok| INGRESS["handle_ingress(buf, src)"]
+        INGRESS --> FLOOD{"ingress_count > 10_000?"}
+        FLOOD -->|no| RECV
+        FLOOD -->|yes| P1DONE
+    end
 
-    ── PHASE 2: DRAIN OUTBOUND CHANNEL ──
-    loop:
-        match outbound_rx.try_recv():
-            Ok(packet) → send(packet)
-            Empty → break
-            Disconnected → break
+    PHASE1 --> PHASE2
 
-    ── PHASE 3: NEURAL COMPUTATION ──
-    if brain_attached:
-        3a. forward_pass.tick(activations, synapses, neurogenesis, tick, observations)
-        3b. hebbian.tick(activations, synapses, tick, outbound_tx, peers, local_id)
+    subgraph PHASE2["Phase 2: Drain Outbound Queue"]
+        TRY_RECV["outbound_rx.try_recv()"] --> MATCH{"Result?"}
+        MATCH -->|Ok(pkt)| SEND_PKT["transport.send(pkt)"]
+        MATCH -->|Empty| P2DONE[""]
+        MATCH -->|Disconnected| P2DONE
+        SEND_PKT --> TRY_RECV
+    end
 
-    ── PHASE 4: RETRANSMIT ──
-    if tick - last_retransmit >= retransmit_interval:
-        transport.retransmit_stale()
+    PHASE2 --> PHASE3
 
-    ── PHASE 5: CLEANUP + APOPTOSIS ──
-    if tick - last_cleanup >= cleanup_interval:
-        5a. transport.cleanup_expired()
-        5b. apoptosis.tick(tick, dht_handler, transport)
-        5c. dht_handler.periodic_maintenance()
-        5d. update_stats()
+    subgraph PHASE3["Phase 3: Neural Computation"]
+        BRAIN{"brain_attached?"}
+        BRAIN -->|yes| FP["forward_pass.tick()"]
+        FP --> HEBBIAN["hebbian.tick()"]
+        HEBBIAN --> P3DONE[""]
+        BRAIN -->|no| P3DONE
+    end
 
-    ── PHASE 6: YIELD ──
-    if ingress_count > 100:
-        thread::yield_now()     // prevent CPU saturation
+    PHASE3 --> RETRANS_CHECK{"tick - last_retransmit >= interval?"}
+    RETRANS_CHECK -->|yes| RETRANS["transport.retransmit_stale()"]
+    RETRANS_CHECK -->|no| CLEANUP_CHECK{"tick - last_cleanup >= interval?"}
+    RETRANS --> CLEANUP_CHECK
 
-    if tick % 1000 == 0:
-        print_stats()
+    CLEANUP_CHECK -->|yes| CLEANUP["transport.cleanup_expired()"]
+    CLEANUP_CHECK -->|no| PHASE6
+    CLEANUP --> APOPTO["apoptosis.tick(tick, dht, transport)"]
+    APOPTO --> MAINT["dht.periodic_maintenance()"]
+    MAINT --> STATS["update_stats()"]
+
+    subgraph PHASE6["Phase 6: Yield / Stats"]
+        BUSY{"ingress_count > 100?"}
+        BUSY -->|yes| YIELD["thread::yield_now()"]
+        BUSY -->|no| LOG{"tick % 1000 == 0?"}
+        LOG -->|yes| PRINT["print_stats()"]
+    end
+
+    PHASE6 --> TICK
 ```
 
 ### 5.2 Ingress Pipeline
 
-```
-handle_ingress(data, src):
-    1. Validate minimum length (≥ 4 bytes for frame_len)
-    2. Strip 4-byte frame_len prefix → nwp_payload
-    3. Track source in peer_rtt map (for convergence detection)
-    4. Build IngressEvent { transport_hdr, nwp_payload, src, timestamp, weight }
-    5. Send event to events_tx (non-blocking)
-    6. If dht_handler attached:
+```rust,ignore
+// src/engine_loop.rs — EngineLoop::handle_ingress()
+// Rust type: fn handle_ingress(&mut self, data: &[u8], src: SocketAddr)
+fn handle_ingress(data: &[u8], src: SocketAddr) {
+    1. Validate minimum length (>= TransportHeader::SIZE + 4, i.e. 20 bytes)
+    2. Zero-copy parse the TransportHeader from data[0..16):
+         seq = TransportHeader::from_bytes(data)
+    3. Populate per-peer RTT map:
+         peer_rtt.entry(src).or_insert(Instant::now())
+    4. Update ACK tracker with received sequence number
+    5. Process the ACK this packet carries:
+         reliable_queue.process_ack(seq.ack_number, seq.ack_bitfield)
+    6. Strip transport header → nwp_frame = data[TransportHeader::SIZE..]
+    7. Strip 4-byte frame_len prefix → nwp_payload = nwp_frame[4..]
+    8. Build IngressEvent { transport_header, nwp_payload, src, timestamp, weight }
+    9. Send event to events_tx (non-blocking)
+    10. If dht_handler attached:
          dht_handler.handle_event(event)
+}
 ```
+
+**Key invariants:**
+- `handle_ingress` receives the **full UDP datagram** — transport header + NWP frame
+- `TransportHeader::from_bytes(data)` is an **unsafe zero-copy cast** (repr(C), no padding)
+- The `frame_len` field in the NWP header is validated: `frame_len + 4 <= data.len()`
+- Sequence numbers are strictly monotonic per-source; duplicates are dropped by the ACK tracker
 
 ### 5.3 Outbound Pipeline
 
@@ -674,17 +712,16 @@ ForwardPassSystem.tick(activation_map, synapse_map, neurogenesis, tick, observat
 
 Implements Spike-Timing-Dependent Plasticity (STDP):
 
-```
-Δw = η × (pre_activation × post_activation - λ × w)
+$$\Delta w = \eta (a_{\text{pre}} \cdot a_{\text{post}} - \lambda \cdot w)$$
 
 where:
-  η = learning rate (default 0.01)
-  λ = weight decay (default 0.999)
-  w = synaptic weight
+- $\eta$ = learning rate (default 0.01)
+- $\lambda$ = weight decay (default 0.999)
+- $a_{\text{pre}}$, $a_{\text{post}}$ = pre- and post-synaptic activations
+- $w$ = synaptic weight
 
-Micro-pruning: if |w| < prune_threshold (default 0.001), synapse is removed
-Gossip: periodically exchange top-K weights with random peers
-```
+**Micro-pruning:** if $|w| < \tau$ (prune threshold, default 0.001), synapse is removed
+**Gossip:** periodically exchange top-K weights with random peers
 
 ### 6.3 Neurogenesis System
 
@@ -953,28 +990,51 @@ reaches and maintains a stable routing table without pathological churn.
 
 ### 9.3 State Machine Summary
 
-```
-NODE LIFECYCLE:
-  INIT → BOOTSTRAP → ACTIVE → (partition) → RECOVERY → ACTIVE
-         ↓                        ↓
-         IDLE (no seeds)    SHUTDOWN
+```mermaid
+stateDiagram-v2
+    state "NODE LIFECYCLE" as NODE
+    [*] --> INIT
+    INIT --> BOOTSTRAP : bind + channels
+    BOOTSTRAP --> ACTIVE : seeds contacted
+    BOOTSTRAP --> IDLE : no seeds found
+    ACTIVE --> SHUTDOWN : shutdown signal
+    ACTIVE --> RECOVERY : partition detected
+    RECOVERY --> ACTIVE : reconnected
+    IDLE --> BOOTSTRAP : incoming PING
 
-PACKET LIFECYCLE (reliable):
-  CREATED → QUEUED → SENT → WAITING_ACK → (ACK received) → DONE
-                              ↓
-                          (timeout) → RETRANSMIT → (retries < N) → SENT
-                                                     ↓
-                                                (retries >= N) → DROPPED
+    state "PACKET LIFECYCLE (reliable)" as PACKET
+    [*] --> CREATED
+    CREATED --> QUEUED
+    QUEUED --> SENT : UDP send
+    SENT --> WAITING_ACK
+    WAITING_ACK --> DONE : ACK received
+    WAITING_ACK --> RETRANSMIT : timeout
+    RETRANSMIT --> WAITING_ACK : retries < N
+    RETRANSMIT --> DROPPED : retries >= N
+    WAITING_ACK --> DROPPED : weight < threshold
+    DONE --> [*]
+    DROPPED --> [*]
 
-DHT ENTRY LIFECYCLE:
-  DISCOVERED (via PING/PONG/NODES) → INSERTED → (last_seen) → STALE
-                                                              ↓
-                                          (ping sent → no PONG) → DEAD
-                                                              ↓
-                                                         EVICTED
+    state "DHT ENTRY LIFECYCLE" as DHT_ENTRY
+    [*] --> DISCOVERED : PING/PONG/NODES
+    DISCOVERED --> INSERTED : upsert into bucket
+    INSERTED --> STALE : last_seen > 300s
+    STALE --> PING_SENT : periodic maintenance
+    PING_SENT --> DISCOVERED : PONG received (re-insert)
+    PING_SENT --> DEAD : no PONG within 10s
+    INSERTED --> DEAD : fail_count >= 3
+    INSERTED --> DEAD : latency > 500ms
+    DEAD --> EVICTED : apoptosis sweep
+    EVICTED --> [*]
 
-ENGINE TICK LIFECYCLE:
-  RECV → SEND → COMPUTE → RETRANSMIT → CLEANUP → YIELD → (repeat)
+    state "ENGINE TICK LIFECYCLE" as TICK
+    [*] --> RECV : Phase 1
+    RECV --> SEND : Phase 2
+    SEND --> COMPUTE : Phase 3
+    COMPUTE --> RETRANSMIT_CYCLE : Phase 4
+    RETRANSMIT_CYCLE --> CLEANUP : Phase 5
+    CLEANUP --> YIELD_CYCLE : Phase 6
+    YIELD_CYCLE --> RECV : next tick
 ```
 
 ---
