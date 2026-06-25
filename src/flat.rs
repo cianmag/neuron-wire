@@ -92,7 +92,7 @@ impl BodyBuilder {
     /// Returns the **relative offset** from the start of the fixed region
     /// to the data. This offset can be stored in a fixed field.
     ///
-    /// Format: [len: u32][bytes]
+    /// Format: `[len: u32][bytes]`
     #[inline]
     pub fn push_data(&mut self, bytes: &[u8]) -> u32 {
         let offset = self.fixed.len() as u32;
@@ -102,7 +102,7 @@ impl BodyBuilder {
     }
 
     /// Finish building — returns the complete body as a single buffer.
-    /// The body layout is: [fixed_region][data_region]
+    /// The body layout is: `[fixed_region][data_region]`
     pub fn finish(&mut self) -> Vec<u8> {
         self.fixed.append(&mut self.data);
         std::mem::take(&mut self.fixed)

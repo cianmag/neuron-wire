@@ -282,7 +282,7 @@ fn serialize_gossip_packet(local_id: EntityId, batch: &[(EntityId, Vec<u8>)]) ->
 }
 
 /// Deserialize a gossip packet received from the network.
-/// Returns (source_entity_id, Vec<(post_id, Vec<target_id>, Vec<weight>, Vec<gradient>)>)
+/// Returns `(source_entity_id, Vec<(post_id, Vec<target_id>, Vec<weight>, Vec<gradient>)>)`
 #[allow(dead_code)]
 pub fn deserialize_gossip_packet(data: &[u8]) -> Option<(EntityId, Vec<(EntityId, Vec<EntityId>, Vec<f32>, Vec<f32>)>)> {
     if data.len() < 34 { return None; }

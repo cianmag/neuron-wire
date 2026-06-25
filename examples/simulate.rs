@@ -161,7 +161,7 @@ fn main() {
     let conv_times: Vec<f64> = all_results.iter()
         .filter_map(|r| r.convergence_time_secs)
         .collect();
-    let conv_count = conv_times.len();
+    let _conv_count = conv_times.len();
     let mean_conv = if !conv_times.is_empty() {
         conv_times.iter().sum::<f64>() / conv_times.len() as f64
     } else { 0.0 };

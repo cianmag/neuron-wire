@@ -166,11 +166,11 @@ pub struct TrialResult {
 /// A managed simulated node running in its own thread.
 struct SimulatedNode {
     node_id: u32,
-    port: u16,
+    _port: u16,
     engine_addr: SocketAddr,
     shutdown: Arc<AtomicBool>,
     handle: Option<std::thread::JoinHandle<()>>,
-    metrics: Arc<Mutex<Vec<NodeMetrics>>>,
+    _metrics: Arc<Mutex<Vec<NodeMetrics>>>,
     /// Shared engine stats pointer — populated by the engine thread.
     engine_stats: Arc<Mutex<EngineStats>>,
 }
@@ -186,7 +186,7 @@ pub struct Simulator {
     /// Global tick counter (approximate — uses wall clock)
     start_time: Option<Instant>,
     /// Metrics collection thread handle
-    collector_handle: Option<std::thread::JoinHandle<()>>,
+    _collector_handle: Option<std::thread::JoinHandle<()>>,
     /// Metrics accumulated from all nodes
     metrics_store: Arc<Mutex<HashMap<u32, Vec<NodeMetrics>>>>,
 }
@@ -199,7 +199,7 @@ impl Simulator {
             nodes: Vec::new(),
             shutdown_all: Arc::new(AtomicBool::new(false)),
             start_time: None,
-            collector_handle: None,
+            _collector_handle: None,
             metrics_store: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -262,11 +262,11 @@ impl Simulator {
                 Ok((_outbound_tx, _events_rx, handle)) => {
                     self.nodes.push(SimulatedNode {
                         node_id: i,
-                        port,
+                        _port: port,
                         engine_addr: node_addrs[i as usize],
                         shutdown,
                         handle: Some(handle),
-                        metrics: Arc::new(Mutex::new(Vec::new())),
+                        _metrics: Arc::new(Mutex::new(Vec::new())),
                         engine_stats,
                     });
                 }

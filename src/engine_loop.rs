@@ -59,14 +59,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::transport::{
-    TransportHeader,
-    UdpTransport,
-    calculate_gradient_weight,
-};
+use crate::transport::{TransportHeader, UdpTransport};
 use crate::apoptosis::ApoptosisSystem;
 use crate::components::{ActivationMap, EntityId, SynapseMap};
-use crate::dht::{DhtHandler, NodeEntry, NodeId, NodeType};
+use crate::dht::{DhtHandler, NodeId, NodeType};
 use crate::forward_pass::ForwardPassSystem;
 use crate::hebbian::HebbianLearningSystem;
 use crate::neurogenesis::NeurogenesisSystem;
@@ -533,20 +529,30 @@ impl EngineLoop {
     /// Validates CRC, updates ACK tracker, applies gradient decay,
     /// and dispatches to the event channel.
     fn handle_ingress(&mut self, data: &[u8], src: SocketAddr) -> Result<(), String> {
-        if data.len() < 4 {
+        // data = full UDP datagram: [16-byte transport header][NWP frame]
+        // NWP frame layout: [4-byte frame_len][16-byte MessageHeader][body]
+        if data.len() < TransportHeader::SIZE + 4 {
             return Err(format!("too short: {} bytes", data.len()));
         }
 
-        // data = everything after the 16-byte transport header (stripped by try_recv()).
-        // Layout: [4-byte frame len][NWP header (16 bytes)][body (N bytes)].
-        //
-        // build_frame() prepends a 4-byte total-length prefix before the
-        // MessageHeader — strip it so nwp_payload starts at MessageHeader.
-        let nwp_payload: &[u8] = &data[4..];
+        // Zero-copy parse the transport header from the raw datagram
+        let transport_header = unsafe { TransportHeader::from_bytes(data) };
 
-        // Duplicate detection and ACK processing are already handled inside
-        // try_recv() which has access to the real transport header. Our `data`
-        // starts after the transport header, so we cannot re-derive it here.
+        // Update ACK tracker with the received sequence number
+        self.transport.ack_tracker.record(transport_header.sequence_number);
+
+        // Process the ACK this packet carries (clear our reliable queue)
+        self.transport.reliable_queue.process_ack(
+            transport_header.ack_number,
+            transport_header.ack_bitfield,
+        );
+
+        // Strip transport header to get the NWP frame (frame_len + header + body)
+        let nwp_frame = &data[TransportHeader::SIZE..];
+
+        // Strip 4-byte frame_len to get the NWP message (header + body)
+        // build_frame() prepends this length prefix before the MessageHeader
+        let nwp_payload: &[u8] = &nwp_frame[4..];
 
         // Track this source as a peer (for peer count / convergence detection)
         self.peer_rtt.entry(src).or_insert(100.0);
@@ -554,12 +560,12 @@ impl EngineLoop {
         // Gradient weight default: 1.0 (full utility for each received packet).
         let gradient_weight = 1.0;
 
-        // Dispatch the event
+        // Dispatch the event with the real transport header
         let event = IngressEvent {
-            transport_header: unsafe { std::mem::zeroed() },
+            transport_header: *transport_header,
             nwp_payload: nwp_payload.to_vec(),
             src,
-            recv_timestamp: 0,
+            recv_timestamp: self.transport.now_ms(),
             gradient_weight,
         };
 
@@ -727,14 +733,10 @@ pub fn spawn_engine(
                             ingress_count += 1;
                             engine.stats.packets_recv += 1;
                             engine.stats.bytes_recv += len as u64;
-                            // Strip transport header before calling handle_ingress.
-                            // try_recv() does this in the struct-based version; we do
-                            // it here to keep handle_ingress consistent: data always
-                            // starts after the transport header.
-                            // Wire: [TransportHeader (16)][frame_len (4)][NWP header (16)][body (N)]
-                            // handle_ingress expects: [frame_len (4)][NWP header (16)][body (N)]
+                            // Pass the full datagram — handle_ingress parses
+                            // the transport header internally.
                             if len >= TransportHeader::SIZE {
-                                if let Err(e) = engine.handle_ingress(&recv_buf[TransportHeader::SIZE..len], src) {
+                                if let Err(e) = engine.handle_ingress(&recv_buf[..len], src) {
                                     eprintln!("[ENGINE] ingress: {}", e);
                                 }
                             }
@@ -836,6 +838,7 @@ pub fn spawn_engine(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::calculate_gradient_weight;
 
     #[test]
     fn test_reliability_enum() {

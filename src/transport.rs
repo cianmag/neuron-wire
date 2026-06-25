@@ -256,7 +256,7 @@ impl ReliableQueue {
 
     /// Get packets that need retransmission (not expired, retries remaining)
     /// Returns (seq, data, dst) for each stale packet.
-    pub fn get_retransmit_batch(&mut self, now_ms: u32) -> Vec<(u32, Vec<u8>, SocketAddr)> {
+    pub fn get_retransmit_batch(&mut self, _now_ms: u32) -> Vec<(u32, Vec<u8>, SocketAddr)> {
         let mut batch = Vec::new();
         let mut to_remove = Vec::new();
 
@@ -291,7 +291,7 @@ impl ReliableQueue {
     }
 
     /// Clean up expired packets
-    pub fn cleanup(&mut self, now_ms: u32) {
+    pub fn cleanup(&mut self, _now_ms: u32) {
         let mut to_remove = Vec::new();
         for (&seq, packet) in &self.packets {
             let age_ms = packet.first_sent.elapsed().as_millis() as u32;

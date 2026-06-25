@@ -111,7 +111,7 @@ impl core::fmt::Display for HeaderError {
 
 // ─── Helper to build a complete framed message ──────────────────
 
-/// Build a complete wire frame: [4-byte len][header][body]
+/// Build a complete wire frame: `[4-byte len][header][body]`
 pub fn build_frame(msg_type: u8, body: Vec<u8>, flags: u16) -> Vec<u8> {
     let body_len = body.len() as u32;
     let header = MessageHeader::new(msg_type, body_len, flags);

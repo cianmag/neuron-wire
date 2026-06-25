@@ -3,6 +3,13 @@ name = "neuron-wire"
 version = "0.2.0"
 edition = "2021"
 description = "Zero-Copy FlatBuffer Protocol for Planetary Brain"
+authors = ["Cian Mac an tSaoir <cian@nousresearch.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cianmag/neuron-wire"
+homepage = "https://neuron-wire-dashboard.vercel.app"
+documentation = "https://github.com/cianmag/neuron-wire/blob/master/ARCHITECTURE.md"
+keywords = ["dht", "kademlia", "p2p", "neural-network", "distributed"]
+categories = ["network", "science", "simulation"]
 
 [dependencies]
 crc32fast = "1"
