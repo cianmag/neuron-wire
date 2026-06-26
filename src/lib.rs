@@ -25,6 +25,7 @@ pub mod neurogenesis;
 pub mod hebbian;
 pub mod forward_pass;
 pub mod simulator;
+pub mod adversary;
 pub mod crc;
 
 pub use flat::*;

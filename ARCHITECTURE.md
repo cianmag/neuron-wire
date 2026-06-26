@@ -919,6 +919,83 @@ cargo run --example simulate -- --nodes 16 --duration 40 --failure-mode partitio
 cargo run --example simulate -- --nodes 8 --duration 20 --failure-mode malicious --malicious-node 3
 ```
 
+### 7.8 Adversarial Testing
+
+**Source:** `src/adversary.rs`
+
+The adversarial testing framework stresses simulated nodes with hostile traffic that mimics real-world network conditions. It runs alongside the simulator's monitoring loop with its own UDP socket for injecting crafted packets.
+
+#### 7.8.1 Attack Vectors
+
+| Attack | Mechanism | Injection Point | What It Validates |
+|--------|-----------|----------------|-------------------|
+| **Bad Packets** | Corrupt magic bytes, invalid version, flipped CRC, truncated/oversized bodies, garbage payload | Separate UDP socket → target node's port | Parsing resilience — engine must not crash on any invalid input |
+| **Corrupted State** | Brief kill/revive cycles on 20% of nodes (non-attacker) | Directly flips `AtomicBool` shutdown flags | Routing table integrity under churn — stale entries must be evicted |
+| **Spoofed Identity** | Node A sends a PING claiming Node B's identity in the NWP body | Adversary socket with crafted `NodeId` payload | DHT handler must detect mismatch between UDP source and claimed identity |
+| **Replay Attack** | Captures a fraction of outbound packets at corruption_rate; replays them with increasing delays | Captures during attack window, replays from adversary socket | Sequence-number idempotency — duplicate packets with same seq must be dropped |
+| **All** | Simultaneously runs all four vectors | Combined injection | System robustness under compound adversarial pressure |
+
+#### 7.8.2 Adversary Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Simulator (monitor loop, every 100ms)                  │
+│                                                         │
+│  tick(elapsed_secs, tick_counter) →                     │
+│    ├─ BadPackets:   send corrupt datagrams to targets   │
+│    ├─ CorruptedState: toggle shutdown flags on nodes    │
+│    ├─ SpoofedIdentity: send PING with wrong NodeId      │
+│    ├─ ReplayAttack:  replay captured packets            │
+│    └─ All:          run every mode simultaneously       │
+│                                                         │
+│  Adversary owns:                                        │
+│    • UdpSocket (bound to ephemeral port)                │
+│    • Vec<CapturedPacket> for replay                     │
+│    • Vec<Arc<AtomicBool>> for state corruption          │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 7.8.3 Configuration
+
+All parameters are serializable to TOML and settable via CLI flags:
+
+| CLI Flag | Default | Description |
+|----------|---------|-------------|
+| `--adversary-mode` | `none` | Attack type: `bad-packets`, `corrupted-state`, `spoofed-identity`, `replay-attack`, `all` |
+| `--adversary-at` | 15.0 | Seconds into simulation to start attacking |
+| `--adversary-duration` | 0.0 | Attack duration (0 = until end of simulation) |
+| `--adversary-rate` | 0.3 | Fraction of traffic to corrupt (0.0–1.0) |
+| `--adversary-node` | 0 | Index of the attacker node |
+
+#### 7.8.4 Usage Examples
+
+```bash
+# Bad-packets attack starting at 10 seconds
+cargo run --example simulate -- --nodes 5 --duration 30 \
+  --adversary-mode bad-packets --adversary-at 10
+
+# Spoofed identity attack at 20% corruption rate
+cargo run --example simulate -- --nodes 10 --duration 60 \
+  --adversary-mode spoofed-identity --adversary-rate 0.2
+
+# Full adversarial gauntlet from second 5
+cargo run --example simulate -- --nodes 8 --duration 120 \
+  --adversary-mode all --adversary-at 5
+
+# Replay attack with 5 replays per captured packet
+cargo run --example simulate -- --nodes 5 --duration 30 \
+  --adversary-mode replay-attack --adversary-rate 0.5 \
+  --adversary-at 10
+```
+
+#### 7.8.5 Adding a New Attack Vector
+
+1. Add a variant to `AdversaryMode` enum in `src/adversary.rs`
+2. Implement `tick_<attack_name>(&mut self, elapsed_secs: f64)` method
+3. Add the dispatch call in the `match self.config.mode` block inside `tick()`
+4. Register CLI flag in `parse_args()` in `src/simulator.rs`
+5. Add unit tests in the `#[cfg(test)] mod tests` block
+
 ---
 
 ## 8. Complexity Analysis

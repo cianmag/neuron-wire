@@ -52,6 +52,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
+use crate::adversary::{Adversary, AdversaryConfig, AdversaryMode};
 
 // ─── Failure Modes ──────────────────────────────────────────────
 
@@ -121,6 +122,9 @@ pub struct SimulationConfig {
     /// Failure injection configuration
     #[serde(default)]
     pub failure: FailureConfig,
+    /// Adversarial testing configuration
+    #[serde(default)]
+    pub adversary: AdversaryConfig,
 }
 
 impl SimulationConfig {
@@ -139,6 +143,7 @@ impl SimulationConfig {
             paper_mode: false,
             convergence: ConvergenceCriteria::default(),
             failure: FailureConfig::default(),
+            adversary: AdversaryConfig::default(),
         }
     }
 }
@@ -285,6 +290,8 @@ pub struct Simulator {
     metrics_store: Arc<Mutex<HashMap<u32, Vec<NodeMetrics>>>>,
     /// Pre-computed node addresses (set during launch)
     node_addrs: Vec<SocketAddr>,
+    /// Adversarial attacker instance
+    adversary: Option<Adversary>,
 }
 
 impl Simulator {
@@ -299,6 +306,7 @@ impl Simulator {
             _collector_handle: None,
             metrics_store: Arc::new(Mutex::new(HashMap::new())),
             node_addrs: Vec::new(),
+            adversary: None,
         }
     }
 
@@ -385,6 +393,26 @@ impl Simulator {
 
         // Connect nodes to each other via DHT
         self.bootstrap_nodes();
+
+        // Initialise adversary for adversarial testing
+        if self.config.adversary.enabled {
+            let shutdowns: Vec<Arc<AtomicBool>> = self.nodes.iter()
+                .map(|n| n.shutdown.clone())
+                .collect();
+            let stats: Vec<Arc<Mutex<EngineStats>>> = self.nodes.iter()
+                .map(|n| n.engine_stats.clone())
+                .collect();
+            let mut adv = Adversary::new(
+                self.config.adversary.clone(),
+                self.node_addrs.clone(),
+                shutdowns,
+                stats,
+                self.config.seed,
+                Some(self.config.adversary.attacker_node_index),
+            );
+            adv.init()?;
+            self.adversary = Some(adv);
+        }
 
         Ok(())
     }
@@ -536,6 +564,11 @@ impl Simulator {
                 self.failure_triggered = true;
                 failure_sample_index = Some(total_samples as usize - 1);
                 self.inject_failure(elapsed_secs);
+            }
+
+            // ── ADVERSARY TICK ─────────────────────────────────
+            if let Some(ref mut adv) = self.adversary {
+                adv.tick(elapsed_secs, tick_counter);
             }
 
             // Brief sleep to avoid busy-waiting
@@ -815,6 +848,33 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
                     args.get(i).ok_or("--malicious-node requires node index")?.parse()
                         .map_err(|_| "invalid --malicious-node index")?
                 );
+            }
+            "--adversary-mode" => {
+                i += 1;
+                let mode_str = args.get(i).ok_or("--adversary-mode requires a value (bad-packets|corrupted-state|spoofed-identity|replay-attack|all)")?;
+                config.adversary.mode = AdversaryMode::from_str(mode_str);
+                config.adversary.enabled = config.adversary.mode != AdversaryMode::None;
+            }
+            "--adversary-at" => {
+                i += 1;
+                config.adversary.attack_start_sec = args.get(i).ok_or("--adversary-at requires seconds")?.parse()
+                    .map_err(|_| "invalid --adversary-at value")?;
+            }
+            "--adversary-duration" => {
+                i += 1;
+                config.adversary.attack_duration_secs = args.get(i).ok_or("--adversary-duration requires seconds")?.parse()
+                    .map_err(|_| "invalid --adversary-duration value")?;
+            }
+            "--adversary-rate" => {
+                i += 1;
+                let rate: f64 = args.get(i).ok_or("--adversary-rate requires a value")?.parse()
+                    .map_err(|_| "invalid --adversary-rate value")?;
+                config.adversary.corruption_rate = rate.clamp(0.0, 1.0);
+            }
+            "--adversary-node" => {
+                i += 1;
+                config.adversary.attacker_node_index = args.get(i).ok_or("--adversary-node requires node index")?.parse()
+                    .map_err(|_| "invalid --adversary-node index")?;
             }
             "--config" => {
                 i += 1;
