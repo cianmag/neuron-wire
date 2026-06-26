@@ -63,7 +63,7 @@ use std::time::{Duration, Instant};
 use crate::transport::{TransportHeader, UdpTransport};
 use crate::apoptosis::ApoptosisSystem;
 use crate::components::{ActivationMap, EntityId, SynapseMap};
-use crate::dht::{DhtHandler, NodeId, NodeType};
+use crate::dht::{DhtHandler, FreshnessConfig, NodeId, NodeType};
 use crate::forward_pass::ForwardPassSystem;
 use crate::hebbian::HebbianLearningSystem;
 use crate::neurogenesis::NeurogenesisSystem;
@@ -91,6 +91,8 @@ pub struct EngineConfig {
     pub local_peers: Vec<SocketAddr>,
     /// Shared pointer so external watchers can read live stats.
     pub shared_stats: Option<Arc<Mutex<EngineStats>>>,
+    /// Sparse Gradient Aging configuration (None = standard maintenance).
+    pub freshness_config: Option<FreshnessConfig>,
 }
 
 impl Default for EngineConfig {
@@ -105,6 +107,7 @@ impl Default for EngineConfig {
             gradient_half_life_ms: 100.0,
             local_peers: Vec::new(),
             shared_stats: None,
+            freshness_config: None,
         }
     }
 }
@@ -719,6 +722,17 @@ pub fn spawn_engine(
                     "local".to_string(),
                 );
                 engine.dht_handler = Some(dht);
+            }
+
+            // Activate SGA if freshness_config is provided
+            if let Some(ref fconfig) = engine.config.freshness_config {
+                if fconfig.enabled {
+                    if let Some(ref mut dht) = engine.dht_handler {
+                        dht.enable_sga(fconfig.clone());
+                        eprintln!("[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
+                            fconfig.half_life_ms, fconfig.stretch_factor, fconfig.base_interval_ms);
+                    }
+                }
             }
 
             // Bootstrap: PING all known peers.

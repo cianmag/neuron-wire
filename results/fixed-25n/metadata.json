@@ -1,0 +1,47 @@
+{
+  "git_commit": "unknown",
+  "os": "Windows 10",
+  "parameters": {
+    "adversary": {
+      "attack_duration_secs": 0.0,
+      "attack_start_sec": 15.0,
+      "attacker_node_index": 0,
+      "capture_window_secs": 5.0,
+      "corruption_rate": 0.3,
+      "enabled": false,
+      "mode": "None",
+      "replay_count": 2,
+      "replay_delay_ms": 100,
+      "target_node_index": null
+    },
+    "bind_prefix": "127.0.0.1",
+    "cleanup_interval_ticks": 1000,
+    "convergence": {
+      "edge_weight_stability_stdev": 0.0010000000474974513,
+      "edge_weight_stability_window": 100,
+      "prediction_error_delta": 0.009999999776482582,
+      "prediction_error_window": 50,
+      "task_accuracy_plateau_improvement": 0.0010000000474974513,
+      "task_accuracy_plateau_window": 10
+    },
+    "duration_secs": 30,
+    "failure": {
+      "malicious_node_index": null,
+      "mode": "None",
+      "percent": 0.5,
+      "trigger_at_sec": 30
+    },
+    "gossip_interval_ticks": 500,
+    "gradient_half_life_ms": 100,
+    "maintenance_mode": "fixed",
+    "max_retries": 3,
+    "node_count": 25,
+    "paper_mode": false,
+    "seed": 42,
+    "tick_interval_ms": 1,
+    "trace_path": ""
+  },
+  "rustc_version": "unknown",
+  "target_triple": "x86_64-pc-windows-msvc",
+  "timestamp": "1782456715"
+}

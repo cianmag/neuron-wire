@@ -429,6 +429,100 @@ pub fn deserialize_node(data: &[u8], offset: &mut usize) -> Option<NodeEntry> {
     Some(NodeEntry::new(NodeId(id), addr, nt))
 }
 
+// ─── Sparse Gradient Aging ─────────────────────────────────────
+
+/// Configuration for Sparse Gradient Aging (SGA) maintenance.
+///
+/// Instead of PINGing all peers at a fixed interval, SGA assigns each peer
+/// a *freshness score* that decays exponentially since the last successful PONG.
+/// The maintenance interval for each peer is stretched proportionally:
+///
+///   interval(ms) = base_interval_ms × (1 + stretch_factor × freshness)
+///
+/// where freshness = exp(-elapsed_since_last_pong / half_life_ms).
+///
+/// A just-heard-from peer (freshness ≈ 1.0) gets interval = base × (1 + stretch),
+/// i.e. *less* frequent PINGs. A near-stale peer (freshness ≈ 0.0) gets interval
+/// ≈ base_interval_ms, i.e. the standard rate. This shifts bandwidth from healthy
+/// peers (which don't need it) toward peers approaching the staleness boundary.
+#[derive(Debug, Clone, Copy)]
+pub struct FreshnessConfig {
+    /// Enable SGA maintenance mode.
+    pub enabled: bool,
+    /// Base interval (ms) between PINGs for a completely stale peer.
+    pub base_interval_ms: u64,
+    /// Freshness half-life (ms). Freshness = exp(-elapsed / half_life_ms).
+    pub half_life_ms: u64,
+    /// Stretch factor α. Interval = base × (1 + α × freshness).
+    /// α=3 means fresh peers get 4× the interval of stale peers.
+    pub stretch_factor: f32,
+}
+
+impl Default for FreshnessConfig {
+    fn default() -> Self {
+        FreshnessConfig {
+            enabled: false,
+            base_interval_ms: 300_000, // 300s (matching STALE_PING_S)
+            half_life_ms: 60_000,       // 60s half-life
+            stretch_factor: 3.0,
+        }
+    }
+}
+
+/// Tracks per-peer PING timestamps and computes gradient-based scheduling.
+pub struct FreshnessTracker {
+    config: FreshnessConfig,
+    last_ping: HashMap<SocketAddr, Instant>,
+    /// Total number of maintenance PINGs sent under SGA.
+    pub total_maintenance_pings: u64,
+}
+
+impl FreshnessTracker {
+    pub fn new(config: FreshnessConfig) -> Self {
+        FreshnessTracker {
+            config,
+            last_ping: HashMap::new(),
+            total_maintenance_pings: 0,
+        }
+    }
+
+    /// Returns the interval (ms) at which this peer should be PING'd,
+    /// based on the time since its last successful PONG.
+    pub fn interval_ms(&self, last_pong: Instant) -> f32 {
+        let now = Instant::now();
+        let elapsed_pong = if last_pong > now {
+            Duration::from_secs(0)
+        } else {
+            now.duration_since(last_pong)
+        };
+        let half_life_secs = self.config.half_life_ms as f32 / 1000.0;
+        let elapsed_secs = elapsed_pong.as_secs_f32();
+        let freshness = (-elapsed_secs / half_life_secs).exp();
+        self.config.base_interval_ms as f32 * (1.0 + self.config.stretch_factor * freshness)
+    }
+
+    /// Returns Some(elapsed_since_last_ping) if the peer is due for maintenance,
+    /// None if it was PING'd recently enough.
+    pub fn should_ping(&self, addr: &SocketAddr, last_pong: Instant) -> Option<Duration> {
+        let now = Instant::now();
+        let elapsed_since_ping = self.last_ping.get(addr)
+            .map(|t| now.duration_since(*t))
+            .unwrap_or(Duration::from_secs(u64::MAX));
+        let interval = self.interval_ms(last_pong);
+        if elapsed_since_ping.as_millis() as f32 >= interval {
+            Some(elapsed_since_ping)
+        } else {
+            None
+        }
+    }
+
+    /// Record that a PING was sent to this address.
+    pub fn record_ping(&mut self, addr: SocketAddr) {
+        self.last_ping.insert(addr, Instant::now());
+        self.total_maintenance_pings += 1;
+    }
+}
+
 // ─── DHT Handler ───────────────────────────────────────────────
 
 pub struct DhtHandler {
@@ -439,6 +533,8 @@ pub struct DhtHandler {
     cache_path: Option<String>,
     seed_domain: String,
     bootstrapped: bool,
+    /// Sparse Gradient Aging maintenance tracker (None = standard fixed-interval maintenance).
+    pub freshness_tracker: Option<FreshnessTracker>,
 }
 
 impl DhtHandler {
@@ -453,8 +549,14 @@ impl DhtHandler {
             pending_pings: HashMap::new(),
             next_ping_seq: 1,
             cache_path, seed_domain, bootstrapped: false,
-        }
-    }
+ freshness_tracker: None,
+ }
+ }
+
+ /// Enable Sparse Gradient Aging with the given config.
+ pub fn enable_sga(&mut self, config: FreshnessConfig) {
+ self.freshness_tracker = Some(FreshnessTracker::new(config));
+ }
 
     // ─── Bootstrap ──────────────────────────────────────────
 
@@ -656,16 +758,46 @@ impl DhtHandler {
 
     pub fn periodic_maintenance(&mut self) {
         let now = Instant::now();
-        let cutoff = Duration::from_secs(STALE_PING_S);
 
-        // Collect stale addrs first, then ping (avoid borrow conflict)
-        let stale: Vec<SocketAddr> = self.routing_table.all_nodes().iter()
-            .filter(|e| now.duration_since(e.last_seen) > cutoff)
-            .map(|e| e.addr)
-            .collect();
+        if let Some(ref mut tracker) = self.freshness_tracker {
+            // ── Sparse Gradient Aging maintenance ─────────────
+            // Each peer gets PING'd on its own freshness-adjusted schedule.
+            let due: Vec<SocketAddr> = self.routing_table.all_nodes().iter()
+                .filter_map(|e| {
+                    if tracker.should_ping(&e.addr, e.last_seen).is_some() {
+                        Some(e.addr)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
-        for addr in stale {
-            self.ping_node(addr);
+            // Drop borrow on tracker before mutating self
+            let count = due.len();
+            for addr in &due {
+                self.ping_node(*addr);
+            }
+            if let Some(ref mut tracker) = self.freshness_tracker {
+                for addr in &due {
+                    tracker.record_ping(*addr);
+                }
+                if !due.is_empty() {
+                    eprintln!("[SGA] PING'd {} peers (total: {})",
+                        count, tracker.total_maintenance_pings);
+                }
+            }
+        } else {
+            // ── Standard fixed-interval maintenance ───────────
+            let cutoff = Duration::from_secs(STALE_PING_S);
+
+            let stale: Vec<SocketAddr> = self.routing_table.all_nodes().iter()
+                .filter(|e| now.duration_since(e.last_seen) > cutoff)
+                .map(|e| e.addr)
+                .collect();
+
+            for addr in stale {
+                self.ping_node(addr);
+            }
         }
 
         if let Some(ref path) = self.cache_path {

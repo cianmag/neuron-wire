@@ -53,6 +53,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufWriter, Write};
 
 use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
+use crate::dht::FreshnessConfig;
 use crate::adversary::{Adversary, AdversaryConfig, AdversaryMode};
 
 // ─── Failure Modes ──────────────────────────────────────────────
@@ -129,6 +130,9 @@ pub struct SimulationConfig {
     /// Path to write interactive trace (empty = no trace)
     #[serde(default)]
     pub trace_path: String,
+    /// Maintenance mode: "fixed" (default) or "sparse-aging"
+    #[serde(default)]
+    pub maintenance_mode: String,
 }
 
 impl SimulationConfig {
@@ -149,6 +153,7 @@ impl SimulationConfig {
             failure: FailureConfig::default(),
             adversary: AdversaryConfig::default(),
             trace_path: String::new(),
+            maintenance_mode: "fixed".to_string(),
         }
     }
 }
@@ -366,6 +371,14 @@ impl Simulator {
                 gradient_half_life_ms: self.config.gradient_half_life_ms as f32,
                 local_peers,
                 shared_stats: Some(engine_stats.clone()),
+                freshness_config: if self.config.maintenance_mode == "sparse-aging" {
+                    Some(FreshnessConfig {
+                        enabled: true,
+                        ..FreshnessConfig::default()
+                    })
+                } else {
+                    None
+                },
             };
 
             // Create shared packet filter for partition injection
@@ -945,6 +958,10 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
             "--trace" => {
                 i += 1;
                 config.trace_path = args.get(i).ok_or("--trace requires a file path")?.to_string();
+            }
+            "--maintenance-mode" => {
+                i += 1;
+                config.maintenance_mode = args.get(i).ok_or("--maintenance-mode requires a value")?.to_string();
             }
             _ => {
                 return Err(format!("Unknown argument: {}", args[i]));
