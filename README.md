@@ -383,6 +383,7 @@ Beyond this README, the following documents provide deeper coverage of specific 
 | [`ROADMAP.md`](ROADMAP.md) | 20-direction research plan with effort estimates and priority matrix |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Personal reflections on hypothesis failure, reproducibility, and process |
 | [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Detailed guide for reproducing every benchmark |
+| [`PROTOCOL_SPEC.md`](PROTOCOL_SPEC.md) | Formal wire format, message types, handshake, DHT routing, reliability |
 | [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Level 1–5 readiness inventory for publication |
 | [`PAPER.md`](PAPER.md) | Paper outline and target venues |
 
