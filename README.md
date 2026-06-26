@@ -3,12 +3,15 @@
 **A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![Tests](https://img.shields.io/badge/tests-60%2F60-brightgreen)](#)
-[![Lines of Rust](https://img.shields.io/badge/rust-6%2C656%20LOC-blue)](#)
+[![Tests](https://img.shields.io/badge/tests-72%2F72-brightgreen)](#)
+[![Lines of Rust](https://img.shields.io/badge/rust-7%2C975%20LOC-blue)](#)
 [![Crates.io](https://img.shields.io/badge/crate-v0.2.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 [![Reproducible](https://img.shields.io/badge/reproducible-yes-brightgreen)](REPRODUCIBILITY.md)
 [![Architecture](https://img.shields.io/badge/architecture-formal-7c3aed)](ARCHITECTURE.md)
+[![Q&A](https://img.shields.io/badge/q%26a-foundational-ff6b6b)](FOUNDATIONAL_QNA.md)
+[![Roadmap](https://img.shields.io/badge/roadmap-20%20directions-ffc107)](ROADMAP.md)
+[![Lessons](https://img.shields.io/badge/lessons-learned-00c853)](LESSONS_LEARNED.md)
 
 ---
 
@@ -28,6 +31,7 @@
 - [Key Numbers](#key-numbers)
 - [Reproducibility](#reproducibility)
 - [Limitations](#limitations)
+- [Documentation](#documentation)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -229,10 +233,10 @@ Apoptosis runs every ~1 s during Phase 5. It enforces four pruning criteria:
 | Metric | Value |
 |---|---|
 | Rust source files | 26 |
-| Total lines of Rust | 6,656 |
-| Test functions | 60 |
-| Test pass rate | 60 / 60 (100 %) |
-| Pre-existing warnings | 3 (simulator.rs only, non-critical) |
+| Total lines of Rust | 7,975 (26 source files) |
+| Test functions | 72 |
+| Test pass rate | 72 / 72 (100 %) |
+| Pre-existing warnings | 0 (zero-warnings policy enforced) |
 | External dependencies | 5 (crc32fast, rand, serde, toml, csv) |
 | Subsystems | 7 |
 | Engine tick rate | ~400 KHz–1 MHz (commodity x86-64) |
@@ -252,7 +256,7 @@ Apoptosis runs every ~1 s during Phase 5. It enforces four pruning criteria:
 | Apoptosis sweep interval | 1 s (every 1000 ticks) |
 | Max failures before eviction | 3 |
 | Stale peer timeout | 600 s (10 min) |
-| Git commit | `e2d99a5` |
+| Git commit | `095f119` |
 | Build profile (release) | `opt-level = "z"`, LTO, strip |
 
 ### Subsystem Test Coverage
@@ -291,10 +295,10 @@ The release build produces a single statically linked binary. No external runtim
 ### Tests
 
 ```bash
-cargo test                # 60 tests, 0 failures
+cargo test                # 72 tests, 0 failures
 ```
 
-All tests are deterministic (seeded RNG, no wall-clock-dependent assertions in the unit test suite). The 3 pre-existing warnings in `simulator.rs` are non-functional (unused variable imports in the simulation orchestration layer).
+All tests are deterministic (seeded RNG, no wall-clock-dependent assertions in the unit test suite). Zero warnings enforced across the entire codebase.
 
 ### Paper Mode Simulation
 
@@ -362,9 +366,27 @@ NWP v0.2.0 is a functional research prototype. The following limitations are kno
 
 8. **Linux/x86-64 only (tested)** — the UDP transport uses `std::net::UdpSocket` which should be portable, but the project has only been tested on x86-64 Linux. Windows and macOS builds may exhibit different timing characteristics.
 
-9. **3 pre-existing warnings** in `simulator.rs` — unused variable imports in the simulation orchestration layer. No functional impact.
+9. **Zero-warnings policy enforced** — the codebase compiles with `cargo clippy -D warnings` in CI, ensuring no warnings in any module.
 
 10. **Documentation coverage** — the inline module-level documentation is thorough, but high-level architectural documentation (this README) was written retroactively. Some internal APIs lack doc examples.
+
+---
+
+## Documentation
+
+Beyond this README, the following documents provide deeper coverage of specific aspects:
+
+| Document | What it covers |
+|----------|----------------|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full subsystem design, engine loop phases, data flow, design decisions |
+| [`FOUNDATIONAL_QNA.md`](FOUNDATIONAL_QNA.md) | 20 categories of research questions answered from codebase evidence (includes glossary) |
+| [`ROADMAP.md`](ROADMAP.md) | 20-direction research plan with effort estimates and priority matrix |
+| [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Personal reflections on hypothesis failure, reproducibility, and process |
+| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Detailed guide for reproducing every benchmark |
+| [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Level 1–5 readiness inventory for publication |
+| [`PAPER.md`](PAPER.md) | Paper outline and target venues |
+
+For API-level documentation, build with `cargo doc --no-deps --open`.
 
 ---
 
@@ -405,6 +427,6 @@ NWP v0.2.0 is a functional research prototype. The following limitations are kno
 
 ## License
 
-[MIT](LICENSE) © 2025 Neuron Wire Contributors
+[MIT](LICENSE-MIT) © 2025–2026 Neuron Wire Contributors
 
 *Built with Rust 2021 edition. Single-threaded, non-blocking, and intentionally free of async runtimes.*
