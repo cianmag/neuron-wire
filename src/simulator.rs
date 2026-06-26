@@ -50,6 +50,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use std::io::{BufWriter, Write};
 
 use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
 use crate::adversary::{Adversary, AdversaryConfig, AdversaryMode};
@@ -125,6 +126,9 @@ pub struct SimulationConfig {
     /// Adversarial testing configuration
     #[serde(default)]
     pub adversary: AdversaryConfig,
+    /// Path to write interactive trace (empty = no trace)
+    #[serde(default)]
+    pub trace_path: String,
 }
 
 impl SimulationConfig {
@@ -144,6 +148,7 @@ impl SimulationConfig {
             convergence: ConvergenceCriteria::default(),
             failure: FailureConfig::default(),
             adversary: AdversaryConfig::default(),
+            trace_path: String::new(),
         }
     }
 }
@@ -292,6 +297,8 @@ pub struct Simulator {
     node_addrs: Vec<SocketAddr>,
     /// Adversarial attacker instance
     adversary: Option<Adversary>,
+    /// Trace writer for interactive visualization
+    trace_writer: Option<BufWriter<std::fs::File>>,
 }
 
 impl Simulator {
@@ -307,6 +314,7 @@ impl Simulator {
             metrics_store: Arc::new(Mutex::new(HashMap::new())),
             node_addrs: Vec::new(),
             adversary: None,
+            trace_writer: None,
         }
     }
 
@@ -412,6 +420,14 @@ impl Simulator {
             );
             adv.init()?;
             self.adversary = Some(adv);
+        }
+
+        // Initialise trace writer for interactive visualization
+        if !self.config.trace_path.is_empty() {
+            let file = std::fs::File::create(&self.config.trace_path)
+                .map_err(|e| format!("Cannot create trace file: {}", e))?;
+            let writer = BufWriter::new(file);
+            self.trace_writer = Some(writer);
         }
 
         Ok(())
@@ -554,6 +570,40 @@ impl Simulator {
                             .push(metrics);
                     }
                 }
+            }
+
+            // ── TRACE EMISSION ──────────────────────────────
+            if let Some(ref mut writer) = self.trace_writer {
+                let mut nodes = Vec::with_capacity(self.nodes.len());
+                for node in &self.nodes {
+                    let s = node.engine_stats.lock().ok().map(|g| g.clone()).unwrap_or_default();
+                    nodes.push(serde_json::json!({
+                        "id": node.node_id,
+                        "peer_count": s.peer_count,
+                        "alive": !node.shutdown.load(Ordering::Relaxed),
+                        "packets_recv": s.packets_recv,
+                        "packets_sent": s.packets_sent,
+                        "bytes_recv": s.bytes_recv,
+                        "bytes_sent": s.bytes_sent,
+                    }));
+                }
+                let mut events: Vec<serde_json::Value> = Vec::new();
+                if self.failure_triggered && failure_sample_index.map(|i| total_samples as usize - 1 == i).unwrap_or(false) {
+                    events.push(serde_json::json!({
+                        "type": "failure",
+                        "mode": format!("{:?}", self.config.failure.mode),
+                        "at_sec": elapsed_secs,
+                    }));
+                }
+                let trace_line = serde_json::json!({
+                    "tick": tick_counter,
+                    "time": elapsed_secs,
+                    "nodes": nodes,
+                    "events": events,
+                });
+                let mut line = serde_json::to_string(&trace_line).unwrap_or_default();
+                line.push('\n');
+                let _ = writer.write_all(line.as_bytes());
             }
 
             // ── FAILURE INJECTION ──────────────────────────────
@@ -891,6 +941,10 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
             }
             "--trials" | "--stale-ping-secs" => {
                 i += 1; // Handled by main
+            }
+            "--trace" => {
+                i += 1;
+                config.trace_path = args.get(i).ok_or("--trace requires a file path")?.to_string();
             }
             _ => {
                 return Err(format!("Unknown argument: {}", args[i]));

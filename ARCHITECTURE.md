@@ -996,6 +996,61 @@ cargo run --example simulate -- --nodes 5 --duration 30 \
 4. Register CLI flag in `parse_args()` in `src/simulator.rs`
 5. Add unit tests in the `#[cfg(test)] mod tests` block
 
+### 7.9 Interactive Trace Visualizer
+
+**Location:** `tools/visualizer/index.html`
+
+A standalone, zero-dependency interactive HTML visualizer that plays back DHT simulation traces in real-time. Opens directly in any browser — no build step, no server required.
+
+#### 7.9.1 Demo Scenarios (Built-in)
+
+The visualizer includes five pre-baked demo scenarios that showcase the full range of DHT behaviour without needing to run the Rust simulator:
+
+| Scenario | Nodes | What Happens | Why It Impresses |
+|----------|-------|-------------|------------------|
+| **Normal Convergence** | 6 | Nodes discover each other and form a full mesh → 100% peer coverage in ~25s | Clean emergent behaviour — the mesh self-assembles |
+| **Network Partition** | 8 | Full mesh → split at t=22s (groups A=0-3, B=4-7) → reconnect at t=40s | Recovery under load — partitions heal automatically |
+| **Adversarial Attack** | 6 | Stable mesh → replay attack at t=20s corrupting 30% of outbound packets | Robustness — network stays up under hostile fire |
+| **Node Death Cascade** | 10 | 3 nodes die at t=18s → survivors reconnect | Graceful degradation — no single point of failure |
+| **Full Gauntlet** | 8 | Death cascade + adversarial attack + partition → complete recovery | Stress test — all failure modes simultaneously |
+
+#### 7.9.2 Visual Features
+
+- **Force-directed layout:** Nodes repel, connected nodes spring-attract. Hover to inspect packet counts, peer count, aliveness.
+- **Animated edges:** Data pulses travel along active connections in both directions.
+- **Real-time metrics HUD:** Time, nodes alive, average peers per node, total packets, convergence status.
+- **Event log:** Right-side panel with live event notifications (converged ✅, partition ⚠️, attack ⚡, death 💀).
+- **Timeline scrubber:** Drag to jump to any point in the simulation. Play/pause, speed control (0.25× to 8×).
+- **Dark space theme:** Star field background, grid overlay, colour-coded node glows (blue for stable, red for dying, orange for attacked).
+- **Keyboard shortcuts:** Space = play/pause, arrow keys = frame advance, R = reset.
+
+#### 7.9.3 Loading Real Traces
+
+Use the `--trace <path>` flag when running the Rust simulator to generate an NDJSON trace file:
+
+```bash
+# Generate a trace
+cargo run --example simulate -- --nodes 10 --duration 30 --trace trace.ndjson
+
+# Load into visualizer → click 📁 Load Trace or drag-and-drop
+open tools/visualizer/index.html
+```
+
+Trace format is newline-delimited JSON with one object per tick:
+
+```json
+{"tick":12,"time":1.2,"nodes":[{"id":0,"peer_count":4,"alive":true,...}],"events":[]}
+```
+
+Load trace files by clicking the 📁 button in the HUD, or by dragging the `.ndjson` file onto the browser window.
+
+#### 7.9.4 Adding a New Scenario
+
+1. Open `tools/visualizer/index.html`
+2. Add a new `<option>` in the `<select id="scenario-select">` element
+3. Add a `case` in the `generateScenario()` function
+4. Define phase timestamps and transition rules using the existing phase pattern (`grow → steady → failure → recover`)
+
 ---
 
 ## 8. Complexity Analysis

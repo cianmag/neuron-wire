@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DHT Network Simulator · Interactive Visualization</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #08080f;
+    color: #c4c8d4;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    overflow: hidden;
+  }
+  #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+  /* ─── HUD Overlay ─── */
+  #hud {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 10;
+    pointer-events: none;
+    padding: 20px 24px;
+    background: linear-gradient(0deg, rgba(8,8,15,0.95) 60%, transparent);
+  }
+  #hud > * { pointer-events: auto; }
+
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  #controls button {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #c4c8d4;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #controls button:hover { background: rgba(255,255,255,0.12); border-color: rgba(100,180,255,0.4); }
+  #controls button.active { background: rgba(100,180,255,0.15); border-color: rgba(100,180,255,0.5); color: #7cb8ff; }
+  #controls select {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #c4c8d4;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #controls select option { background: #12121f; }
+  #timeline-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+  #timeline {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.08);
+    outline: none;
+    cursor: pointer;
+  }
+  #timeline::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #7cb8ff;
+    border: 2px solid #12121f;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(100,180,255,0.3);
+  }
+  #timeline::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #7cb8ff;
+    border: 2px solid #12121f;
+    cursor: pointer;
+  }
+  #time-display {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    min-width: 80px;
+    text-align: right;
+  }
+
+  /* ─── Metrics Panel ─── */
+  #metrics {
+    position: fixed;
+    top: 16px; left: 16px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #metrics > div {
+    background: rgba(8,8,15,0.7);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    backdrop-filter: blur(8px);
+    min-width: 160px;
+  }
+  #metrics .label { font-size: 10px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.5px; }
+  #metrics .value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  #metrics .value.good { color: #4ade80; }
+  #metrics .value.warn { color: #facc15; }
+  #metrics .value.bad { color: #f87171; }
+  #metrics .value.neutral { color: #7cb8ff; }
+
+  /* ─── Event Log ─── */
+  #event-log {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 10;
+    pointer-events: none;
+    width: 280px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  #event-log::-webkit-scrollbar { width: 3px; }
+  #event-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+  .event {
+    background: rgba(8,8,15,0.7);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    backdrop-filter: blur(8px);
+    animation: eventIn 0.3s ease-out;
+  }
+  @keyframes eventIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .event .ev-time { color: rgba(255,255,255,0.3); }
+  .event .ev-type { font-weight: 600; }
+  .event.ev-converge .ev-type { color: #4ade80; }
+  .event.ev-failure .ev-type { color: #f87171; }
+  .event.ev-adversary .ev-type { color: #facc15; }
+  .event.ev-join .ev-type { color: #7cb8ff; }
+  .event.ev-partition .ev-type { color: #fb923c; }
+  .event.ev-connect .ev-type { color: #a78bfa; }
+
+  /* ─── Node Tooltip ─── */
+  #tooltip {
+    position: fixed;
+    z-index: 20;
+    background: rgba(8,8,15,0.9);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    backdrop-filter: blur(8px);
+    min-width: 140px;
+  }
+  #tooltip .tt-id { font-weight: 600; color: #7cb8ff; margin-bottom: 4px; }
+  #tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; }
+  #tooltip .tt-row .tt-label { color: rgba(255,255,255,0.35); }
+  #tooltip .tt-row .tt-val { font-weight: 500; }
+
+  /* ─── File Loader ─── */
+  #file-loader {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: none;
+  }
+  #file-loader input[type="file"] {
+    display: none;
+  }
+  #file-loader label {
+    background: rgba(8,8,15,0.8);
+    border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 20px 40px;
+    cursor: pointer;
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    backdrop-filter: blur(8px);
+    text-align: center;
+  }
+  #file-loader label:hover { border-color: rgba(100,180,255,0.3); color: rgba(255,255,255,0.6); }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 768px) {
+    #controls { gap: 6px; }
+    #controls button { padding: 4px 10px; font-size: 11px; }
+    #metrics > div { padding: 6px 10px; min-width: 100px; }
+    #metrics .value { font-size: 14px; }
+    #event-log { width: 200px; max-height: 30vh; }
+    .event { font-size: 10px; padding: 4px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="metrics">
+  <div><div class="label">Time</div><div class="value neutral" id="m-time">0.0s</div></div>
+  <div><div class="label">Nodes Alive</div><div class="value good" id="m-nodes">0</div></div>
+  <div><div class="label">Avg Peers/Node</div><div class="value neutral" id="m-peers">0</div></div>
+  <div><div class="label">Total Packets</div><div class="value neutral" id="m-packets">0</div></div>
+  <div><div class="label">Convergence</div><div class="value warn" id="m-convergence">—</div></div>
+</div>
+
+<div id="event-log"></div>
+
+<div id="tooltip">
+  <div class="tt-id" id="tt-id">Node 0</div>
+  <div class="tt-row"><span class="tt-label">Peers</span><span class="tt-val" id="tt-peers">0</span></div>
+  <div class="tt-row"><span class="tt-label">Packets Sent</span><span class="tt-val" id="tt-sent">0</span></div>
+  <div class="tt-row"><span class="tt-label">Packets Recv</span><span class="tt-val" id="tt-recv">0</span></div>
+  <div class="tt-row"><span class="tt-label">Alive</span><span class="tt-val" id="tt-alive">Yes</span></div>
+</div>
+
+<div id="hud">
+  <div id="controls">
+    <button id="btn-play" class="active" title="Play/Pause">▶</button>
+    <button id="btn-reset" title="Reset">⟲</button>
+    <button id="btn-speed-down" title="Slower">−</button>
+    <span id="speed-label" style="font-size:12px;color:rgba(255,255,255,0.4);min-width:30px">1×</span>
+    <button id="btn-speed-up" title="Faster">+</button>
+    <select id="scenario-select">
+      <option value="convergence">Normal Convergence</option>
+      <option value="partition">Network Partition</option>
+      <option value="adversarial">Adversarial Attack</option>
+      <option value="death">Node Death Cascade</option>
+      <option value="all">Full Gauntlet</option>
+    </select>
+    <label style="font-size:12px;color:rgba(255,255,255,0.3);cursor:pointer;">
+      📁 Load Trace
+      <input type="file" id="file-input" accept=".ndjson,.json" style="display:none">
+    </label>
+  </div>
+  <div id="timeline-container">
+    <span id="time-display">0.0s / 0.0s</span>
+    <input type="range" id="timeline" min="0" max="100" value="0" step="1">
+  </div>
+</div>
+
+<div id="file-loader">
+  <label for="file-input">📂 Drop or click to load a .ndjson trace</label>
+  <input type="file" id="file-input-hidden" accept=".ndjson,.json">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+<script>
+p5.disableFriendlyErrors = true;
+
+// ═══════════════════════════════════════════════════════════════
+// DEMO SCENARIOS — compelling baked-in data that shows off
+// the DHT simulation without needing to run the Rust code.
+// ═══════════════════════════════════════════════════════════════
+
+function generateScenario(name) {
+  const frames = [];
+  const totalFrames = 60;
+  const nodeCount = name === 'convergence' ? 6 : name === 'partition' ? 8 : name === 'death' ? 10 : name === 'adversarial' ? 6 : 8;
+
+  // Pre-generate node positions (seeded for reproducibility)
+  const seed = { x: 0.5, y: 0.5 };
+  const positions = [];
+  for (let i = 0; i < nodeCount; i++) {
+    const angle = (i / nodeCount) * Math.PI * 2 + (name === 'partition' ? i * 0.3 : 0);
+    const r = 0.22 + (i % 3) * 0.04;
+    positions.push({
+      x: 0.5 + Math.cos(angle) * r,
+      y: 0.5 + Math.sin(angle) * r + 0.02,
+    });
+  }
+
+  const allPeers = Array.from({length: nodeCount}, () => new Set());
+  const alive = Array(nodeCount).fill(true);
+  const events = [];
+
+  // Phase definitions per scenario
+  let phases = [];
+  if (name === 'convergence') {
+    phases = [{ t: 0, mode: 'grow' }, { t: 25, mode: 'steady' }];
+  } else if (name === 'partition') {
+    phases = [
+      { t: 0, mode: 'grow' },
+      { t: 18, mode: 'steady' },
+      { t: 22, mode: 'partition_start' },
+      { t: 26, mode: 'partition' },
+      { t: 40, mode: 'recover' },
+    ];
+  } else if (name === 'adversarial') {
+    phases = [
+      { t: 0, mode: 'grow' },
+      { t: 15, mode: 'steady' },
+      { t: 20, mode: 'attack' },
+      { t: 30, mode: 'post_attack' },
+    ];
+  } else if (name === 'death') {
+    phases = [
+      { t: 0, mode: 'grow' },
+      { t: 14, mode: 'steady' },
+      { t: 18, mode: 'death' },
+      { t: 24, mode: 'recover' },
+    ];
+  } else {
+    phases = [
+      { t: 0, mode: 'grow' },
+      { t: 14, mode: 'steady' },
+      { t: 18, mode: 'death' },
+      { t: 22, mode: 'attack' },
+      { t: 28, mode: 'partition_start' },
+      { t: 30, mode: 'partition' },
+      { t: 42, mode: 'recover' },
+    ];
+  }
+
+  function getPhase(t) {
+    let current = phases[0];
+    for (const p of phases) {
+      if (t >= p.t) current = p;
+    }
+    return current;
+  }
+
+  for (let frame = 0; frame < totalFrames; frame++) {
+    const t = frame / totalFrames;
+    const phase = getPhase(t * 60);
+
+    // Determine alive set
+    if (name === 'death' || name === 'all') {
+      if (phase.mode === 'death') {
+        for (let i = 0; i < 3; i++) alive[i] = false;
+      } else if (phase.mode === 'recover') {
+        for (let i = 0; i < 3; i++) alive[i] = true;
+      }
+    }
+
+    // Grow connections
+    if (phase.mode === 'grow') {
+      const progress = Math.min(1, (t * 60 - phase.t) / 15);
+      for (let i = 0; i < nodeCount; i++) {
+        if (!alive[i]) continue;
+        for (let j = i + 1; j < nodeCount; j++) {
+          if (!alive[j]) continue;
+          if (Math.random() < progress * 0.15 || (frame === totalFrames - 1)) {
+            allPeers[i].add(j);
+            allPeers[j].add(i);
+          }
+        }
+      }
+    }
+
+    // Partition
+    if (phase.mode === 'partition_start' || phase.mode === 'partition') {
+      const groupA = new Set([0,1,2,3]);
+      const groupB = new Set([4,5,6,7]);
+      for (let i = 0; i < nodeCount; i++) {
+        if (!alive[i]) continue;
+        for (const j of [...allPeers[i]]) {
+          if ((groupA.has(i) && groupB.has(j)) || (groupB.has(i) && groupA.has(j))) {
+            allPeers[i].delete(j);
+            if (allPeers[j]) allPeers[j].delete(i);
+          }
+        }
+      }
+    }
+
+    // Recover (reconnect partitions)
+    if (phase.mode === 'recover') {
+      const progress = Math.min(1, (t * 60 - phase.t) / 10);
+      for (let i = 0; i < nodeCount; i++) {
+        if (!alive[i]) continue;
+        for (let j = i + 1; j < nodeCount; j++) {
+          if (!alive[j]) continue;
+          if (!allPeers[i].has(j) && Math.random() < progress * 0.2) {
+            allPeers[i].add(j);
+            allPeers[j].add(i);
+          }
+        }
+      }
+    }
+
+    // Build frame
+    const nodes = [];
+    const totalPeers = new Set();
+    for (let i = 0; i < nodeCount; i++) {
+      const peerArr = [...allPeers[i]];
+      peerArr.forEach(p => totalPeers.add(p));
+      nodes.push({
+        id: i,
+        peer_count: peerArr.length,
+        peers: peerArr,
+        alive: alive[i],
+        x: positions[i].x,
+        y: positions[i].y,
+        packets_sent: Math.floor(Math.random() * 100 + 50 * (frame / totalFrames)),
+        packets_recv: Math.floor(Math.random() * 80 + 30 * (frame / totalFrames)),
+      });
+    }
+
+    const frameEvents = [];
+
+    // Add scenario events
+    if (frame === 0) frameEvents.push({type: 'start', text: `Simulation started — ${nodeCount} nodes`});
+    if (phase.mode === 'grow' && frame > 0 && frame === Math.ceil(phase.t) + 1) {
+      frameEvents.push({type: 'connecting', text: 'Nodes discovering peers...'});
+    }
+    if (phase.mode === 'steady' && Math.abs(t * 60 - phase.t) < 1) {
+      frameEvents.push({type: 'converge', text: '✅ Network converged — full mesh'});
+    }
+    if (phase.mode === 'partition_start' && Math.abs(t * 60 - phase.t) < 1) {
+      frameEvents.push({type: 'partition', text: '⚠️ Partition: Group A (0-3) split from Group B (4-7)'});
+    }
+    if (phase.mode === 'attack' && Math.abs(t * 60 - phase.t) < 1) {
+      frameEvents.push({type: 'adversary', text: '⚡ Adversary attack — replaying captured packets'});
+    }
+    if (phase.mode === 'death' && Math.abs(t * 60 - phase.t) < 1) {
+      const deathNames = [0,1,2].map(i => `Node ${i}`).join(', ');
+      frameEvents.push({type: 'failure', text: `💀 Node death cascade — ${deathNames} killed`});
+    }
+    if (phase.mode === 'recover' && Math.abs(t * 60 - phase.t) < 1) {
+      frameEvents.push({type: 'converge', text: '🔄 Recovery — nodes reconnecting'});
+    }
+
+    frames.push({ tick: frame, time: (frame / totalFrames) * 60, nodes: nodes, events: frameEvents });
+  }
+
+  return { frames, totalTime: 60 };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VISUALIZER — p5.js sketch
+// ═══════════════════════════════════════════════════════════════
+
+const state = {
+  trace: null,
+  currentFrame: 0,
+  playing: true,
+  speed: 1,
+  totalTime: 0,
+  totalFrames: 0,
+  nodePositions: new Map(),
+  nodeVelocities: new Map(),
+  hoveredNode: null,
+};
+
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1 + (4-2*t)*t; }
+
+// Interpolate between frames for smooth animation
+function lerpFrame(a, b, t) {
+  if (!a || !b) return a || b;
+  const nodes = a.nodes.map((na, i) => {
+    const nb = b.nodes[i] || na;
+    return {
+      id: na.id,
+      peer_count: Math.round(na.peer_count + (nb.peer_count - na.peer_count) * t),
+      peers: t < 0.5 ? na.peers : nb.peers,
+      alive: na.alive && nb.alive,
+      x: na.x, y: na.y, // positions stay fixed for demo
+      packets_sent: Math.round((na.packets_sent || 0) + ((nb.packets_sent || 0) - (na.packets_sent || 0)) * t),
+      packets_recv: Math.round((na.packets_recv || 0) + ((nb.packets_recv || 0) - (na.packets_recv || 0)) * t),
+    };
+  });
+  return { tick: a.tick, time: a.time + (b.time - a.time) * t, nodes };
+}
+
+function getInterpolatedFrame(frameIndex, subframe) {
+  const frames = state.trace.frames;
+  if (!frames || frames.length === 0) return null;
+  const i = Math.max(0, Math.min(frameIndex, frames.length - 1));
+  const j = Math.min(i + 1, frames.length - 1);
+  return lerpFrame(frames[i], frames[j], subframe);
+}
+
+function getCurrentFrameData() {
+  const frames = state.trace.frames;
+  if (!frames || frames.length === 0) return null;
+  const idx = Math.max(0, Math.min(state.currentFrame, frames.length - 1));
+  return frames[idx];
+}
+
+const sketch = (p) => {
+  let bgLayer, nodeLayer, edgeLayer, glowLayer;
+
+  p.setup = function() {
+    const container = document.getElementById('canvas-container');
+    const canvas = p.createCanvas(container.offsetWidth, container.offsetHeight);
+    canvas.parent('canvas-container');
+    p.pixelDensity(1);
+    bgLayer = p.createGraphics(p.width, p.height);
+    nodeLayer = p.createGraphics(p.width, p.height);
+    edgeLayer = p.createGraphics(p.width, p.height);
+    glowLayer = p.createGraphics(p.width, p.height);
+
+    // Load default scenario
+    loadScenario('convergence');
+  };
+
+  p.draw = function() {
+    if (!state.trace || !state.trace.frames || state.trace.frames.length === 0) return;
+
+    const dt = (1 / 60) * state.speed;
+
+    // Advance frame
+    if (state.playing) {
+      state.currentFrame += dt;
+      if (state.currentFrame >= state.trace.frames.length - 1) {
+        state.currentFrame = state.trace.frames.length - 1;
+        state.playing = false;
+        document.getElementById('btn-play').textContent = '▶';
+        document.getElementById('btn-play').classList.remove('active');
+      }
+    }
+
+    const frameIdx = Math.floor(state.currentFrame);
+    const subframe = state.currentFrame - frameIdx;
+    const data = getInterpolatedFrame(frameIdx, subframe);
+
+    if (!data) return;
+
+    // Update timeline
+    const timeline = document.getElementById('timeline');
+    if (timeline && !timeline.matches(':active')) {
+      const pct = (state.currentFrame / Math.max(1, state.trace.frames.length - 1)) * 100;
+      timeline.value = pct;
+    }
+    document.getElementById('m-time').textContent = data.time.toFixed(1) + 's';
+    document.getElementById('time-display').textContent = `${data.time.toFixed(1)}s / ${state.trace.totalTime.toFixed(0)}s`;
+
+    // Update metrics
+    const liveNodes = data.nodes.filter(n => n.alive);
+    const avgPeers = liveNodes.length > 0
+      ? (liveNodes.reduce((s, n) => s + n.peer_count, 0) / liveNodes.length).toFixed(1)
+      : '0.0';
+    const totalPkts = data.nodes.reduce((s, n) => s + (n.packets_sent || 0) + (n.packets_recv || 0), 0);
+
+    document.getElementById('m-nodes').textContent = liveNodes.length;
+    document.getElementById('m-nodes').className = 'value ' + (liveNodes.length === data.nodes.length ? 'good' : liveNodes.length > 0 ? 'warn' : 'bad');
+    document.getElementById('m-peers').textContent = avgPeers;
+    document.getElementById('m-packets').textContent = totalPkts;
+
+    const totalPossible = data.nodes.filter(n => n.alive).length - 1;
+    let convClass = 'warn';
+    let convText = 'Forming...';
+    if (liveNodes.length > 0 && parseFloat(avgPeers) >= totalPossible * 0.9) {
+      convClass = 'good';
+      convText = '✅ Converged';
+    } else if (liveNodes.length === 0) {
+      convClass = 'bad';
+      convText = '❌ Dead';
+    } else if (data.nodes.some(n => !n.alive)) {
+      convText = '⚡ Recovering';
+    }
+    document.getElementById('m-convergence').className = 'value ' + convClass;
+    document.getElementById('m-convergence').textContent = convText;
+
+    // NEW EVENTS
+    if (data.events && data.events.length > 0) {
+      for (const ev of data.events) {
+        addEvent(ev.type, ev.text, data.time);
+      }
+    }
+
+    // ─── RENDER ──────────────────────────────────────────
+    p.clear();
+    bgLayer.clear();
+    edgeLayer.clear();
+    nodeLayer.clear();
+    glowLayer.clear();
+
+    renderBackground();
+    renderEdges(data, frameIdx, subframe);
+    renderGlow(data);
+    renderNodes(data);
+
+    p.image(bgLayer, 0, 0);
+    p.image(edgeLayer, 0, 0);
+    p.image(glowLayer, 0, 0);
+    p.image(nodeLayer, 0, 0);
+
+    // Extra shine overlay
+    p.noStroke();
+    p.fill(0, 0, 0, 0);
+  };
+
+  function renderBackground() {
+    const g = bgLayer;
+    g.clear();
+    // Deep space gradient
+    for (let y = 0; y < p.height; y += 1) {
+      const t = y / p.height;
+      const r = p.lerp(8, 12, t) | 0;
+      const gv = p.lerp(8, 14, t) | 0;
+      const b = p.lerp(15, 25, t) | 0;
+      g.stroke(r, gv, b);
+      g.line(0, y, p.width, y);
+    }
+    // Star field
+    g.noStroke();
+    g.fill(255, 255, 255, 30);
+    for (let i = 0; i < 80; i++) {
+      const sx = (i * 137.5 + 42) % p.width;
+      const sy = (i * 73.1 + 17) % p.height;
+      const sz = 0.5 + (i % 3) * 0.5;
+      g.ellipse(sx, sy, sz, sz);
+    }
+    // Subtle grid
+    g.stroke(100, 180, 255, 8);
+    g.strokeWeight(0.3);
+    const spacing = 60;
+    for (let x = 0; x < p.width; x += spacing) g.line(x, 0, x, p.height);
+    for (let y = 0; y < p.height; y += spacing) g.line(0, y, p.width, y);
+  }
+
+  function renderEdges(data, frameIdx, subframe) {
+    const g = edgeLayer;
+    g.clear();
+    g.strokeWeight(1.2);
+
+    // Build edge set
+    const edgeSet = new Set();
+    for (const node of data.nodes) {
+      if (!node.alive || !node.peers) continue;
+      for (const peerId of node.peers) {
+        const key = Math.min(node.id, peerId) + ':' + Math.max(node.id, peerId);
+        if (edgeSet.has(key)) continue;
+        edgeSet.add(key);
+        // Only draw if both alive
+        const peer = data.nodes.find(n => n.id === peerId);
+        if (!peer || !peer.alive) continue;
+
+        const nx = node.x * p.width;
+        const ny = node.y * p.height;
+        const px = peer.x * p.width;
+        const py = peer.y * p.height;
+
+        const dx = px - nx;
+        const dy = py - ny;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > p.width * 0.5) continue;
+
+        // Edge gradient + data pulse animation
+        const pulsePhase = (p.millis() / 3000 + node.id * 0.7) % 1;
+        const pulse = Math.sin(pulsePhase * Math.PI * 2) * 0.5 + 0.5;
+
+        // Glow line
+        g.stroke(100, 180, 255, 18);
+        g.strokeWeight(3 + pulse * 2);
+        g.line(nx, ny, px, py);
+
+        // Core line
+        const alpha = p.lerp(40, 120, pulse);
+        g.stroke(140, 200, 255, alpha | 0);
+        g.strokeWeight(1 + pulse * 0.8);
+        g.line(nx, ny, px, py);
+
+        // Animated data packet traveling along edge
+        const packetPos = (p.millis() / 2000 + node.id * 0.3) % 1;
+        const ex = p.lerp(nx, px, packetPos);
+        const ey = p.lerp(ny, py, packetPos);
+        g.noStroke();
+        g.fill(200, 230, 255, 160);
+        g.ellipse(ex, ey, 4 + pulse * 3, 4 + pulse * 3);
+
+        // Second packet in opposite direction
+        const packetPos2 = (p.millis() / 2500 + peer.id * 0.5 + 0.5) % 1;
+        const ex2 = p.lerp(nx, px, packetPos2);
+        const ey2 = p.lerp(ny, py, packetPos2);
+        g.fill(255, 200, 100, 100);
+        g.ellipse(ex2, ey2, 2 + pulse * 2, 2 + pulse * 2);
+      }
+    }
+  }
+
+  function renderGlow(data) {
+    const g = glowLayer;
+    g.clear();
+    g.drawingContext.filter = 'blur(20px)';
+    for (const node of data.nodes) {
+      if (!node.alive) continue;
+      const nx = node.x * p.width;
+      const ny = node.y * p.height;
+      const color = node.id % 2 === 0 ? [100, 180, 255, 20] : [180, 140, 255, 20];
+      g.noStroke();
+      g.fill(color[0], color[1], color[2], color[3]);
+      g.ellipse(nx, ny, 60, 60);
+    }
+    g.drawingContext.filter = 'none';
+  }
+
+  function renderNodes(data) {
+    const g = nodeLayer;
+    g.clear();
+
+    // First pass: connections glow
+    for (const node of data.nodes) {
+      if (!node.alive) continue;
+      const nx = node.x * p.width;
+      const ny = node.y * p.height;
+      const peerCount = node.peer_count || 0;
+
+      // Node aura
+      for (let r = 30; r > 0; r -= 3) {
+        const alpha = p.lerp(0, 30, 1 - r / 30);
+        g.noStroke();
+        g.fill(100, 180, 255, alpha | 0);
+        g.ellipse(nx, ny, r * 2, r * 2);
+      }
+    }
+
+    // Second pass: actual nodes
+    for (const node of data.nodes) {
+      const nx = node.x * p.width;
+      const ny = node.y * p.height;
+      const peerCount = node.peer_count || 0;
+      const isHovered = state.hoveredNode === node.id;
+      const pulse = Math.sin(p.millis() / 800 + node.id * 1.7) * 0.15 + 0.85;
+      const radius = Math.max(8, Math.min(18, 10 + peerCount * 0.8)) * (isHovered ? 1.3 : 1);
+
+      if (!node.alive) {
+        // Dead node — dim, red hue
+        g.noStroke();
+        g.fill(60, 20, 20, 80);
+        g.ellipse(nx, ny, radius * 1.5, radius * 1.5);
+        g.fill(120, 40, 40, 120);
+        g.ellipse(nx, ny, radius * pulse, radius * pulse);
+        g.stroke(180, 60, 60, 60);
+        g.strokeWeight(1);
+        g.line(nx - 6, ny - 6, nx + 6, ny + 6);
+        g.line(nx + 6, ny - 6, nx - 6, ny + 6);
+        continue;
+      }
+
+      // Node body — gradient
+      g.noStroke();
+      const hue = p.lerp(200, 260, node.id / Math.max(1, data.nodes.length));
+      const sat = 70 + pulse * 20;
+      const bri = 80 + pulse * 20;
+
+      if (peerCount === 0) {
+        // Isolated node — dimmer
+        g.fill(80, 120, 180, 120);
+        g.ellipse(nx, ny, radius * 1.5, radius * 1.5);
+        g.fill(120, 160, 200, 150);
+        g.ellipse(nx, ny, radius * 0.8, radius * 0.8);
+      } else {
+        // Connected node — full glow
+        // Outer ring
+        g.fill(hue, sat * 0.5, bri * 0.4, 60);
+        g.ellipse(nx, ny, radius * 3, radius * 3);
+        // Middle glow
+        g.fill(hue, sat * 0.7, bri * 0.6, 100);
+        g.ellipse(nx, ny, radius * 2, radius * 2);
+        // Core
+        g.fill(hue, sat, bri, 200);
+        g.ellipse(nx, ny, radius, radius);
+        // Inner bright spot
+        g.fill(255, 255, 255, 120);
+        g.ellipse(nx - radius * 0.2, ny - radius * 0.2, radius * 0.4, radius * 0.4);
+      }
+
+      // Node ID label
+      if (radius > 10 || isHovered) {
+        g.noStroke();
+        g.fill(255, 255, 255, isHovered ? 200 : 130);
+        g.textAlign(p.CENTER, p.CENTER);
+        g.textSize(isHovered ? 11 : 8);
+        g.textStyle(p.BOLD);
+        g.text(node.id, nx, ny + 1);
+      }
+
+      // Label below node
+      g.textSize(9);
+      g.textStyle(p.NORMAL);
+      g.fill(180, 200, 220, 120);
+      g.textAlign(p.CENTER, p.TOP);
+      g.text(`N${node.id}  (${peerCount}p)`, nx, ny + radius + 4);
+    }
+  }
+
+  p.windowResized = function() {
+    const container = document.getElementById('canvas-container');
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+    p.resizeCanvas(w, h);
+    if (bgLayer) { bgLayer.resizeCanvas(w, h); }
+    if (nodeLayer) { nodeLayer.resizeCanvas(w, h); }
+    if (edgeLayer) { edgeLayer.resizeCanvas(w, h); }
+    if (glowLayer) { glowLayer.resizeCanvas(w, h); }
+  };
+
+  p.mouseMoved = function() {
+    // Find hovered node
+    if (!state.trace) return;
+    const frames = state.trace.frames;
+    if (!frames || frames.length === 0) return;
+    const idx = Math.max(0, Math.min(Math.round(state.currentFrame), frames.length - 1));
+    const data = frames[idx];
+    if (!data) return;
+
+    state.hoveredNode = null;
+    for (const node of data.nodes) {
+      const nx = node.x * p.width;
+      const ny = node.y * p.height;
+      const dist = p.dist(p.mouseX, p.mouseY, nx, ny);
+      const radius = Math.max(8, Math.min(18, 10 + (node.peer_count || 0) * 0.8));
+      if (dist < radius * 3) {
+        state.hoveredNode = node.id;
+        // Update tooltip
+        const tt = document.getElementById('tooltip');
+        document.getElementById('tt-id').textContent = `Node ${node.id}`;
+        document.getElementById('tt-peers').textContent = `${node.peer_count}`;
+        document.getElementById('tt-sent').textContent = `${node.packets_sent || 0}`;
+        document.getElementById('tt-recv').textContent = `${node.packets_recv || 0}`;
+        document.getElementById('tt-alive').textContent = node.alive ? '✓ Yes' : '✗ Dead';
+        document.getElementById('tt-alive').style.color = node.alive ? '#4ade80' : '#f87171';
+        tt.style.display = 'block';
+        tt.style.left = (p.mouseX + 14) + 'px';
+        tt.style.top = (p.mouseY - 10) + 'px';
+        break;
+      }
+    }
+    if (state.hoveredNode === null) {
+      document.getElementById('tooltip').style.display = 'none';
+    }
+  };
+
+  p.mousePressed = function() {
+    if (state.playing) {
+      state.playing = false;
+      document.getElementById('btn-play').textContent = '▶';
+      document.getElementById('btn-play').classList.remove('active');
+    }
+  };
+};
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT LOG
+// ═══════════════════════════════════════════════════════════════
+
+function addEvent(type, text, time) {
+  const log = document.getElementById('event-log');
+  const existing = log.querySelectorAll('.event');
+  // Deduplicate recent events (same text within 0.5s)
+  for (const el of existing) {
+    if (el.dataset.text === text && el.dataset.time > time - 0.5) return;
+  }
+  const ev = document.createElement('div');
+  ev.className = `event ev-${type}`;
+  ev.dataset.text = text;
+  ev.dataset.time = time;
+  ev.innerHTML = `<span class="ev-time">t=${time.toFixed(1)}s</span> <span class="ev-type">${text}</span>`;
+  log.appendChild(ev);
+  // Keep max 20 events
+  while (log.children.length > 20) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCENARIO LOADER
+// ═══════════════════════════════════════════════════════════════
+
+function loadScenario(name) {
+  state.trace = generateScenario(name);
+  state.currentFrame = 0;
+  state.playing = true;
+  state.totalFrames = state.trace.frames.length;
+  state.totalTime = state.trace.totalTime;
+
+  document.getElementById('btn-play').textContent = '⏸';
+  document.getElementById('btn-play').classList.add('active');
+  document.getElementById('event-log').innerHTML = '';
+  document.getElementById('tooltip').style.display = 'none';
+
+  const timeline = document.getElementById('timeline');
+  timeline.max = 100;
+  timeline.value = 0;
+}
+
+function loadTraceFromFile(text) {
+  try {
+    const lines = text.trim().split('\n').filter(l => l.trim());
+    const frames = lines.map((line, i) => {
+      const obj = JSON.parse(line);
+      return {
+        tick: obj.tick || i,
+        time: obj.time || obj.tick || i,
+        nodes: (obj.nodes || []).map(n => ({
+          id: n.id,
+          peer_count: n.peer_count || 0,
+          peers: n.peers || [],
+          alive: n.alive !== false,
+          x: n.x || (Math.cos(n.id * 1.5) * 0.25 + 0.5),
+          y: n.y || (Math.sin(n.id * 1.5) * 0.25 + 0.5),
+          packets_sent: n.packets_sent || 0,
+          packets_recv: n.packets_recv || 0,
+        })),
+        events: (obj.events || []).map(e => ({
+          type: evType(e.type || e.mode || 'info'),
+          text: e.text || `${e.type || e.mode || 'event'} at t=${(obj.time || obj.tick || i).toFixed(1)}s`,
+        })),
+      };
+    });
+
+    if (frames.length === 0) { alert('Trace contains no frames'); return; }
+    state.trace = { frames, totalTime: frames[frames.length - 1].time || frames.length };
+    state.currentFrame = 0;
+    state.playing = true;
+    state.totalFrames = frames.length;
+    state.totalTime = state.trace.totalTime;
+    document.getElementById('btn-play').textContent = '⏸';
+    document.getElementById('btn-play').classList.add('active');
+    document.getElementById('event-log').innerHTML = '';
+    document.getElementById('scenario-select').value = 'custom';
+  } catch(e) {
+    alert('Failed to parse trace: ' + e.message);
+  }
+}
+
+function evType(s) {
+  const l = s.toLowerCase();
+  if (l.includes('converge') || l.includes('✅')) return 'converge';
+  if (l.includes('fail') || l.includes('death') || l.includes('kill') || l.includes('💀')) return 'failure';
+  if (l.includes('adversary') || l.includes('attack') || l.includes('⚡')) return 'adversary';
+  if (l.includes('partition') || l.includes('split') || l.includes('⚠️')) return 'partition';
+  if (l.includes('join') || l.includes('start')) return 'join';
+  if (l.includes('connect')) return 'connect';
+  return 'info';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI BINDINGS
+// ═══════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btnPlay = document.getElementById('btn-play');
+  const btnReset = document.getElementById('btn-reset');
+  const btnSpeedDown = document.getElementById('btn-speed-down');
+  const btnSpeedUp = document.getElementById('btn-speed-up');
+  const speedLabel = document.getElementById('speed-label');
+  const scenarioSelect = document.getElementById('scenario-select');
+  const timeline = document.getElementById('timeline');
+  const fileInput = document.getElementById('file-input');
+
+  btnPlay.onclick = () => {
+    state.playing = !state.playing;
+    btnPlay.textContent = state.playing ? '⏸' : '▶';
+    btnPlay.classList.toggle('active', state.playing);
+    if (state.playing && state.currentFrame >= state.trace.frames.length - 1) {
+      state.currentFrame = 0;
+    }
+  };
+
+  btnReset.onclick = () => {
+    state.currentFrame = 0;
+    state.playing = true;
+    btnPlay.textContent = '⏸';
+    btnPlay.classList.add('active');
+    document.getElementById('event-log').innerHTML = '';
+  };
+
+  btnSpeedDown.onclick = () => {
+    const speeds = [0.25, 0.5, 1, 2, 4, 8];
+    const i = Math.max(0, speeds.indexOf(state.speed) - 1);
+    state.speed = speeds[Math.max(0, i)];
+    speedLabel.textContent = state.speed + '×';
+  };
+
+  btnSpeedUp.onclick = () => {
+    const speeds = [0.25, 0.5, 1, 2, 4, 8];
+    const i = Math.max(0, speeds.indexOf(state.speed) + 1);
+    state.speed = speeds[Math.min(speeds.length - 1, i)];
+    speedLabel.textContent = state.speed + '×';
+  };
+
+  scenarioSelect.onchange = () => {
+    loadScenario(scenarioSelect.value);
+  };
+
+  timeline.addEventListener('input', () => {
+    if (!state.trace || !state.trace.frames) return;
+    const pct = parseFloat(timeline.value) / 100;
+    state.currentFrame = pct * (state.trace.frames.length - 1);
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      loadTraceFromFile(ev.target.result);
+    };
+    reader.readAsText(file);
+  });
+
+  // Drag and drop on document
+  document.addEventListener('dragover', (e) => { e.preventDefault(); document.getElementById('file-loader').style.display = 'block'; });
+  document.addEventListener('dragleave', () => { document.getElementById('file-loader').style.display = 'none'; });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    document.getElementById('file-loader').style.display = 'none';
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => loadTraceFromFile(ev.target.value);
+    reader.readAsText(file);
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ') { e.preventDefault(); btnPlay.click(); }
+    if (e.key === 'ArrowRight') state.currentFrame = Math.min(state.currentFrame + 1, (state.trace.frames?.length || 1) - 1);
+    if (e.key === 'ArrowLeft') state.currentFrame = Math.max(state.currentFrame - 1, 0);
+    if (e.key === 'r' || e.key === 'R') btnReset.click();
+  });
+});
+
+new p5(sketch, 'canvas-container');
+</script>
+</body>
+</html>
