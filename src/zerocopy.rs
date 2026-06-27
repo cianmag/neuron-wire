@@ -6,17 +6,18 @@
 //! ## How it works
 //!
 //! 1. Receive bytes from network into a buffer
-//! 2. Cast the buffer pointer to a `MessageHeader` — reads the first 16 bytes
+//! 2. Call `MessageHeader::from_bytes(buf)` — zero-copy cast
 //! 3. Validate the header (magic, CRC)
-//! 4. Cast the buffer + 16 to the appropriate body type
-//! 5. Read fields directly from the buffer
+//! 4. Read body bytes from `HEADER_SIZE..total_size`
+//! 5. Read fields directly from the body slice
 //! 6. When done, the buffer is returned to the pool
 //!
 //! No memory was allocated. No data was copied. The entire message was
 //! "deserialized" by reading bytes that were already in memory.
 
-use crate::header::MessageHeader;
-use crate::types::MessageType;
+use crate::header::{HeaderError, MessageHeader};
+use crate::types::MsgType;
+use crate::HEADER_SIZE;
 
 /// A parsed message referencing a network buffer.
 /// This is zero-copy — it borrows the buffer, it doesn't own it.
@@ -30,37 +31,24 @@ pub struct MessageRef<'a> {
 
 impl<'a> MessageRef<'a> {
     /// Parse a message from a byte buffer.
-    /// This is zero-copy — the returned references point directly into `buf`.
+    /// Zero-copy — the returned references point directly into `buf`.
     ///
-    /// Returns None if the buffer is too small or the header is invalid.
+    /// Returns `Err(HeaderError)` if the buffer is too small or invalid.
     #[inline]
-    pub fn parse(buf: &'a [u8]) -> Option<MessageRef<'a>> {
-        if buf.len() < MessageHeader::SIZE {
-            return None;
-        }
-
-        // Zero-copy: cast the buffer to a header
-        let header = unsafe { MessageHeader::from_bytes(buf) };
-
-        // Validate the header
-        if header.validate().is_err() {
-            return None;
-        }
-
+    pub fn parse(buf: &'a [u8]) -> Result<MessageRef<'a>, HeaderError> {
+        let header = MessageHeader::from_bytes(buf)?;
         let total_size = header.total_size();
         if buf.len() < total_size {
-            return None;
+            return Err(HeaderError::ShortBuffer(buf.len()));
         }
-
-        let body = &buf[MessageHeader::SIZE..total_size];
-
-        Some(MessageRef { header, body })
+        let body = &buf[HEADER_SIZE..total_size];
+        Ok(MessageRef { header, body })
     }
 
     /// Get the message type
     #[inline]
-    pub fn msg_type(&self) -> MessageType {
-        MessageType::from_u8(self.header.msg_type).unwrap_or(MessageType::Reserved)
+    pub fn msg_type(&self) -> Option<MsgType> {
+        MsgType::from_u8(self.header.msg_type)
     }
 
     /// Get flags
@@ -83,8 +71,8 @@ impl<'a> MessageRef<'a> {
 
     /// Create a buffer with a Ping message
     pub fn new_ping() -> Vec<u8> {
-        let header = MessageHeader::new(MessageType::Ping as u8, 0, 0);
-        let mut buf = Vec::with_capacity(MessageHeader::SIZE);
+        let header = MessageHeader::new(MsgType::Ping as u8, 0, 0);
+        let mut buf = Vec::with_capacity(HEADER_SIZE);
         buf.extend_from_slice(&header.magic);
         buf.push(header.version);
         buf.push(header.msg_type);
@@ -96,8 +84,8 @@ impl<'a> MessageRef<'a> {
 
     /// Create a buffer with a Pong message
     pub fn new_pong() -> Vec<u8> {
-        let header = MessageHeader::new(MessageType::Pong as u8, 0, 0);
-        let mut buf = Vec::with_capacity(MessageHeader::SIZE);
+        let header = MessageHeader::new(MsgType::Pong as u8, 0, 0);
+        let mut buf = Vec::with_capacity(HEADER_SIZE);
         buf.extend_from_slice(&header.magic);
         buf.push(header.version);
         buf.push(header.msg_type);
@@ -108,7 +96,7 @@ impl<'a> MessageRef<'a> {
     }
 }
 
-/// Pre-allocated buffer pool for zero-copy message I/O
+/// Pre-allocated buffer pool for zero-copy message I/O.
 /// Reuses buffers to avoid allocation during high-throughput messaging.
 pub struct BufferPool {
     pool: Vec<Vec<u8>>,
@@ -127,7 +115,9 @@ impl BufferPool {
     /// Get a buffer from the pool (or allocate a new one)
     #[inline]
     pub fn acquire(&mut self) -> Vec<u8> {
-        self.pool.pop().unwrap_or_else(|| Vec::with_capacity(self.buffer_size))
+        self.pool
+            .pop()
+            .unwrap_or_else(|| Vec::with_capacity(self.buffer_size))
     }
 
     /// Return a buffer to the pool for reuse
@@ -143,44 +133,44 @@ impl BufferPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::CommandBody;
+    use crate::types;
 
     #[test]
     fn test_parse_ping() {
         let buf = MessageRef::new_ping();
         let msg = MessageRef::parse(&buf).unwrap();
-        assert_eq!(msg.msg_type(), MessageType::Ping);
-        assert_eq!(msg.total_size(), MessageHeader::SIZE);
+        assert_eq!(msg.msg_type(), Some(MsgType::Ping));
+        assert_eq!(msg.total_size(), HEADER_SIZE);
     }
 
     #[test]
-    fn test_parse_command() {
-        let cmd = CommandBody::new(1, 2, 0.95, 0xABCD, 100_000, 0x42, 0xFF);
-        let header = MessageHeader::new(MessageType::Command as u8, CommandBody::SIZE as u32, 0);
+    fn test_parse_empty() {
+        let result = MessageRef::parse(&[]);
+        assert!(result.is_err());
+    }
 
-        let mut buf = Vec::with_capacity(header.total_size());
-        buf.extend_from_slice(&header.magic);
-        buf.push(header.version);
-        buf.push(header.msg_type);
-        buf.extend_from_slice(&header.flags.to_le_bytes());
-        buf.extend_from_slice(&header.body_len.to_le_bytes());
-        buf.extend_from_slice(&header.header_crc.to_le_bytes());
-        // body
-        buf.extend_from_slice(&cmd.command_id.to_le_bytes());
-        buf.extend_from_slice(&cmd.prediction_code.to_le_bytes());
-        buf.extend_from_slice(&cmd.confidence_raw.to_le_bytes());
-        buf.extend_from_slice(&cmd.context_hash.to_le_bytes());
-        buf.extend_from_slice(&cmd.deadline_us.to_le_bytes());
-        buf.extend_from_slice(&cmd.source_id.to_le_bytes());
-        buf.extend_from_slice(&cmd.target_mask.to_le_bytes());
+    #[test]
+    fn test_parse_too_short() {
+        let buf = vec![0u8; 4];
+        let result = MessageRef::parse(&buf);
+        assert!(result.is_err());
+    }
 
+    #[test]
+    fn test_buffer_pool() {
+        let mut pool = BufferPool::new(65535);
+        let buf = pool.acquire();
+        assert!(buf.capacity() >= 65535);
+        pool.release(buf);
+        let buf2 = pool.acquire();
+        assert!(buf2.is_empty());
+        assert!(buf2.capacity() >= 65535);
+    }
+
+    #[test]
+    fn test_has_flag() {
+        let buf = MessageRef::new_ping();
         let msg = MessageRef::parse(&buf).unwrap();
-        assert_eq!(msg.msg_type(), MessageType::Command);
-
-        // Zero-copy: cast body bytes directly to CommandBody
-        let parsed_cmd = unsafe { CommandBody::from_bytes(msg.body) };
-        assert_eq!(parsed_cmd.command_id, 1);
-        assert_eq!(parsed_cmd.prediction_code, 2);
-        assert!((parsed_cmd.confidence() - 0.95).abs() < 0.001);
+        assert!(!msg.has_flag(types::flags::COMPRESSED));
     }
 }

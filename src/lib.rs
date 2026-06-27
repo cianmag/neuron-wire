@@ -24,6 +24,7 @@ pub mod components;
 pub mod neurogenesis;
 pub mod hebbian;
 pub mod forward_pass;
+pub mod zerocopy;
 pub mod simulator;
 pub mod adversary;
 pub mod crc;

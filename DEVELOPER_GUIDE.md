@@ -22,7 +22,7 @@ A map of the codebase: where things are, how they connect, and how to debug, tes
 
 ## 1. Codebase Overview
 
-The Rust source lives in `src/`, organized into **17 public modules** and **9 support files**:
+The Rust source lives in `src/`, organized into **17 modules**:
 
 ```
 src/
@@ -31,8 +31,7 @@ src/
 ├── types.rs            # MsgType enum, field offsets, constants (inline mods)
 ├── flat.rs             # FlatBuffer serialization/deserialization
 ├── io.rs               # Packet I/O helpers
-├── transport.rs        # TransportHeader, AckTracker, ReliableQueue
-├── udp_transport.rs    # UdpTransport: socket lifecycle, recv/send orchestration
+├── transport.rs        # TransportHeader, AckTracker, ReliableQueue, UdpTransport
 ├── engine_loop.rs      # EngineLoop: the 6-phase main loop (~913 lines)
 ├── dht.rs              # DHT handler: k-buckets, bootstrap, latency-weighted routing
 ├── components.rs       # ECS components: EntityId (256-bit), ActivationMap, SynapseMap
@@ -43,12 +42,12 @@ src/
 ├── simulator.rs        # Simulation harness: paper mode, multi-trial, CSV export
 ├── adversary.rs        # Adversarial testing: packet injection, corruption, replay
 ├── crc.rs              # CRC32 checksum helpers
-└── zerocopy.rs         # Zero-copy field access utilities
+├── zerocopy.rs         # Zero-copy field access utilities
 ```
 
-**Orphaned files** (not compiled — leftover from inline migration into `types.rs`):
-`command.rs`, `consensus.rs`, `data.rs`, `dict.rs`, `network.rs`, `readiness.rs`, `spike.rs`.
-These can be deleted; they contain no code that affects the binary.
+**Deleted orphans** (previously existed as dead files, now removed):
+`command.rs`, `consensus.rs`, `data.rs`, `dict.rs`, `network.rs`, `readiness.rs`, `spike.rs`, `udp_transport.rs`.
+All their content was already split across `types.rs` (field offsets, inline modules) and `transport.rs` (UdpTransport struct). This cleanup reduces source file count from 25→17 and eliminates confusion.
 
 **Examples:** `examples/simulate.rs` (CLI runner), `examples/zero_copy_demo.rs`.
 
@@ -61,10 +60,8 @@ These can be deleted; they contain no code that affects the binary.
                    /   |    |    \       \
                  /     |    |     \       \
            header  types  flat  io     crc
-              |       |     |              |
+              |       |     |      \
               +-------+-----+---- transport
-                                   |
-                              udp_transport
                                    |
                              engine_loop ←─────── the central coordinator
                             /    |    |    \ \
@@ -73,7 +70,7 @@ These can be deleted; they contain no code that affects the binary.
                      |         |          |
                      |         +---- neurogenesis
                      |
-                 simulator    adversary
+                 simulator    adversary    zerocopy
 ```
 
 Key observations:
@@ -197,7 +194,7 @@ Subsystem (DHT, Hebbian, etc.)
 
 ## 7. Testing Patterns
 
-The project has **72 unit tests** across 15 modules. All tests are inline `#[cfg(test)] mod tests { ... }` blocks — there is no separate `tests/` directory.
+The project has **77 unit tests** across 16 modules. All tests are inline `#[cfg(test)] mod tests { ... }` blocks — there is no separate `tests/` directory.
 
 ### Patterns used
 

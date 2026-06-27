@@ -3,7 +3,7 @@
 **A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![Tests](https://img.shields.io/badge/tests-72%2F72-brightgreen)](#)
+[![Tests](https://img.shields.io/badge/tests-77%2F77-brightgreen)](#)
 [![Lines of Rust](https://img.shields.io/badge/rust-7%2C975%20LOC-blue)](#)
 [![Crates.io](https://img.shields.io/badge/crate-v0.2.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
@@ -232,10 +232,10 @@ Apoptosis runs every ~1 s during Phase 5. It enforces four pruning criteria:
 
 | Metric | Value |
 |---|---|
-| Rust source files | 26 |
-| Total lines of Rust | 7,975 (26 source files) |
-| Test functions | 72 |
-| Test pass rate | 72 / 72 (100 %) |
+| Rust source files | 17 |
+| Total lines of Rust | 7,975 (17 source files) |
+| Test functions | 77 |
+| Test pass rate | 77 / 77 (100 %) |
 | Pre-existing warnings | 0 (zero-warnings policy enforced) |
 | External dependencies | 5 (crc32fast, rand, serde, toml, csv) |
 | Subsystems | 7 |
@@ -295,7 +295,7 @@ The release build produces a single statically linked binary. No external runtim
 ### Tests
 
 ```bash
-cargo test                # 72 tests, 0 failures
+cargo test                # 77 tests, 0 failures
 ```
 
 All tests are deterministic (seeded RNG, no wall-clock-dependent assertions in the unit test suite). Zero warnings enforced across the entire codebase.
