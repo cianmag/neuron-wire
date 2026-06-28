@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+- Removed stray `mut` on `MessageHeader` in integration test (zero-warnings policy enforcement)
+
 ### Added
 - 110 unit tests across 17 modules (+43% coverage from 77)
 - 14 criterion benchmarks for hot paths (header, CRC, DHT, Hebbian, forward pass)

@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| v0.3.x  | ✅ (development focus) |
+| v0.3.0  | ✅ (current release) |
 | < v0.3  | ❌ (pre-release prototypes) |
 
 ## Reporting a Vulnerability

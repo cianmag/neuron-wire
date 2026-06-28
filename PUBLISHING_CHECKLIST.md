@@ -25,7 +25,7 @@
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Unit tests | ✅ | 72 tests across 15 modules |
+| Unit tests | ✅ | 110 unit + 8 proptest + 7 integration = 125 tests across 17 modules |
 | Integration tests | ⬜ | No `tests/` directory — all tests are in-module |
 | Network tests | ⬜ | Simulator runs localhost only — no `#[cfg(network)]` tests |
 | Failure tests | ✅ | `adversary.rs` — 9 tests (corruption, replay, garbage) |

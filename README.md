@@ -295,7 +295,7 @@ The release build produces a single statically linked binary. No external runtim
 ### Tests
 
 ```bash
-cargo test                # 77 tests, 0 failures
+cargo test                # 125 tests, 0 failures
 ```
 
 All tests are deterministic (seeded RNG, no wall-clock-dependent assertions in the unit test suite). Zero warnings enforced across the entire codebase.

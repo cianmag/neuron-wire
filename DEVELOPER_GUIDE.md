@@ -194,7 +194,7 @@ Subsystem (DHT, Hebbian, etc.)
 
 ## 7. Testing Patterns
 
-The project has **77 unit tests** across 16 modules. All tests are inline `#[cfg(test)] mod tests { ... }` blocks — there is no separate `tests/` directory.
+The project has **110 unit tests** across 16 modules and **15 additional integration/property tests** in `tests/` (7 integration, 8 property-based). All unit tests are inline `#[cfg(test)] mod tests { ... }` blocks in each module.
 
 ### Patterns used
 
@@ -229,7 +229,7 @@ fn test_partition() { /* isolate a node, verify reconnection */ }
 ### Running tests
 
 ```bash
-cargo test                    # All 72 tests
+cargo test                    # All 125 tests
 cargo test dht                # DHT subsystem tests only
 cargo test -- --show-output   # See stdout from tests
 cargo clippy -D warnings      # Zero-warnings enforcement
@@ -237,7 +237,7 @@ cargo clippy -D warnings      # Zero-warnings enforcement
 
 ### CI pipeline
 
-The GitHub Actions CI runs: `cargo build --release` → `cargo test` → `cargo clippy -D warnings` → benchmark validation against known-good CSVs.
+The GitHub Actions CI runs: `cargo build --verbose` → `cargo clippy -- -D warnings` → `cargo test --verbose` → `cargo llvm-cov` (code coverage) → `cargo bench --no-run` → `cargo audit` (dependency vulnerabilities) → `cargo deny check` (license/duplicate policy).
 
 ---
 
@@ -388,7 +388,7 @@ If you're making a change that could be controversial or has lasting impact, wri
 
 ---
 
-*Last updated: 2026-06-28 · Codebase at commit `c54965b`*
+*Last updated: 2026-06-28 · Codebase at commit [`69f2c7b`](https://github.com/cianmag/neuron-wire/commit/69f2c7b)*
 
 [![CI](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml)
 [![clippy](https://img.shields.io/badge/clippy-zero%20warnings-brightgreen)]()
@@ -398,4 +398,4 @@ If you're making a change that could be controversial or has lasting impact, wri
 | Tests | 110 |
 | Modules | 17 |
 | Warnings | 0 (clippy -D warnings) |
-| Coverage | ad-hoc (no CI coverage yet) |
+|| Coverage | 60%+ (CI: cargo-llvm-cov with codecov output) |
