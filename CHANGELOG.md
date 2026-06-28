@@ -6,41 +6,41 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## [Unreleased]
+## [v0.3.0] — Quality Infrastructure (2026-06-28)
+
+> Git tag: `v0.3.0`
+
+### Added
+- CI matrix: `test` runs on ubuntu / macos / windows × stable Rust
+- CI: WASM compile check (`cargo build --target wasm32-wasip1`)
+- CI: `cargo-semver-checks` API compatibility against latest git tag
+- CI: Criterion benchmark baseline caching with `--load-baseline master` across PR branches
+- CI: `cargo-llvm-cov` code coverage, `cargo-audit`, `cargo-deny` (all block on failure)
+- 110 unit tests across 17 modules (+43% coverage from 77)
+- 14 criterion benchmarks for hot paths (header, CRC, DHT, Hebbian, forward pass)
+- Property-based tests via `proptest` (8 targets in `tests/proptest.rs`)
+- Integration tests (7 roundtrip scenarios in `tests/integration.rs`)
+- Fuzz targets in `fuzz/` for header parsing (`libfuzzer`)
+
+### Changed
+- `Cargo.toml`: version 0.2.0 → 0.3.0, MSRV `rust-version = "1.87"`
+- `src/lib.rs`: `#![deny(missing_docs)]` enforced; 16 submodules annotated with `#![allow(missing_docs)]`
+- `DEVELOPER_GUIDE.md`: CI pipeline described as 7 parallel jobs, test counts corrected
 
 ### Fixed
 - Removed stray `mut` on `MessageHeader` in integration test (zero-warnings policy enforcement)
 
-### Added
-- 110 unit tests across 17 modules (+43% coverage from 77)
-- 14 criterion benchmarks for hot paths (header, CRC, DHT, Hebbian, forward pass)
-- GitHub Actions CI: build + clippy `-D warnings` + test + bench --no-run
-- CI status badge and stats table in `DEVELOPER_GUIDE.md`
-- `benches/benchmarks.rs` with throughput-measured CRC and parse benchmarks
-- Property-based tests via `proptest` for random DHT and Hebbian invariants
-- Integration tests in `tests/` directory for end-to-end protocol scenarios
-- Fuzz targets in `fuzz/` for header parsing and deserialization
-- CHANGELOG.md in keepachangelog format
-
-### Changed
-- `Cargo.toml`: MSRV declared (`rust-version = "1.85"`), proptest dev-dependency added
-- `CONTRIBUTING.md`: updated test count (110), added bench + proptest instructions
-- `src/lib.rs`: `#![deny(missing_docs)]` enforced
-- Removed unused `cdylib`/`staticlib` crate types
-
 ### Infrastructure
-- CI: cargo-audit for dependency vulnerabilities
-- CI: cargo-deny for license duplication and crate duplicates
-- CI: cargo-llvm-cov for code coverage (summary + badge generation)
-- Code coverage badge in DEVELOPER_GUIDE.md
-
-### Security
-- Dependency auditing pipeline added to CI workflow
-- Vulnerability disclosure policy remains via SECURITY.md
+- `benches/benchmarks.rs` — throughput-measured CRC and parse benchmarks
+- `tests/integration.rs` — end-to-end protocol roundtrips
+- `tests/proptest.rs` — randomized DHT, Hebbian, header invariants
+- `fuzz/` — libfuzzer target for header parsing
+- `.github/workflows/ci.yml` — 7 parallel jobs with 3-OS matrix
+- `deny.toml` — license & duplicate-dependency policy
 
 ---
 
-## v0.3.0 — Negative SGA Result (2026-06-26)
+## [v0.3.0-negative-sga] — Negative SGA Result (2026-06-26)
 
 > GitHub release: `v0.3.0-negative-sga`
 
@@ -64,7 +64,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## v0.2.0 — Research Prototype (2026-05)
+## [v0.2.0] — Research Prototype (2026-05)
 
 ### Added
 - Interactive DHT visualization and trace output system
@@ -90,7 +90,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
-## v0.1.0 — Initial Prototype (2026-04)
+## [v0.1.0] — Initial Prototype (2026-04)
 
 ### Added
 - Kademlia-style DHT routing with k-buckets (K=20, 256 buckets)
@@ -109,3 +109,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Initial commit `e2d99a5`
 - Design inspired by Kademlia DHT, FlatBuffers, Hebbian learning/STDP, and neuroplasticity concepts
 - Dual-licensed MIT
+
+[Unreleased]: https://github.com/cianmag/neuron-wire/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/cianmag/neuron-wire/compare/v0.3.0-negative-sga...v0.3.0
+[v0.3.0-negative-sga]: https://github.com/cianmag/neuron-wire/compare/v0.2.0...v0.3.0-negative-sga
+[v0.2.0]: https://github.com/cianmag/neuron-wire/compare/v0.1.0...v0.2.0
+[v0.1.0]: https://github.com/cianmag/neuron-wire/releases/tag/v0.1.0
+
