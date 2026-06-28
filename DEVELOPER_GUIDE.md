@@ -237,7 +237,22 @@ cargo clippy -D warnings      # Zero-warnings enforcement
 
 ### CI pipeline
 
-The GitHub Actions CI runs: `cargo build --verbose` → `cargo clippy -- -D warnings` → `cargo test --verbose` → `cargo llvm-cov` (code coverage) → `cargo bench --no-run` → `cargo audit` (dependency vulnerabilities) → `cargo deny check` (license/duplicate policy).
+The GitHub Actions CI runs **7 parallel jobs**:
+
+| Job | Description | Platform |
+|-----|-------------|----------|
+| `test` | Build + clippy + unit/integration tests + WASM compile check | ubuntu / macos / windows × stable |
+| `coverage` | `cargo-llvm-cov` code coverage (codecov JSON output) | ubuntu |
+| `bench` | Criterion benchmarks with cached baseline comparison | ubuntu |
+| `audit` | `cargo-audit` dependency vulnerability scan | ubuntu |
+| `deny` | `cargo-deny` license & duplicate-dependency policy | ubuntu |
+| `semver` | `cargo-semver-checks` API compatibility against latest tag | ubuntu |
+
+Cross-platform notes:
+- Windows skips test **execution** (`cargo test` fails on git-bash due to missing `dlltool.exe` for `windows-sys`) and runs `cargo check --tests` instead for compile verification.
+- WASM compile check targets `wasm32-wasip1` (WASI interface — no JS bundler needed).
+- Criterion baseline is cached between runs via `actions/cache`. On PR branches, the cache falls back to the most recent master baseline for automatic regression comparison.
+- `cargo audit` and `cargo deny` block CI on failure (no `|| echo` suppression).
 
 ---
 

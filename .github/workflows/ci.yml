@@ -11,8 +11,14 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  # ── Cross-platform build + test matrix ──────────────────────────
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,35 +27,111 @@ jobs:
         with:
           components: clippy
 
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Clippy (all targets)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test (full suite)
+        if: runner.os != 'Windows'
+        run: cargo test --verbose
+
+      - name: Test (compile check only, Windows)
+        if: runner.os == 'Windows'
+        run: cargo check --tests --verbose
+
+      - name: WASM compile check
+        if: runner.os == 'Linux'
+        run: |
+          rustup target add wasm32-wasip1
+          cargo build --target wasm32-wasip1 --verbose
+
+  # ── Code coverage ──────────────────────────────────────────────
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Run coverage
+        run: cargo llvm-cov --all-features --codecov --output-path coverage.json
+
+  # ── Criterion benchmarks (with cached baseline comparison) ─────
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore cached criterion baseline
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: criterion-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            criterion-refs/heads/master-
+            criterion-
+
+      - name: Run benchmarks (load + save baseline)
+        run: cargo bench --all-features -- --load-baseline master --save-baseline master
+
+  # ── Dependency vulnerability audit ─────────────────────────────
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
 
+      - name: Audit
+        run: cargo audit
+
+  # ── License & duplicate-dependency policy ──────────────────────
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install cargo-deny
         uses: taiki-e/install-action@cargo-deny
 
-      - name: Check formatting
-        run: cargo fmt --check || echo "cargo fmt not enforced (skip)"
+      - name: Deny
+        run: cargo deny check
 
-      - name: Build
-        run: cargo build --verbose
+  # ── API compatibility (semver) ─────────────────────────────────
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # need full history + tags for baseline
 
-      - name: Clippy
-        run: cargo clippy -- -D warnings
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Test
-        run: cargo test --verbose
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@cargo-semver-checks
 
-      - name: Code coverage
-        run: cargo llvm-cov --all-features --codecov --output-path coverage.json
-
-      - name: Bench (compile-check only)
-        run: cargo bench --all-features --no-run || echo "benches may not exist yet"
-
-      - name: Dependency audit
-        run: cargo audit || echo "cargo audit warnings (non-blocking)"
-
-      - name: Dependency deny
-        run: cargo deny check || echo "cargo deny warnings (non-blocking)"
+      - name: Check API compatibility
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$TAG" ]; then
+            cargo semver-checks --baseline-rev "$TAG" --verbose
+          else
+            echo "No git tags found — skipping semver checks (baseline unavailable)."
+          fi
