@@ -102,6 +102,12 @@ pub struct AckTracker {
     max_seen: u32,
 }
 
+impl Default for AckTracker {
+    fn default() -> Self {
+        AckTracker::new()
+    }
+}
+
 impl AckTracker {
     pub fn new() -> Self {
         AckTracker {
@@ -132,7 +138,7 @@ impl AckTracker {
                 self.advance_window();
             } else {
                 // Packet in the future (gap)
-                let bit_pos = (offset - 1) as u32;
+                let bit_pos = offset - 1;
                 if self.bitfield & (1 << bit_pos) != 0 {
                     return false; // already received (rare with u32 bitfield)
                 }
@@ -216,6 +222,12 @@ pub struct ReliableQueue {
     packets: HashMap<u32, ReliablePacket>,
 }
 
+impl Default for ReliableQueue {
+    fn default() -> Self {
+        ReliableQueue::new()
+    }
+}
+
 impl ReliableQueue {
     pub fn new() -> Self {
         ReliableQueue {
@@ -238,7 +250,7 @@ impl ReliableQueue {
     /// Process an incoming ACK: remove acknowledged packets
     pub fn process_ack(&mut self, ack_number: u32, ack_bitfield: u32) -> Vec<u32> {
         let mut to_remove = Vec::new();
-        for (&seq, _packet) in &self.packets {
+        for &seq in self.packets.keys() {
             if seq <= ack_number {
                 to_remove.push(seq);
             } else {
@@ -320,7 +332,7 @@ pub fn calculate_gradient_weight(age_ms: u32, half_life_ms: f32) -> f32 {
     }
     let delta_t = age_ms as f32;
     // e^(-ln(2) * dt / half_life)
-    (-0.69314718 * delta_t / half_life_ms).exp()
+    (-std::f32::consts::LN_2 * delta_t / half_life_ms).exp()
 }
 
 // ─── Full UDP Transport ────────────────────────────────────────

@@ -83,6 +83,7 @@ impl std::fmt::Display for FailureMode {
 }
 
 impl FailureMode {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "node-death" | "node_death" | "death" => FailureMode::NodeDeath,
@@ -135,9 +136,8 @@ pub struct SimulationConfig {
     pub maintenance_mode: String,
 }
 
-impl SimulationConfig {
-    /// Default config for a standard benchmark run.
-    pub fn default() -> Self {
+impl Default for SimulationConfig {
+    fn default() -> Self {
         SimulationConfig {
             node_count: 10,
             duration_secs: 120,
@@ -158,7 +158,6 @@ impl SimulationConfig {
     }
 }
 
-/// Pre-registered convergence criteria (frozen before experiment, not tuned on data).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConvergenceCriteria {
     /// Max standard deviation of edge weights over window (converged if below)
@@ -558,7 +557,7 @@ impl Simulator {
             if total_samples * sample_interval_ms <= elapsed.as_millis() as u64 {
                 total_samples += 1;
                 // Tick estimate: elapsed_ms / tick_interval_ms
-                tick_counter = elapsed.as_millis() as u64 / self.config.tick_interval_ms as u64;
+                tick_counter = elapsed.as_millis() as u64 / self.config.tick_interval_ms;
 
                 for node in &self.nodes {
                     // Read real engine stats from the engine thread via shared pointer
@@ -692,8 +691,8 @@ impl Simulator {
                     .count();
                 if live_count > 0 {
                     // Among live nodes, find min peer count
-                    let min_peers_this_sample = store.iter()
-                        .filter_map(|(_, samples)| samples.get(si))
+                    let min_peers_this_sample = store.values()
+                        .filter_map(|samples| samples.get(si))
                         .map(|m| m.peer_count)
                         .min().unwrap_or(0);
                     if min_peers_this_sample < min_peers_post_failure {

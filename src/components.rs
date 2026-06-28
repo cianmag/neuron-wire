@@ -26,7 +26,7 @@ impl EntityId {
     pub fn hex(&self) -> String {
         let mut s = String::with_capacity(10);
         for &b in &self.0[..4] { s.push_str(&format!("{:02x}", b)); }
-        s.push_str("…");
+        s.push('…');
         for &b in &self.0[28..] { s.push_str(&format!("{:02x}", b)); }
         s
     }

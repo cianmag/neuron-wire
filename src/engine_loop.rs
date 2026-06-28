@@ -527,7 +527,7 @@ impl EngineLoop {
             }
 
             // Print stats every 1000 ticks
-            if self.tick % 1000 == 0 {
+            if self.tick.is_multiple_of(1000) {
                 self.print_stats();
             }
         }
@@ -728,7 +728,7 @@ pub fn spawn_engine(
             if let Some(ref fconfig) = engine.config.freshness_config {
                 if fconfig.enabled {
                     if let Some(ref mut dht) = engine.dht_handler {
-                        dht.enable_sga(fconfig.clone());
+                        dht.enable_sga(*fconfig);
                         eprintln!("[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
                             fconfig.half_life_ms, fconfig.stretch_factor, fconfig.base_interval_ms);
                     }
@@ -864,7 +864,7 @@ pub fn spawn_engine(
                 }
 
                 // Stats every 1000 ticks
-                if engine.tick % 1000 == 0 {
+                if engine.tick.is_multiple_of(1000) {
                     engine.print_stats();
                 }
             }

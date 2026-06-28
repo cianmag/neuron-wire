@@ -84,6 +84,12 @@ pub struct ApoptosisSystem {
     pub peak_deaths_per_sweep: usize,
 }
 
+impl Default for ApoptosisSystem {
+    fn default() -> Self {
+        ApoptosisSystem::new()
+    }
+}
+
 impl ApoptosisSystem {
     pub fn new() -> Self {
         ApoptosisSystem {

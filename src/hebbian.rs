@@ -89,6 +89,17 @@ pub struct HebbianLearningSystem {
     pub total_gossip_packets: u64,
 }
 
+impl Default for HebbianLearningSystem {
+    fn default() -> Self {
+        Self::new(
+            DEFAULT_LEARNING_RATE,
+            DEFAULT_WEIGHT_DECAY,
+            DEFAULT_PRUNE_THRESHOLD,
+            DEFAULT_GOSSIP_INTERVAL,
+        )
+    }
+}
+
 impl HebbianLearningSystem {
     pub fn new(learning_rate: f32, weight_decay: f32, prune_threshold: f32, gossip_interval: u64) -> Self {
         HebbianLearningSystem {
@@ -99,16 +110,6 @@ impl HebbianLearningSystem {
             total_micro_pruned: 0,
             total_gossip_packets: 0,
         }
-    }
-
-    /// Default constructor with sensible planetary-brain defaults.
-    pub fn default() -> Self {
-        HebbianLearningSystem::new(
-            DEFAULT_LEARNING_RATE,
-            DEFAULT_WEIGHT_DECAY,
-            DEFAULT_PRUNE_THRESHOLD,
-            DEFAULT_GOSSIP_INTERVAL,
-        )
     }
 
     /// Execute one Hebbian tick across all synapses.
@@ -168,7 +169,7 @@ impl HebbianLearningSystem {
             }
 
             // Phase 4: Batch for Gossip
-            if current_tick % self.gossip_tick_interval == 0
+            if current_tick.is_multiple_of(self.gossip_tick_interval)
                 && !synapse.accumulated_gradients.is_empty()
             {
                 if let Some(serialized) = serialize_synapse_gossip(post_id, synapse) {
@@ -284,6 +285,7 @@ fn serialize_gossip_packet(local_id: EntityId, batch: &[(EntityId, Vec<u8>)]) ->
 /// Deserialize a gossip packet received from the network.
 /// Returns `(source_entity_id, Vec<(post_id, Vec<target_id>, Vec<weight>, Vec<gradient>)>)`
 #[allow(dead_code)]
+#[allow(clippy::type_complexity)]
 pub fn deserialize_gossip_packet(data: &[u8]) -> Option<(EntityId, Vec<(EntityId, Vec<EntityId>, Vec<f32>, Vec<f32>)>)> {
     if data.len() < 34 { return None; }
 

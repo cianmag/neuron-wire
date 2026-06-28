@@ -80,6 +80,12 @@ pub struct ForwardPassSystem {
     pub prediction_horizon: f32,
 }
 
+impl Default for ForwardPassSystem {
+    fn default() -> Self {
+        Self::new(DEFAULT_ACTIVATION_LEAK, DEFAULT_PREDICTION_HORIZON)
+    }
+}
+
 impl ForwardPassSystem {
     pub fn new(activation_leak: f32, prediction_horizon: f32) -> Self {
         ForwardPassSystem {
@@ -88,14 +94,10 @@ impl ForwardPassSystem {
         }
     }
 
-    /// Default constructor with sensible defaults.
-    pub fn default() -> Self {
-        ForwardPassSystem::new(DEFAULT_ACTIVATION_LEAK, DEFAULT_PREDICTION_HORIZON)
-    }
-
-    /// Execute one full forward pass tick.
-    ///
-    /// ## Parameters
+    // Default constructor with sensible defaults.
+    /// Executes one forward pass tick: decay activations, propagate through
+    /// synapses, incorporate observations, and detect prediction errors for
+    /// neurogenesis.
     ///
     /// - `activations`: current ActivationMap (mutated in-place with new values)
     /// - `synapses`: mutable SynapseMap (weights unchanged — Hebbian handles that)

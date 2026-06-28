@@ -68,6 +68,7 @@ impl std::fmt::Display for AdversaryMode {
 }
 
 impl AdversaryMode {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "bad-packets" | "badpackets" | "corrupt" => AdversaryMode::BadPackets,
@@ -374,7 +375,7 @@ impl Adversary {
         }
 
         // Pick 2-3 nodes to momentarily kill (brief blip)
-        let to_blip = (target_count as f64 * 0.2).max(2.0).min(5.0) as usize;
+        let to_blip = (target_count as f64 * 0.2).clamp(2.0, 5.0) as usize;
         for i in 0..to_blip.min(target_count) {
             let idx = (i + self.rng_seed as usize) % target_count;
             // Skip attacker node
@@ -385,7 +386,7 @@ impl Adversary {
                 // Toggle kill → revived next tick (simulates crash + restart)
                 // This creates routing table pollution as peers see the node
                 // disappear then reappear with potentially stale entries.
-                if self.rng_seed % 3 == 0 {
+                if self.rng_seed.is_multiple_of(3) {
                     shutdown.store(true, Ordering::SeqCst);
                 }
             }

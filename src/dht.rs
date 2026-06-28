@@ -44,7 +44,7 @@ impl NodeId {
     /// XOR distance
     pub fn xor_distance(&self, other: &NodeId) -> [u8; 32] {
         let mut d = [0u8; 32];
-        for i in 0..32 { d[i] = self.0[i] ^ other.0[i]; }
+        for (i, item) in d.iter_mut().enumerate() { *item = self.0[i] ^ other.0[i]; }
         d
     }
 
@@ -63,7 +63,7 @@ impl NodeId {
     pub fn hex(&self) -> String {
         let mut s = String::with_capacity(64);
         for &b in &self.0[..4] { s.push_str(&format!("{:02x}", b)); }
-        s.push_str("…");
+        s.push('…');
         for &b in &self.0[28..] { s.push_str(&format!("{:02x}", b)); }
         s
     }
@@ -135,6 +135,12 @@ pub struct KBucket {
     pub max_size: usize,
 }
 
+impl Default for KBucket {
+    fn default() -> Self {
+        KBucket::new()
+    }
+}
+
 impl KBucket {
     pub fn new() -> Self { KBucket { entries: Vec::with_capacity(K), max_size: K } }
 
@@ -192,8 +198,14 @@ impl KBucket {
         false
     }
 
-    pub fn fastest(&self) -> Option<&NodeEntry> { self.entries.first() }
+    /// Number of entries
     pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+
+    /// Node with the lowest latency in this bucket
+    pub fn fastest(&self) -> Option<&NodeEntry> {
+        self.entries.iter().min_by(|a, b| a.latency_ms.partial_cmp(&b.latency_ms).unwrap_or(std::cmp::Ordering::Equal))
+    }
 }
 
 // ─── Routing Table ─────────────────────────────────────────────

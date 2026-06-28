@@ -76,6 +76,12 @@ pub struct NeurogenesisSystem {
     pub current_tick: u64,
 }
 
+impl Default for NeurogenesisSystem {
+    fn default() -> Self {
+        Self::new(DEFAULT_SPAWN_THRESHOLD, DEFAULT_DECAY_RATE)
+    }
+}
+
 impl NeurogenesisSystem {
     pub fn new(spawn_threshold: f32, decay_rate: f32) -> Self {
         NeurogenesisSystem {
@@ -87,12 +93,9 @@ impl NeurogenesisSystem {
         }
     }
 
-    /// Default constructor with sensible planetary-brain defaults.
-    pub fn default() -> Self {
-        NeurogenesisSystem::new(DEFAULT_SPAWN_THRESHOLD, DEFAULT_DECAY_RATE)
-    }
-
-    /// Feed a prediction error into the surprise accumulator.
+    // Default constructor with sensible planetary-brain defaults.
+    /// Monitors incoming prediction errors and fires spawns when the
+    /// accumulated surprise breaches the threshold.
     ///
     /// Returns `true` if the threshold was breached — the caller should
     /// immediately call `spawn_neuron()`.
