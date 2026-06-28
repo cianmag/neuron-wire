@@ -388,4 +388,4 @@ If you're making a change that could be controversial or has lasting impact, wri
 
 ---
 
-*Last updated: 2026-06-27 · Codebase at commit `7aa4be5`*
+*Last updated: 2026-06-28 · Codebase at commit `eed2155`*
