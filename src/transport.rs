@@ -34,6 +34,7 @@
 //! | CONSENSUS | Up to 5 retries | Reliable |
 //! | GOSSIP | Never (next cycle) | Best-effort |
 
+#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU32, Ordering};

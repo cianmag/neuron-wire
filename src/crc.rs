@@ -1,4 +1,5 @@
 //! CRC32 helper
+#![allow(missing_docs)]
 use crc32fast::Hasher;
 
 #[inline]

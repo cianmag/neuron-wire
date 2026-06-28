@@ -21,6 +21,15 @@ jobs:
         with:
           components: clippy
 
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
       - name: Check formatting
         run: cargo fmt --check || echo "cargo fmt not enforced (skip)"
 
@@ -33,5 +42,14 @@ jobs:
       - name: Test
         run: cargo test --verbose
 
+      - name: Code coverage
+        run: cargo llvm-cov --all-features --codecov --output-path coverage.json
+
       - name: Bench (compile-check only)
-        run: cargo bench --no-run || echo "benches may not exist yet"
+        run: cargo bench --all-features --no-run || echo "benches may not exist yet"
+
+      - name: Dependency audit
+        run: cargo audit || echo "cargo audit warnings (non-blocking)"
+
+      - name: Dependency deny
+        run: cargo deny check || echo "cargo deny warnings (non-blocking)"

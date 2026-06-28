@@ -10,6 +10,7 @@
 //! [12-15] header_crc: u32   = CRC32 of bytes [0..12)
 //! ```
 
+#![allow(missing_docs)]
 use crate::{HEADER_SIZE, MAGIC, MAX_BODY_SIZE, VERSION};
 
 /// 16-byte message header — zero-copy accessible via repr(C)

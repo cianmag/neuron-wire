@@ -34,6 +34,7 @@
 //! observed reality. The DHT handler and transport layer also feed into it:
 //! a CONSENSUS frame that fails to converge is a form of prediction error.
 
+#![allow(missing_docs)]
 use rand::RngCore;
 
 use crate::components::{

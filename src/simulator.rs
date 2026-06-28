@@ -41,6 +41,7 @@
 //! | partition | Split network into two groups | Packet filter blocks cross-group traffic |
 //! | malicious | One node sends garbage | Corrupt payloads, high retransmit, network flood |
 
+#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::fs;
 use std::net::{SocketAddr, TcpListener};

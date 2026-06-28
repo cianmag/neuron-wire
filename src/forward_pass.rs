@@ -23,6 +23,7 @@
 //! separated: ForwardPass handles activation flow, Hebbian handles weight
 //! adaptation.
 
+#![allow(missing_docs)]
 use std::collections::HashMap;
 
 use crate::components::{

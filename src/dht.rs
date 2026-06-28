@@ -10,6 +10,7 @@
 //! 3. Hardcoded seed VPS addresses
 //! 4. Passive listening (wait for gossip)
 
+#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::fmt;
 use std::net::SocketAddr;

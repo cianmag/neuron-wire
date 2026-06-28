@@ -12,14 +12,17 @@ git clone https://github.com/cianmag/neuron-wire
 cd neuron-wire
 cargo build --release
 
-# Run tests (72 tests, must all pass)
+# Run tests (110 tests, must all pass)
 cargo test
 
 # Check for warnings (zero-warnings policy)
 cargo clippy -D warnings
 
-# Run a paper-mode experiment
-cargo run --example simulate -- --paper-mode --nodes 10 --duration 30
+# Run benchmarks (requires nightly or bench feature)
+cargo bench --features bench
+
+# Run property-based tests
+cargo test --features proptest
 ```
 
 ---
@@ -57,9 +60,14 @@ git checkout -b feature/your-description
 
 **For code changes:**
 - Follow existing code style (run `cargo fmt` before committing)
-- Add tests for new functionality
+- Add tests for new functionality (unit and property-based where appropriate)
 - Ensure zero warnings (`cargo clippy -D warnings`)
-- All 72 tests must pass (`cargo test`)
+- All 110 tests must pass (`cargo test`)
+
+**For fuzzing:**
+- Install cargo-fuzz (requires nightly) and run `cargo +nightly fuzz run header_parse`
+- The fuzz target lives in `fuzz/fuzz_targets/header_parse.rs`
+- See `fuzz/README.md` for details
 
 **For documentation changes:**
 - Write for a reader who may not know the field (see the glossary in FOUNDATIONAL_QNA.md for the style)

@@ -16,6 +16,7 @@
 //! into the network, bypassing the normal outbound channel. For state
 //! corruption, it mutates node state through shared references.
 
+#![allow(missing_docs)]
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -2,6 +2,7 @@
 name = "neuron-wire"
 version = "0.2.0"
 edition = "2021"
+rust-version = "1.87"
 description = "Zero-Copy FlatBuffer Protocol for Planetary Brain"
 authors = ["Cian Mac an tSaoir <cian@nousresearch.com>"]
 license = "MIT OR Apache-2.0"
@@ -33,6 +34,7 @@ required-features = ["bench"]
 
 [dev-dependencies]
 criterion = "0.5"
+proptest = "1"
 
 [profile.release]
 opt-level = "z"

@@ -12,6 +12,8 @@
 //! All field access is through offset computation into the buffer.
 //! No deserialization, no allocation, no parsing step.
 
+#![deny(missing_docs)]
+
 pub mod flat;
 pub mod header;
 pub mod types;
@@ -36,8 +38,11 @@ pub use io::*;
 
 /// Magic: "NWP\0"
 pub const MAGIC: [u8; 4] = [0x4E, 0x57, 0x50, 0x00];
+/// NWP protocol version (currently 2)
 pub const VERSION: u8 = 2;
+/// Maximum allowed message body size in bytes
 pub const MAX_BODY_SIZE: u32 = 1_000_000_000;
+/// Size of the message header in bytes (16)
 pub const HEADER_SIZE: usize = 16;
 
 /// 64-bit neuron ID — enough for 18 quintillion devices

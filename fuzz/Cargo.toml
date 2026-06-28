@@ -1,0 +1,18 @@
+[package]
+name = "neuron-wire-fuzz"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+neuron-wire = { path = ".." }
+
+[[bin]]
+name = "header_parse"
+path = "fuzz_targets/header_parse.rs"
+test = false
+doc = false

@@ -30,6 +30,7 @@
 //! It returns an `ApoptosisReport` that feeds into EngineStats for real-time
 //! observability.
 
+#![allow(missing_docs)]
 use std::time::{Duration, Instant};
 
 use crate::dht::DhtHandler;

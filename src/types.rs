@@ -1,5 +1,6 @@
 //! Message type identifiers and body layout constants.
 
+#![allow(missing_docs)]
 /// NWP Message types
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

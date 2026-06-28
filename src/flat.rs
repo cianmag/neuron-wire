@@ -12,6 +12,7 @@
 //! All access is zero-copy: we compute offsets into the buffer and return
 //! slices. No allocation, no parsing.
 
+#![allow(missing_docs)]
 use core::fmt;
 
 // ─── Helpers ────────────────────────────────────────────────────

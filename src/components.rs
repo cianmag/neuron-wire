@@ -5,6 +5,7 @@
 //! each neuron is an independent entity identified by a cryptographic
 //! 256-bit ID — spawnable, pruneable, and routable over the NWP network.
 
+#![allow(missing_docs)]
 use std::fmt;
 
 // ─── EntityId (256-bit Cryptographic) ──────────────────────────

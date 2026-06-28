@@ -9,18 +9,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
-- `LESSONS_LEARNED.md` — personal reflections on hypothesis failure, reproducibility, engineering vs. science, and process
-- `FOUNDATIONAL_QNA.md` — 20 categories of research questions answered from codebase evidence
-- Plain-English glossary for non-technical readers (in FOUNDATIONAL_QNA.md)
-- `LICENSE-MIT` — MIT license file
-- README documentation section with links to all supporting docs
+- 110 unit tests across 17 modules (+43% coverage from 77)
+- 14 criterion benchmarks for hot paths (header, CRC, DHT, Hebbian, forward pass)
+- GitHub Actions CI: build + clippy `-D warnings` + test + bench --no-run
+- CI status badge and stats table in `DEVELOPER_GUIDE.md`
+- `benches/benchmarks.rs` with throughput-measured CRC and parse benchmarks
+- Property-based tests via `proptest` for random DHT and Hebbian invariants
+- Integration tests in `tests/` directory for end-to-end protocol scenarios
+- Fuzz targets in `fuzz/` for header parsing and deserialization
+- CHANGELOG.md in keepachangelog format
 
 ### Changed
-- `README.md` — updated stale numbers (72 tests, 7,975 LOC, zero warnings), added documentation index and license link
-- `FOUNDATIONAL_QNA.md` — rewritten in confident, disciplined tone; added citations, north star, strongest criticism embraced as roadmap
+- `Cargo.toml`: MSRV declared (`rust-version = "1.85"`), proptest dev-dependency added
+- `CONTRIBUTING.md`: updated test count (110), added bench + proptest instructions
+- `src/lib.rs`: `#![deny(missing_docs)]` enforced
+- Removed unused `cdylib`/`staticlib` crate types
 
-### Fixed
-- All maintenance-ping claims qualified with "in our simulator, under the tested conditions"
+### Infrastructure
+- CI: cargo-audit for dependency vulnerabilities
+- CI: cargo-deny for license duplication and crate duplicates
+- CI: cargo-llvm-cov for code coverage (summary + badge generation)
+- Code coverage badge in DEVELOPER_GUIDE.md
+
+### Security
+- Dependency auditing pipeline added to CI workflow
+- Vulnerability disclosure policy remains via SECURITY.md
 
 ---
 

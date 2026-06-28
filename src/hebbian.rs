@@ -37,6 +37,7 @@
 //! This converges gradients faster within expert clusters (vision nodes share
 //! vision weights) while still propagating globally.
 
+#![allow(missing_docs)]
 use std::net::SocketAddr;
 use std::sync::mpsc::Sender;
 
