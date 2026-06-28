@@ -21,7 +21,18 @@ csv = "1"
 
 [lib]
 name = "neuron_wire"
-crate-type = ["lib", "cdylib", "staticlib"]
+crate-type = ["lib"]
+
+[features]
+bench = []
+
+[[bench]]
+name = "benchmarks"
+harness = false
+required-features = ["bench"]
+
+[dev-dependencies]
+criterion = "0.5"
 
 [profile.release]
 opt-level = "z"

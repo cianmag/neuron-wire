@@ -131,6 +131,136 @@ pub fn build_pong() -> Vec<u8> {
     build_frame(1, Vec::new(), 0)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{HEADER_SIZE, MAGIC, VERSION, MAX_BODY_SIZE};
+
+    #[test]
+    fn test_header_new_validates_crc() {
+        let h = MessageHeader::new(5, 100, 0x0001);
+        assert_eq!(h.magic, MAGIC);
+        assert_eq!(h.version, VERSION);
+        assert_eq!(h.msg_type, 5);
+        assert_eq!(h.body_len, 100);
+        assert_eq!(h.flags, 0x0001);
+        assert!(h.verify_crc());
+    }
+
+    #[test]
+    fn test_header_from_bytes_valid() {
+        let h = MessageHeader::new(2, 64, 0);
+        let bytes = h.to_bytes();
+        let parsed = MessageHeader::from_bytes(&bytes).unwrap();
+        assert_eq!(parsed.msg_type, 2);
+        assert_eq!(parsed.body_len, 64);
+    }
+
+    #[test]
+    fn test_header_short_buffer() {
+        let buf = [0u8; 4];
+        let err = MessageHeader::from_bytes(&buf).unwrap_err();
+        match err {
+            HeaderError::ShortBuffer(n) => assert_eq!(n, 4),
+            _ => panic!("expected ShortBuffer"),
+        }
+    }
+
+    #[test]
+    fn test_header_bad_magic() {
+        let mut h = MessageHeader::new(0, 0, 0);
+        h.magic = [0; 4]; // corrupt magic
+        let bytes = h.to_bytes();
+        let err = MessageHeader::from_bytes(&bytes).unwrap_err();
+        match err {
+            HeaderError::BadMagic(m) => assert_eq!(m, [0; 4]),
+            _ => panic!("expected BadMagic"),
+        }
+    }
+
+    #[test]
+    fn test_header_bad_version() {
+        let mut h = MessageHeader::new(0, 0, 0);
+        h.version = 99;
+        let bytes = h.to_bytes();
+        let err = MessageHeader::from_bytes(&bytes).unwrap_err();
+        match err {
+            HeaderError::BadVersion(v) => assert_eq!(v, 99),
+            _ => panic!("expected BadVersion"),
+        }
+    }
+
+    #[test]
+    fn test_header_bad_crc() {
+        let mut h = MessageHeader::new(0, 0, 0);
+        h.header_crc = 0xDEADBEEF; // corrupt CRC
+        let bytes = h.to_bytes();
+        let err = MessageHeader::from_bytes(&bytes).unwrap_err();
+        match err {
+            HeaderError::BadCrc => {},
+            _ => panic!("expected BadCrc"),
+        }
+    }
+
+    #[test]
+    fn test_header_body_too_large() {
+        let mut h = MessageHeader::new(0, 0, 0);
+        h.body_len = MAX_BODY_SIZE + 1;
+        h.header_crc = h.compute_crc(); // recompute with modified body_len
+        let bytes = h.to_bytes();
+        let err = MessageHeader::from_bytes(&bytes).unwrap_err();
+        match err {
+            HeaderError::BodyTooLarge(s) => assert!(s > MAX_BODY_SIZE),
+            _ => panic!("expected BodyTooLarge"),
+        }
+    }
+
+    #[test]
+    fn test_build_frame_and_parse() {
+        let body = vec![0xAB, 0xCD, 0xEF];
+        let frame = build_frame(3, body.clone(), 0);
+        // frame starts with 4-byte length prefix
+        let frame_len = u32::from_le_bytes(frame[0..4].try_into().unwrap()) as usize;
+        assert_eq!(frame_len, frame.len());
+        // parse the header+body portion (after 4-byte len)
+        let (header, parsed_body) = parse_frame(&frame[4..]).unwrap();
+        assert_eq!(header.msg_type, 3);
+        assert_eq!(parsed_body, &body[..]);
+    }
+
+    #[test]
+    fn test_header_total_size() {
+        let h = MessageHeader::new(0, 256, 0);
+        assert_eq!(h.total_size(), HEADER_SIZE + 256);
+    }
+
+    #[test]
+    fn test_build_ping_pong() {
+        let ping = build_ping();
+        let pong = build_pong();
+        assert!(ping.len() == 4 + HEADER_SIZE); // 4-byte len + header
+        assert!(pong.len() == 4 + HEADER_SIZE);
+        // msg_type 0 = Ping, 1 = Pong
+        let ping_h = MessageHeader::from_bytes(&ping[4..]).unwrap();
+        assert_eq!(ping_h.msg_type, 0);
+        let pong_h = MessageHeader::from_bytes(&pong[4..]).unwrap();
+        assert_eq!(pong_h.msg_type, 1);
+    }
+
+    #[test]
+    fn test_header_error_display() {
+        let e = HeaderError::ShortBuffer(4);
+        let s = format!("{}", e);
+        assert!(s.contains("4") && s.contains("16"));
+        let e = HeaderError::BadMagic([0;4]);
+        assert!(format!("{}", e).contains("magic"));
+        let e = HeaderError::BadVersion(99);
+        assert!(format!("{}", e).contains("99"));
+        let e = HeaderError::BadCrc;
+        assert!(format!("{}", e).contains("CRC"));
+    }
+}
+
 /// Parse a complete frame: returns (header, body_slice)
 pub fn parse_frame(buf: &[u8]) -> Result<(&MessageHeader, &[u8]), HeaderError> {
     let header = MessageHeader::from_bytes(buf)?;

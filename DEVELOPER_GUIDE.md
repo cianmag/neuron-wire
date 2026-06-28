@@ -388,4 +388,14 @@ If you're making a change that could be controversial or has lasting impact, wri
 
 ---
 
-*Last updated: 2026-06-28 · Codebase at commit `eed2155`*
+*Last updated: 2026-06-28 · Codebase at commit `c54965b`*
+
+[![CI](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml)
+[![clippy](https://img.shields.io/badge/clippy-zero%20warnings-brightgreen)]()
+
+| Stat | Value |
+|------|-------|
+| Tests | 110 |
+| Modules | 17 |
+| Warnings | 0 (clippy -D warnings) |
+| Coverage | ad-hoc (no CI coverage yet) |

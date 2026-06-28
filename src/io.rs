@@ -73,3 +73,86 @@ impl core::fmt::Display for IoError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_io_error_display() {
+        let e = IoError::ConnectionClosed;
+        assert_eq!(format!("{}", e), "connection closed");
+        let e = IoError::FrameTooLarge(999999);
+        assert!(format!("{}", e).contains("999999"));
+        let header_err = crate::header::HeaderError::ShortBuffer(4);
+        let e = IoError::BadHeader(header_err);
+        assert!(format!("{}", e).contains("header:"));
+    }
+
+    #[test]
+    fn test_read_write_frame_loopback() {
+        use std::net::{TcpListener, TcpStream};
+        use std::thread;
+        use std::time::Duration;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+            let mut buf = Vec::new();
+            read_frame(&mut stream, &mut buf)
+        });
+
+        let mut client = TcpStream::connect(addr).unwrap();
+        // Send raw header+body (write_frame adds its own 4-byte len)
+        let h = crate::header::MessageHeader::new(0, 0, 0);
+        write_frame(&mut client, &h.to_bytes()).unwrap();
+        drop(client);
+
+        let result = handle.join().unwrap();
+        assert!(result.is_ok(), "read_frame loopback failed: {:?}", result);
+    }
+
+    #[test]
+    fn test_read_message_loopback() {
+        use std::net::{TcpListener, TcpStream};
+        use std::thread;
+        use std::time::Duration;
+
+        let body = vec![0x01, 0x02, 0x03, 0x04];
+        let h = crate::header::MessageHeader::new(5, body.len() as u32, 0);
+        let mut msg = Vec::with_capacity(crate::HEADER_SIZE + body.len());
+        msg.extend_from_slice(&h.to_bytes());
+        msg.extend_from_slice(&body);
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+            let mut buf = Vec::new();
+            read_frame(&mut stream, &mut buf).ok()?;
+            let (h, b) = crate::header::parse_frame(&buf).ok()?;
+            Some((h.msg_type, b.to_vec()))
+        });
+
+        let mut client = TcpStream::connect(addr).unwrap();
+        write_frame(&mut client, &msg).unwrap();
+        drop(client);
+
+        let result = handle.join().unwrap();
+        assert!(result.is_some(), "read_message loopback failed");
+        let (msg_type, parsed_body) = result.unwrap();
+        assert_eq!(msg_type, 5);
+        assert_eq!(parsed_body, body);
+    }
+
+    #[test]
+    fn test_frame_too_large_error() {
+        let e = IoError::FrameTooLarge(1_000_000_100);
+        assert!(format!("{}", e).contains("frame too large"));
+    }
+}
