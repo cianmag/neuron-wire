@@ -403,7 +403,7 @@ If you're making a change that could be controversial or has lasting impact, wri
 
 ---
 
-*Last updated: 2026-06-28 · Codebase at commit [`6f9b18c`](https://github.com/cianmag/neuron-wire/commit/6f9b18c)*
+*Last updated: 2026-06-28 · Codebase at commit [`7ef2a0a`](https://github.com/cianmag/neuron-wire/commit/7ef2a0a)*
 
 [![CI](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml)
 [![clippy](https://img.shields.io/badge/clippy-zero%20warnings-brightgreen)]()
