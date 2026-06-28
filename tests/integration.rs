@@ -63,7 +63,7 @@ fn integration_invalid_frame_rejected() {
 
 #[test]
 fn integration_bad_magic_rejected() {
-    let mut h = MessageHeader::new(0, 0, 0);
+    let h = MessageHeader::new(0, 0, 0);
     let mut bytes = h.to_bytes();
     bytes[0..4].copy_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]); // corrupt magic
     let err = MessageHeader::from_bytes(&bytes).unwrap_err();
