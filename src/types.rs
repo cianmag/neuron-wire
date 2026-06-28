@@ -33,10 +33,10 @@ impl MsgType {
     pub fn fixed_size(&self) -> usize {
         match self {
             MsgType::Ping | MsgType::Pong => 0,
-            MsgType::Command => 36,  // 7 scalar fields + 2 offsets (name + metadata)
-            MsgType::Spike => 32,    // 5 scalar fields + 1 offset (payload)
+            MsgType::Command => 36, // 7 scalar fields + 2 offsets (name + metadata)
+            MsgType::Spike => 32,   // 5 scalar fields + 1 offset (payload)
             MsgType::Readiness => 20, // 3 scalars + 3 padding
-            MsgType::Data => 24,     // DataHeader: sender_id + data_hash + content_type + compression + original_len + payload_len
+            MsgType::Data => 24, // DataHeader: sender_id + data_hash + content_type + compression + original_len + payload_len
             MsgType::Consensus => 24, // proposal_id + voter_id + confidence_raw + flags
         }
     }
@@ -46,56 +46,56 @@ impl MsgType {
 
 /// COMMAND body layout (36 bytes fixed + optional data)
 pub mod cmd {
-    pub const COMMAND_ID: usize = 0;       // u32
-    pub const PREDICTION_CODE: usize = 4;  // u32
-    pub const CONFIDENCE: usize = 8;       // u32 (raw, 0-1_000_000)
-    pub const CONTEXT_HASH: usize = 12;    // u32
-    pub const DEADLINE_US: usize = 16;     // u32
-    pub const SOURCE_ID: usize = 20;       // u64
-    pub const TARGET_MASK: usize = 28;     // u32
-    pub const NAME_OFFSET: usize = 32;     // u32 (relative offset to string in data region)
-    // Optional data follows at fixed_size (36)
+    pub const COMMAND_ID: usize = 0; // u32
+    pub const PREDICTION_CODE: usize = 4; // u32
+    pub const CONFIDENCE: usize = 8; // u32 (raw, 0-1_000_000)
+    pub const CONTEXT_HASH: usize = 12; // u32
+    pub const DEADLINE_US: usize = 16; // u32
+    pub const SOURCE_ID: usize = 20; // u64
+    pub const TARGET_MASK: usize = 28; // u32
+    pub const NAME_OFFSET: usize = 32; // u32 (relative offset to string in data region)
+                                       // Optional data follows at fixed_size (36)
     pub const SIZE: usize = 36;
 }
 
 /// SPIKE body layout (32 bytes fixed + optional data)
 pub mod spike {
-    pub const SOURCE_ID: usize = 0;       // u64
-    pub const TARGET_ID: usize = 8;       // u64
-    pub const SPIKE_TYPE: usize = 16;     // u32
-    pub const STRENGTH: usize = 20;       // u32 (raw)
-    pub const PAYLOAD_HASH: usize = 24;   // u32
+    pub const SOURCE_ID: usize = 0; // u64
+    pub const TARGET_ID: usize = 8; // u64
+    pub const SPIKE_TYPE: usize = 16; // u32
+    pub const STRENGTH: usize = 20; // u32 (raw)
+    pub const PAYLOAD_HASH: usize = 24; // u32
     pub const PAYLOAD_OFFSET: usize = 28; // u32 (relative offset)
     pub const SIZE: usize = 32;
 }
 
 /// READINESS body layout (20 bytes fixed)
 pub mod readiness {
-    pub const NEURON_ID: usize = 0;       // u64
-    pub const COMMAND_ID: usize = 8;      // u32
-    pub const LATENCY_US: usize = 12;     // u32
-    pub const CACHE_HIT: usize = 16;      // u32 (0 or 1)
-    // padding to 20
+    pub const NEURON_ID: usize = 0; // u64
+    pub const COMMAND_ID: usize = 8; // u32
+    pub const LATENCY_US: usize = 12; // u32
+    pub const CACHE_HIT: usize = 16; // u32 (0 or 1)
+                                     // padding to 20
     pub const SIZE: usize = 20;
 }
 
 /// DATA body layout (24 bytes fixed header + payload bytes)
 pub mod data {
-    pub const SENDER_ID: usize = 0;       // u64
-    pub const DATA_HASH: usize = 8;       // u32
-    pub const CONTENT_TYPE: usize = 12;   // u16
-    pub const COMPRESSION: usize = 14;    // u16
-    pub const ORIGINAL_LEN: usize = 16;   // u32
-    pub const PAYLOAD_LEN: usize = 20;    // u32
-    pub const HEADER_SIZE: usize = 24;    // fixed header size
+    pub const SENDER_ID: usize = 0; // u64
+    pub const DATA_HASH: usize = 8; // u32
+    pub const CONTENT_TYPE: usize = 12; // u16
+    pub const COMPRESSION: usize = 14; // u16
+    pub const ORIGINAL_LEN: usize = 16; // u32
+    pub const PAYLOAD_LEN: usize = 20; // u32
+    pub const HEADER_SIZE: usize = 24; // fixed header size
 }
 
 /// CONSENSUS body layout (24 bytes fixed)
 pub mod consensus {
-    pub const PROPOSAL_ID: usize = 0;     // u64
-    pub const VOTER_ID: usize = 8;        // u64
-    pub const CONFIDENCE: usize = 16;     // u32 (raw)
-    pub const FLAGS: usize = 20;          // u32
+    pub const PROPOSAL_ID: usize = 0; // u64
+    pub const VOTER_ID: usize = 8; // u64
+    pub const CONFIDENCE: usize = 16; // u32 (raw)
+    pub const FLAGS: usize = 20; // u32
     pub const SIZE: usize = 24;
 }
 
@@ -183,11 +183,26 @@ pub mod prediction {
 
     pub fn name(code: u32) -> &'static str {
         match code {
-            1 => "code", 2 => "math", 3 => "text", 4 => "vision",
-            5 => "audio", 6 => "action", 7 => "memory", 8 => "science",
-            9 => "logic", 10 => "translate", 11 => "summarize", 12 => "qa",
-            13 => "creative", 14 => "debug", 15 => "data", 16 => "plan",
-            17 => "tool", 18 => "multimodal", 19 => "learning", 20 => "social",
+            1 => "code",
+            2 => "math",
+            3 => "text",
+            4 => "vision",
+            5 => "audio",
+            6 => "action",
+            7 => "memory",
+            8 => "science",
+            9 => "logic",
+            10 => "translate",
+            11 => "summarize",
+            12 => "qa",
+            13 => "creative",
+            14 => "debug",
+            15 => "data",
+            16 => "plan",
+            17 => "tool",
+            18 => "multimodal",
+            19 => "learning",
+            20 => "social",
             _ => "unknown",
         }
     }
@@ -228,7 +243,13 @@ mod tests {
             let raw = conf_to_raw(v);
             let back = conf_from_raw(raw);
             let diff = (v - back).abs();
-            assert!(diff < 1e-6, "roundtrip failed for {}: raw={} back={}", v, raw, back);
+            assert!(
+                diff < 1e-6,
+                "roundtrip failed for {}: raw={} back={}",
+                v,
+                raw,
+                back
+            );
         }
     }
 
@@ -253,8 +274,11 @@ mod tests {
 
     #[test]
     fn test_flags_no_overlap() {
-        let all = flags::COMPRESSED | flags::ENCRYPTED | flags::BROADCAST
-                | flags::URGENT | flags::RESPONSE_EXPECTED;
+        let all = flags::COMPRESSED
+            | flags::ENCRYPTED
+            | flags::BROADCAST
+            | flags::URGENT
+            | flags::RESPONSE_EXPECTED;
         assert_eq!(all.count_ones(), 5);
     }
 

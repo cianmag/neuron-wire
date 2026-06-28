@@ -53,9 +53,9 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use std::io::{BufWriter, Write};
 
-use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
-use crate::dht::FreshnessConfig;
 use crate::adversary::{Adversary, AdversaryConfig, AdversaryMode};
+use crate::dht::FreshnessConfig;
+use crate::engine_loop::{spawn_engine, EngineConfig, EngineStats};
 
 // ─── Failure Modes ──────────────────────────────────────────────
 
@@ -340,10 +340,13 @@ impl Simulator {
         self.nodes.reserve(node_count as usize);
 
         // Pre-compute all ports so each node knows its peers
-        let ports: Vec<u16> = (0..node_count).map(|i| self.find_free_port(i as u16)).collect();
-        let node_addrs: Vec<SocketAddr> = ports.iter().map(|p| {
-            format!("127.0.0.1:{}", p).parse().unwrap()
-        }).collect();
+        let ports: Vec<u16> = (0..node_count)
+            .map(|i| self.find_free_port(i as u16))
+            .collect();
+        let node_addrs: Vec<SocketAddr> = ports
+            .iter()
+            .map(|p| format!("127.0.0.1:{}", p).parse().unwrap())
+            .collect();
         self.node_addrs = node_addrs.clone();
 
         for i in 0..node_count {
@@ -353,7 +356,8 @@ impl Simulator {
             let engine_stats = Arc::new(Mutex::new(EngineStats::default()));
 
             // Build list of other node addresses for DHT bootstrapping
-            let local_peers: Vec<SocketAddr> = node_addrs.iter()
+            let local_peers: Vec<SocketAddr> = node_addrs
+                .iter()
                 .enumerate()
                 .filter(|(j, _)| *j as u32 != i)
                 .map(|(_, addr)| *addr)
@@ -407,7 +411,10 @@ impl Simulator {
                     });
                 }
                 Err(e) => {
-                    return Err(format!("Failed to launch node {} on {}: {}", i, bind_addr, e));
+                    return Err(format!(
+                        "Failed to launch node {} on {}: {}",
+                        i, bind_addr, e
+                    ));
                 }
             }
         }
@@ -417,12 +424,10 @@ impl Simulator {
 
         // Initialise adversary for adversarial testing
         if self.config.adversary.enabled {
-            let shutdowns: Vec<Arc<AtomicBool>> = self.nodes.iter()
-                .map(|n| n.shutdown.clone())
-                .collect();
-            let stats: Vec<Arc<Mutex<EngineStats>>> = self.nodes.iter()
-                .map(|n| n.engine_stats.clone())
-                .collect();
+            let shutdowns: Vec<Arc<AtomicBool>> =
+                self.nodes.iter().map(|n| n.shutdown.clone()).collect();
+            let stats: Vec<Arc<Mutex<EngineStats>>> =
+                self.nodes.iter().map(|n| n.engine_stats.clone()).collect();
             let mut adv = Adversary::new(
                 self.config.adversary.clone(),
                 self.node_addrs.clone(),
@@ -457,14 +462,21 @@ impl Simulator {
         let failure = &self.config.failure;
         eprintln!(
             "[FAILURE] Injecting {:?} at t={:.1}s ({}% of {} nodes)",
-            failure.mode, elapsed_secs, failure.percent * 100.0, self.config.node_count
+            failure.mode,
+            elapsed_secs,
+            failure.percent * 100.0,
+            self.config.node_count
         );
 
         match failure.mode {
             FailureMode::NodeDeath => {
                 let count = (self.config.node_count as f64 * failure.percent) as u32;
                 let count = count.max(1).min(self.config.node_count - 1);
-                eprintln!("[FAILURE] Killing {} nodes ({}%)", count, failure.percent * 100.0);
+                eprintln!(
+                    "[FAILURE] Killing {} nodes ({}%)",
+                    count,
+                    failure.percent * 100.0
+                );
 
                 // Kill the first N nodes (deterministic by index)
                 for i in 0..count as usize {
@@ -503,11 +515,13 @@ impl Simulator {
 
                 eprintln!(
                     "[FAILURE] Partition active: {} nodes in group A, {} in group B",
-                    group_a.len(), group_b.len()
+                    group_a.len(),
+                    group_b.len()
                 );
             }
             FailureMode::MaliciousNode => {
-                let malice_idx = failure.malicious_node_index
+                let malice_idx = failure
+                    .malicious_node_index
                     .unwrap_or(0)
                     .min(self.config.node_count - 1) as usize;
                 eprintln!("[FAILURE] Node {} turned malicious", malice_idx);
@@ -519,8 +533,13 @@ impl Simulator {
                 // 1. Killing it briefly so peers get confused
                 // 2. Restarting chaos
                 if malice_idx < self.nodes.len() {
-                    self.nodes[malice_idx].shutdown.store(true, Ordering::SeqCst);
-                    eprintln!("[FAILURE] Malicious node {} killed (will cause routing table corruption)", malice_idx);
+                    self.nodes[malice_idx]
+                        .shutdown
+                        .store(true, Ordering::SeqCst);
+                    eprintln!(
+                        "[FAILURE] Malicious node {} killed (will cause routing table corruption)",
+                        malice_idx
+                    );
                 }
             }
             FailureMode::None => {}
@@ -562,7 +581,12 @@ impl Simulator {
 
                 for node in &self.nodes {
                     // Read real engine stats from the engine thread via shared pointer
-                    let s = node.engine_stats.lock().ok().map(|g| g.clone()).unwrap_or_default();
+                    let s = node
+                        .engine_stats
+                        .lock()
+                        .ok()
+                        .map(|g| g.clone())
+                        .unwrap_or_default();
                     let metrics = NodeMetrics {
                         tick: tick_counter,
                         packets_recv: s.packets_recv,
@@ -589,7 +613,12 @@ impl Simulator {
             if let Some(ref mut writer) = self.trace_writer {
                 let mut nodes = Vec::with_capacity(self.nodes.len());
                 for node in &self.nodes {
-                    let s = node.engine_stats.lock().ok().map(|g| g.clone()).unwrap_or_default();
+                    let s = node
+                        .engine_stats
+                        .lock()
+                        .ok()
+                        .map(|g| g.clone())
+                        .unwrap_or_default();
                     nodes.push(serde_json::json!({
                         "id": node.node_id,
                         "peer_count": s.peer_count,
@@ -601,7 +630,11 @@ impl Simulator {
                     }));
                 }
                 let mut events: Vec<serde_json::Value> = Vec::new();
-                if self.failure_triggered && failure_sample_index.map(|i| total_samples as usize - 1 == i).unwrap_or(false) {
+                if self.failure_triggered
+                    && failure_sample_index
+                        .map(|i| total_samples as usize - 1 == i)
+                        .unwrap_or(false)
+                {
                     events.push(serde_json::json!({
                         "type": "failure",
                         "mode": format!("{:?}", self.config.failure.mode),
@@ -642,16 +675,44 @@ impl Simulator {
         let elapsed_secs = self.start_time.unwrap().elapsed().as_secs_f64();
 
         let store = self.metrics_store.lock().map_err(|e| e.to_string())?;
-        let total_pkts_recv: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.packets_recv).sum();
-        let total_pkts_sent: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.packets_sent).sum();
-        let total_bytes_r: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.bytes_recv).sum();
-        let total_bytes_s: u64 = store.values().flat_map(|v| v.iter()).map(|m| m.bytes_sent).sum();
+        let total_pkts_recv: u64 = store
+            .values()
+            .flat_map(|v| v.iter())
+            .map(|m| m.packets_recv)
+            .sum();
+        let total_pkts_sent: u64 = store
+            .values()
+            .flat_map(|v| v.iter())
+            .map(|m| m.packets_sent)
+            .sum();
+        let total_bytes_r: u64 = store
+            .values()
+            .flat_map(|v| v.iter())
+            .map(|m| m.bytes_recv)
+            .sum();
+        let total_bytes_s: u64 = store
+            .values()
+            .flat_map(|v| v.iter())
+            .map(|m| m.bytes_sent)
+            .sum();
 
         let sample_count: usize = store.values().map(|v| v.len()).sum();
         let avg_peers: f64 = if sample_count > 0 {
-            store.values().flat_map(|v| v.iter()).map(|m| m.peer_count as f64).sum::<f64>() / sample_count as f64
-        } else { 0.0 };
-        let max_peers: usize = store.values().flat_map(|v| v.iter()).map(|m| m.peer_count).max().unwrap_or(0);
+            store
+                .values()
+                .flat_map(|v| v.iter())
+                .map(|m| m.peer_count as f64)
+                .sum::<f64>()
+                / sample_count as f64
+        } else {
+            0.0
+        };
+        let max_peers: usize = store
+            .values()
+            .flat_map(|v| v.iter())
+            .map(|m| m.peer_count)
+            .max()
+            .unwrap_or(0);
 
         // Convergence detection: first sample where ALL active nodes know ALL other active nodes
         let total_known = self.config.node_count as usize - 1;
@@ -661,7 +722,10 @@ impl Simulator {
             let mut conv_time = None;
             for si in 0..min_samples {
                 let all_connected = store.iter().all(|(_, samples)| {
-                    samples.get(si).map(|m| m.peer_count >= total_known).unwrap_or(false)
+                    samples
+                        .get(si)
+                        .map(|m| m.peer_count >= total_known)
+                        .unwrap_or(false)
                 });
                 if all_connected {
                     conv = true;
@@ -674,37 +738,51 @@ impl Simulator {
         };
 
         // Post-failure metrics
-        let nodes_killed = if self.config.failure.mode == FailureMode::NodeDeath && self.failure_triggered {
-            ((self.config.node_count as f64 * self.config.failure.percent) as u32).max(1)
-                .min(self.config.node_count - 1)
-        } else {
-            0
-        };
+        let nodes_killed =
+            if self.config.failure.mode == FailureMode::NodeDeath && self.failure_triggered {
+                ((self.config.node_count as f64 * self.config.failure.percent) as u32)
+                    .max(1)
+                    .min(self.config.node_count - 1)
+            } else {
+                0
+            };
 
         // Post-failure convergence / recovery
         if let Some(fail_si) = failure_sample_index {
             // Check min peers in post-failure samples
             for si in fail_si..min_samples {
-                let live_count: usize = store.iter()
+                let live_count: usize = store
+                    .iter()
                     .filter(|(_, samples)| {
                         samples.get(si).map(|m| m.peer_count > 0).unwrap_or(false)
                     })
                     .count();
                 if live_count > 0 {
                     // Among live nodes, find min peer count
-                    let min_peers_this_sample = store.values()
+                    let min_peers_this_sample = store
+                        .values()
                         .filter_map(|samples| samples.get(si))
                         .map(|m| m.peer_count)
-                        .min().unwrap_or(0);
+                        .min()
+                        .unwrap_or(0);
                     if min_peers_this_sample < min_peers_post_failure {
                         min_peers_post_failure = min_peers_this_sample;
                     }
 
                     // Check if all active nodes have re-converged
-                    let active_count = self.nodes.iter().filter(|n| !n.shutdown.load(Ordering::Relaxed)).count();
-                    let active_known = if active_count > 0 { active_count - 1 } else { 0 };
+                    let active_count = self
+                        .nodes
+                        .iter()
+                        .filter(|n| !n.shutdown.load(Ordering::Relaxed))
+                        .count();
+                    let active_known = if active_count > 0 {
+                        active_count - 1
+                    } else {
+                        0
+                    };
                     if active_known > 0 {
-                        let all_reconnected = store.iter()
+                        let all_reconnected = store
+                            .iter()
                             .filter(|(id, _)| {
                                 // Only check nodes that are still alive
                                 if let Some(n) = self.nodes.get(**id as usize) {
@@ -714,7 +792,10 @@ impl Simulator {
                                 }
                             })
                             .all(|(_, samples)| {
-                                samples.get(si).map(|m| m.peer_count >= active_known).unwrap_or(false)
+                                samples
+                                    .get(si)
+                                    .map(|m| m.peer_count >= active_known)
+                                    .unwrap_or(false)
                             });
                         if all_reconnected && !recovered {
                             recovered = true;
@@ -727,8 +808,10 @@ impl Simulator {
 
         let recovery_time_secs = post_failure_converged_sample
             .map(|si| si as f64 * 1.0 - self.config.failure.trigger_at_sec as f64);
-        let was_partitioned = self.config.failure.mode == FailureMode::Partition && self.failure_triggered;
-        let had_malicious_node = self.config.failure.mode == FailureMode::MaliciousNode && self.failure_triggered;
+        let was_partitioned =
+            self.config.failure.mode == FailureMode::Partition && self.failure_triggered;
+        let had_malicious_node =
+            self.config.failure.mode == FailureMode::MaliciousNode && self.failure_triggered;
 
         // For now, return a basic result
         Ok(TrialResult {
@@ -741,7 +824,11 @@ impl Simulator {
             total_packets_sent: total_pkts_sent,
             total_bytes_recv: total_bytes_r,
             total_bytes_sent: total_bytes_s,
-            bandwidth_kbps: if elapsed_secs > 0.0 { (total_bytes_r + total_bytes_s) as f64 * 8.0 / 1000.0 / elapsed_secs } else { 0.0 },
+            bandwidth_kbps: if elapsed_secs > 0.0 {
+                (total_bytes_r + total_bytes_s) as f64 * 8.0 / 1000.0 / elapsed_secs
+            } else {
+                0.0
+            },
             avg_peers,
             max_peers,
             total_apoptosis_deaths: 0,
@@ -797,8 +884,11 @@ impl Simulator {
             "parameters": self.config,
         });
         let metadata_path = output_dir.join("metadata.json");
-        fs::write(&metadata_path, serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+        fs::write(
+            &metadata_path,
+            serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
 
         // Write summary
         let summary_path = output_dir.join("summary.csv");
@@ -821,13 +911,15 @@ impl Simulator {
                 let num_samples = store.values().map(|v| v.len()).max().unwrap_or(0);
                 for si in 0..num_samples {
                     // tick value from first node's sample
-                    let tick = store.get(&0)
+                    let tick = store
+                        .get(&0)
                         .and_then(|s| s.get(si))
                         .map(|m| m.tick.to_string())
                         .unwrap_or_else(|| (si as u64 * 1000).to_string());
                     let mut row = vec![tick];
                     for ni in 0..node_count {
-                        let peers = store.get(&(ni as u32))
+                        let peers = store
+                            .get(&(ni as u32))
                             .and_then(|s| s.get(si))
                             .map(|m| m.peer_count.to_string())
                             .unwrap_or_else(|| "0".to_string());
@@ -865,17 +957,26 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
         match args[i].as_str() {
             "--nodes" => {
                 i += 1;
-                config.node_count = args.get(i).ok_or("--nodes requires a value")?.parse()
+                config.node_count = args
+                    .get(i)
+                    .ok_or("--nodes requires a value")?
+                    .parse()
                     .map_err(|_| "invalid --nodes value")?;
             }
             "--duration" => {
                 i += 1;
-                config.duration_secs = args.get(i).ok_or("--duration requires a value")?.parse()
+                config.duration_secs = args
+                    .get(i)
+                    .ok_or("--duration requires a value")?
+                    .parse()
                     .map_err(|_| "invalid --duration value")?;
             }
             "--seed" => {
                 i += 1;
-                config.seed = args.get(i).ok_or("--seed requires a value")?.parse()
+                config.seed = args
+                    .get(i)
+                    .ok_or("--seed requires a value")?
+                    .parse()
                     .map_err(|_| "invalid --seed value")?;
             }
             "--paper-mode" => {
@@ -886,30 +987,43 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
             }
             "--gossip-interval" => {
                 i += 1;
-                config.gossip_interval_ticks = args.get(i).ok_or("--gossip-interval requires a value")?.parse()
+                config.gossip_interval_ticks = args
+                    .get(i)
+                    .ok_or("--gossip-interval requires a value")?
+                    .parse()
                     .map_err(|_| "invalid --gossip-interval")?;
             }
             "--failure-mode" => {
                 i += 1;
-                let mode_str = args.get(i).ok_or("--failure-mode requires a value (node-death|partition|malicious)")?;
+                let mode_str = args
+                    .get(i)
+                    .ok_or("--failure-mode requires a value (node-death|partition|malicious)")?;
                 config.failure.mode = FailureMode::from_str(mode_str);
             }
             "--failure-at" => {
                 i += 1;
-                config.failure.trigger_at_sec = args.get(i).ok_or("--failure-at requires seconds")?.parse()
+                config.failure.trigger_at_sec = args
+                    .get(i)
+                    .ok_or("--failure-at requires seconds")?
+                    .parse()
                     .map_err(|_| "invalid --failure-at value")?;
             }
             "--failure-percent" => {
                 i += 1;
-                let pct: f64 = args.get(i).ok_or("--failure-percent requires a value")?.parse()
+                let pct: f64 = args
+                    .get(i)
+                    .ok_or("--failure-percent requires a value")?
+                    .parse()
                     .map_err(|_| "invalid --failure-percent value")?;
                 config.failure.percent = (pct / 100.0).clamp(0.05_f64, 0.95_f64);
             }
             "--malicious-node" => {
                 i += 1;
                 config.failure.malicious_node_index = Some(
-                    args.get(i).ok_or("--malicious-node requires node index")?.parse()
-                        .map_err(|_| "invalid --malicious-node index")?
+                    args.get(i)
+                        .ok_or("--malicious-node requires node index")?
+                        .parse()
+                        .map_err(|_| "invalid --malicious-node index")?,
                 );
             }
             "--adversary-mode" => {
@@ -920,31 +1034,44 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
             }
             "--adversary-at" => {
                 i += 1;
-                config.adversary.attack_start_sec = args.get(i).ok_or("--adversary-at requires seconds")?.parse()
+                config.adversary.attack_start_sec = args
+                    .get(i)
+                    .ok_or("--adversary-at requires seconds")?
+                    .parse()
                     .map_err(|_| "invalid --adversary-at value")?;
             }
             "--adversary-duration" => {
                 i += 1;
-                config.adversary.attack_duration_secs = args.get(i).ok_or("--adversary-duration requires seconds")?.parse()
+                config.adversary.attack_duration_secs = args
+                    .get(i)
+                    .ok_or("--adversary-duration requires seconds")?
+                    .parse()
                     .map_err(|_| "invalid --adversary-duration value")?;
             }
             "--adversary-rate" => {
                 i += 1;
-                let rate: f64 = args.get(i).ok_or("--adversary-rate requires a value")?.parse()
+                let rate: f64 = args
+                    .get(i)
+                    .ok_or("--adversary-rate requires a value")?
+                    .parse()
                     .map_err(|_| "invalid --adversary-rate value")?;
                 config.adversary.corruption_rate = rate.clamp(0.0, 1.0);
             }
             "--adversary-node" => {
                 i += 1;
-                config.adversary.attacker_node_index = args.get(i).ok_or("--adversary-node requires node index")?.parse()
+                config.adversary.attacker_node_index = args
+                    .get(i)
+                    .ok_or("--adversary-node requires node index")?
+                    .parse()
                     .map_err(|_| "invalid --adversary-node index")?;
             }
             "--config" => {
                 i += 1;
                 let path = args.get(i).ok_or("--config requires a path")?;
-                let content = fs::read_to_string(path).map_err(|e| format!("cannot read config: {}", e))?;
-                let file_config: SimulationConfig = toml::from_str(&content)
-                    .map_err(|e| format!("invalid config: {}", e))?;
+                let content =
+                    fs::read_to_string(path).map_err(|e| format!("cannot read config: {}", e))?;
+                let file_config: SimulationConfig =
+                    toml::from_str(&content).map_err(|e| format!("invalid config: {}", e))?;
                 // CLI flags override file config
                 config = file_config;
             }
@@ -957,11 +1084,17 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
             }
             "--trace" => {
                 i += 1;
-                config.trace_path = args.get(i).ok_or("--trace requires a file path")?.to_string();
+                config.trace_path = args
+                    .get(i)
+                    .ok_or("--trace requires a file path")?
+                    .to_string();
             }
             "--maintenance-mode" => {
                 i += 1;
-                config.maintenance_mode = args.get(i).ok_or("--maintenance-mode requires a value")?.to_string();
+                config.maintenance_mode = args
+                    .get(i)
+                    .ok_or("--maintenance-mode requires a value")?
+                    .to_string();
             }
             _ => {
                 return Err(format!("Unknown argument: {}", args[i]));
@@ -1007,7 +1140,10 @@ mod tests {
         assert_eq!(FailureMode::from_str("node-death"), FailureMode::NodeDeath);
         assert_eq!(FailureMode::from_str("node_death"), FailureMode::NodeDeath);
         assert_eq!(FailureMode::from_str("partition"), FailureMode::Partition);
-        assert_eq!(FailureMode::from_str("malicious"), FailureMode::MaliciousNode);
+        assert_eq!(
+            FailureMode::from_str("malicious"),
+            FailureMode::MaliciousNode
+        );
         assert_eq!(FailureMode::from_str("unknown"), FailureMode::None);
     }
 

@@ -45,31 +45,50 @@ fn main() {
         match args[i].as_str() {
             "--trials" => {
                 i += 1;
-                trials = args.get(i)
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(1);
+                trials = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(1);
             }
-            "--output-dir" => { i += 1; /* skip value */ }
+            "--output-dir" => {
+                i += 1; /* skip value */
+            }
             _ => {}
         }
         i += 1;
     }
 
-    let base_seed = if config.paper_mode && config.seed == 0 { 42 } else { config.seed };
+    let base_seed = if config.paper_mode && config.seed == 0 {
+        42
+    } else {
+        config.seed
+    };
 
-    eprintln!("[SIM] Launching {} trials of {} nodes for {}s...",
-        if trials > 1 { trials.to_string() } else { "1".into() },
-        config.node_count, config.duration_secs);
+    eprintln!(
+        "[SIM] Launching {} trials of {} nodes for {}s...",
+        if trials > 1 {
+            trials.to_string()
+        } else {
+            "1".into()
+        },
+        config.node_count,
+        config.duration_secs
+    );
     if trials > 1 {
-        eprintln!("[SIM] {} TRIALS with seeds {}-{}",
-            trials, base_seed, base_seed + trials as u64 - 1);
+        eprintln!(
+            "[SIM] {} TRIALS with seeds {}-{}",
+            trials,
+            base_seed,
+            base_seed + trials as u64 - 1
+        );
     }
 
     // Collect results across trials
     let mut all_results: Vec<neuron_wire::simulator::TrialResult> = Vec::new();
 
     for trial in 0..trials {
-        let seed = if base_seed == 0 { 0 } else { base_seed + trial as u64 };
+        let seed = if base_seed == 0 {
+            0
+        } else {
+            base_seed + trial as u64
+        };
 
         let mut trial_config = config.clone();
         trial_config.seed = seed;
@@ -101,7 +120,12 @@ fn main() {
         let output_path = PathBuf::from(&output_dir);
 
         if trials > 1 {
-            eprintln!("[SIM] --- Trial {}/{} (seed={}) ---", trial + 1, trials, seed);
+            eprintln!(
+                "[SIM] --- Trial {}/{} (seed={}) ---",
+                trial + 1,
+                trials,
+                seed
+            );
         }
 
         // Run the simulation
@@ -165,36 +189,59 @@ fn main() {
     let avg_max_peers = all_results.iter().map(|r| r.max_peers as f64).sum::<f64>() / n;
     let avg_avg_peers = all_results.iter().map(|r| r.avg_peers).sum::<f64>() / n;
 
-    let conv_times: Vec<f64> = all_results.iter()
+    let conv_times: Vec<f64> = all_results
+        .iter()
         .filter_map(|r| r.convergence_time_secs)
         .collect();
     let _conv_count = conv_times.len();
     let mean_conv = if !conv_times.is_empty() {
         conv_times.iter().sum::<f64>() / conv_times.len() as f64
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let std_conv = if conv_times.len() > 1 {
         let m = mean_conv;
-        (conv_times.iter().map(|t| (t - m).powi(2)).sum::<f64>() / (conv_times.len() - 1) as f64).sqrt()
-    } else { 0.0 };
+        (conv_times.iter().map(|t| (t - m).powi(2)).sum::<f64>() / (conv_times.len() - 1) as f64)
+            .sqrt()
+    } else {
+        0.0
+    };
 
     let min_conv = conv_times.iter().cloned().fold(f64::MAX, f64::min);
     let max_conv = conv_times.iter().cloned().fold(0.0f64, f64::max);
 
     let avg_bw = all_results.iter().map(|r| r.bandwidth_kbps).sum::<f64>() / n;
-    let avg_pkts = all_results.iter().map(|r| r.total_packets_recv as f64).sum::<f64>() / n;
+    let avg_pkts = all_results
+        .iter()
+        .map(|r| r.total_packets_recv as f64)
+        .sum::<f64>()
+        / n;
 
     // Print (also save to file if single-run that generated an output dir)
     eprintln!();
     eprintln!("═══════════════════════════════════════════════════");
     eprintln!("  NEURON-WIRE DHT CONVERGENCE BENCHMARK");
-    eprintln!("  Nodes: {} × {}s × {} trial(s)", config.node_count, config.duration_secs, trials);
+    eprintln!(
+        "  Nodes: {} × {}s × {} trial(s)",
+        config.node_count, config.duration_secs, trials
+    );
     eprintln!("═══════════════════════════════════════════════════");
     eprintln!();
-    eprintln!("  Convergence rate:   {}/{} ({:.0}%)", converged_count, trials,
-        converged_count as f64 / n * 100.0);
-    eprintln!("  Convergence time:   {:.2}s ± {:.2}s  [min={:.1}s, max={:.1}s]",
-        mean_conv, std_conv, min_conv, max_conv);
-    eprintln!("  Max peers:          {:.2} (of {})", avg_max_peers, config.node_count - 1);
+    eprintln!(
+        "  Convergence rate:   {}/{} ({:.0}%)",
+        converged_count,
+        trials,
+        converged_count as f64 / n * 100.0
+    );
+    eprintln!(
+        "  Convergence time:   {:.2}s ± {:.2}s  [min={:.1}s, max={:.1}s]",
+        mean_conv, std_conv, min_conv, max_conv
+    );
+    eprintln!(
+        "  Max peers:          {:.2} (of {})",
+        avg_max_peers,
+        config.node_count - 1
+    );
     eprintln!("  Avg peers (steady): {:.2}", avg_avg_peers);
     eprintln!("  Bandwidth:          {:.1} kbps avg", avg_bw);
     eprintln!("  Packets/run:        {:.0} total recv", avg_pkts);
@@ -204,21 +251,48 @@ fn main() {
     eprintln!("--- LaTeX Table ---");
     eprintln!(r"\begin{{table}}[h]");
     eprintln!(r"\centering");
-    eprintln!(r"\caption{{DHT Convergence Benchmark ({} × {}s, {} trials)}}", config.node_count, config.duration_secs, trials);
+    eprintln!(
+        r"\caption{{DHT Convergence Benchmark ({} × {}s, {} trials)}}",
+        config.node_count, config.duration_secs, trials
+    );
     eprintln!(r"\begin{{tabular}}{{lrrrr}}");
     eprintln!(r"\toprule");
     eprintln!("Metric & Mean & StdDev & Min & Max \\\\");
     eprintln!(r"\midrule");
-    eprintln!("Convergence time (s) & {:.2} & {:.2} & {:.1} & {:.1} \\\\", mean_conv, std_conv, min_conv, max_conv);
-    eprintln!("Max peers & {:.2} & -- & {} & {} \\\\", avg_max_peers,
+    eprintln!(
+        "Convergence time (s) & {:.2} & {:.2} & {:.1} & {:.1} \\\\",
+        mean_conv, std_conv, min_conv, max_conv
+    );
+    eprintln!(
+        "Max peers & {:.2} & -- & {} & {} \\\\",
+        avg_max_peers,
         all_results.iter().map(|r| r.max_peers).min().unwrap_or(0),
-        all_results.iter().map(|r| r.max_peers).max().unwrap_or(0));
-    eprintln!("Avg peers & {:.2} & -- & {:.2} & {:.2} \\\\", avg_avg_peers,
-        all_results.iter().map(|r| r.avg_peers).fold(f64::MAX, f64::min),
-        all_results.iter().map(|r| r.avg_peers).fold(0.0f64, f64::max));
-    eprintln!("Bandwidth (kbps) & {:.1} & -- & {:.1} & {:.1} \\\\", avg_bw,
-        all_results.iter().map(|r| r.bandwidth_kbps).fold(f64::MAX, f64::min),
-        all_results.iter().map(|r| r.bandwidth_kbps).fold(0.0f64, f64::max));
+        all_results.iter().map(|r| r.max_peers).max().unwrap_or(0)
+    );
+    eprintln!(
+        "Avg peers & {:.2} & -- & {:.2} & {:.2} \\\\",
+        avg_avg_peers,
+        all_results
+            .iter()
+            .map(|r| r.avg_peers)
+            .fold(f64::MAX, f64::min),
+        all_results
+            .iter()
+            .map(|r| r.avg_peers)
+            .fold(0.0f64, f64::max)
+    );
+    eprintln!(
+        "Bandwidth (kbps) & {:.1} & -- & {:.1} & {:.1} \\\\",
+        avg_bw,
+        all_results
+            .iter()
+            .map(|r| r.bandwidth_kbps)
+            .fold(f64::MAX, f64::min),
+        all_results
+            .iter()
+            .map(|r| r.bandwidth_kbps)
+            .fold(0.0f64, f64::max)
+    );
     eprintln!(r"\bottomrule");
     eprintln!(r"\end{{tabular}}");
     eprintln!(r"\end{{table}}");

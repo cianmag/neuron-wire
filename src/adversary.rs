@@ -18,15 +18,15 @@
 
 #![allow(missing_docs)]
 use std::net::{SocketAddr, UdpSocket};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use crate::engine_loop::EngineStats;
 use crate::header::{self, MessageHeader};
-use crate::{HEADER_SIZE};
 use crate::transport::TransportHeader;
+use crate::HEADER_SIZE;
 use serde::{Deserialize, Serialize};
 
 // ─── Constants ──────────────────────────────────────────────────
@@ -186,8 +186,7 @@ impl Adversary {
         rng_seed: u64,
         attacker_index: Option<u32>,
     ) -> Self {
-        let attacker_addr = attacker_index
-            .and_then(|idx| node_addrs.get(idx as usize).copied());
+        let attacker_addr = attacker_index.and_then(|idx| node_addrs.get(idx as usize).copied());
 
         Adversary {
             config,
@@ -211,11 +210,13 @@ impl Adversary {
         }
 
         // Bind a free port for our injection socket
-        let socket = UdpSocket::bind("127.0.0.1:0")
-            .map_err(|e| format!("adversary socket bind: {}", e))?;
-        socket.set_nonblocking(true)
+        let socket =
+            UdpSocket::bind("127.0.0.1:0").map_err(|e| format!("adversary socket bind: {}", e))?;
+        socket
+            .set_nonblocking(true)
             .map_err(|e| format!("adversary nonblocking: {}", e))?;
-        socket.set_write_timeout(Some(Duration::from_millis(ADV_SOCKET_TIMEOUT_MS)))
+        socket
+            .set_write_timeout(Some(Duration::from_millis(ADV_SOCKET_TIMEOUT_MS)))
             .ok();
         self.socket = Some(socket);
 
@@ -257,10 +258,7 @@ impl Adversary {
                 if start.elapsed().as_secs_f64() >= self.config.attack_duration_secs {
                     if self.active {
                         self.active = false;
-                        eprintln!(
-                            "[ADVERSARY] Attack ended at t={:.1}s",
-                            elapsed_secs,
-                        );
+                        eprintln!("[ADVERSARY] Attack ended at t={:.1}s", elapsed_secs,);
                     }
                     return;
                 }
@@ -287,7 +285,12 @@ impl Adversary {
     /// Let the adversary observe an outbound packet for replay capture.
     /// Called from the simulator when a packet is sent by a node.
     pub fn observe_outbound(&mut self, data: &[u8], dst: SocketAddr, _src_node: u32, now: Instant) {
-        if !self.active || !matches!(self.config.mode, AdversaryMode::ReplayAttack | AdversaryMode::All) {
+        if !self.active
+            || !matches!(
+                self.config.mode,
+                AdversaryMode::ReplayAttack | AdversaryMode::All
+            )
+        {
             return;
         }
 
@@ -424,10 +427,7 @@ impl Adversary {
         let frame = header::build_frame(7, body, 0); // msg_type 7 = PING
 
         // Wrap in transport header
-        let transport = TransportHeader::new(
-            self.rng_seed as u32,
-            0, 0, 0,
-        );
+        let transport = TransportHeader::new(self.rng_seed as u32, 0, 0, 0);
         let mut datagram = Vec::with_capacity(16 + frame.len());
         datagram.extend_from_slice(&transport.to_bytes());
         datagram.extend_from_slice(&frame);
@@ -460,7 +460,8 @@ impl Adversary {
             }
 
             let age = now.duration_since(pkt.captured_at);
-            let expected_delay = Duration::from_millis(pkt.delay_ms * (pkt.replay_count as u64 + 1));
+            let expected_delay =
+                Duration::from_millis(pkt.delay_ms * (pkt.replay_count as u64 + 1));
             if age >= expected_delay {
                 to_send.push((pkt.data.clone(), pkt.dst));
                 pkt.replay_count += 1;
@@ -615,13 +616,34 @@ mod tests {
     #[test]
     fn test_adversary_mode_from_str() {
         assert_eq!(AdversaryMode::from_str("none"), AdversaryMode::None);
-        assert_eq!(AdversaryMode::from_str("bad-packets"), AdversaryMode::BadPackets);
-        assert_eq!(AdversaryMode::from_str("badpackets"), AdversaryMode::BadPackets);
-        assert_eq!(AdversaryMode::from_str("corrupted-state"), AdversaryMode::CorruptedState);
-        assert_eq!(AdversaryMode::from_str("spoofed-identity"), AdversaryMode::SpoofedIdentity);
-        assert_eq!(AdversaryMode::from_str("spoof"), AdversaryMode::SpoofedIdentity);
-        assert_eq!(AdversaryMode::from_str("replay-attack"), AdversaryMode::ReplayAttack);
-        assert_eq!(AdversaryMode::from_str("replay"), AdversaryMode::ReplayAttack);
+        assert_eq!(
+            AdversaryMode::from_str("bad-packets"),
+            AdversaryMode::BadPackets
+        );
+        assert_eq!(
+            AdversaryMode::from_str("badpackets"),
+            AdversaryMode::BadPackets
+        );
+        assert_eq!(
+            AdversaryMode::from_str("corrupted-state"),
+            AdversaryMode::CorruptedState
+        );
+        assert_eq!(
+            AdversaryMode::from_str("spoofed-identity"),
+            AdversaryMode::SpoofedIdentity
+        );
+        assert_eq!(
+            AdversaryMode::from_str("spoof"),
+            AdversaryMode::SpoofedIdentity
+        );
+        assert_eq!(
+            AdversaryMode::from_str("replay-attack"),
+            AdversaryMode::ReplayAttack
+        );
+        assert_eq!(
+            AdversaryMode::from_str("replay"),
+            AdversaryMode::ReplayAttack
+        );
         assert_eq!(AdversaryMode::from_str("all"), AdversaryMode::All);
         assert_eq!(AdversaryMode::from_str("unknown"), AdversaryMode::None);
     }

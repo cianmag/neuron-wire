@@ -14,10 +14,10 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::net::SocketAddr;
-use std::time::{Duration, Instant};
 use std::sync::mpsc::Sender;
+use std::time::{Duration, Instant};
 
-use crate::engine_loop::{OutgoingPacket, Reliability, IngressEvent};
+use crate::engine_loop::{IngressEvent, OutgoingPacket, Reliability};
 use crate::header;
 
 // ─── Constants ─────────────────────────────────────────────────
@@ -40,12 +40,16 @@ const SEED_NODES: &[&str] = &[
 pub struct NodeId(pub [u8; 32]);
 
 impl NodeId {
-    pub fn new(bytes: [u8; 32]) -> Self { NodeId(bytes) }
+    pub fn new(bytes: [u8; 32]) -> Self {
+        NodeId(bytes)
+    }
 
     /// XOR distance
     pub fn xor_distance(&self, other: &NodeId) -> [u8; 32] {
         let mut d = [0u8; 32];
-        for (i, item) in d.iter_mut().enumerate() { *item = self.0[i] ^ other.0[i]; }
+        for (i, item) in d.iter_mut().enumerate() {
+            *item = self.0[i] ^ other.0[i];
+        }
         d
     }
 
@@ -63,9 +67,13 @@ impl NodeId {
 
     pub fn hex(&self) -> String {
         let mut s = String::with_capacity(64);
-        for &b in &self.0[..4] { s.push_str(&format!("{:02x}", b)); }
+        for &b in &self.0[..4] {
+            s.push_str(&format!("{:02x}", b));
+        }
         s.push('…');
-        for &b in &self.0[28..] { s.push_str(&format!("{:02x}", b)); }
+        for &b in &self.0[28..] {
+            s.push_str(&format!("{:02x}", b));
+        }
         s
     }
 }
@@ -80,9 +88,14 @@ impl fmt::Display for NodeId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
-    General = 0, Language = 1, Reasoning = 2,
-    Memory = 3,  Vision = 4,   Audio = 5,
-    Consensus = 6, Gateway = 7,
+    General = 0,
+    Language = 1,
+    Reasoning = 2,
+    Memory = 3,
+    Vision = 4,
+    Audio = 5,
+    Consensus = 6,
+    Gateway = 7,
 }
 
 impl NodeType {
@@ -115,7 +128,14 @@ pub struct NodeEntry {
 
 impl NodeEntry {
     pub fn new(id: NodeId, addr: SocketAddr, node_type: NodeType) -> Self {
-        NodeEntry { id, addr, latency_ms: 100.0, last_seen: Instant::now(), node_type, fail_count: 0 }
+        NodeEntry {
+            id,
+            addr,
+            latency_ms: 100.0,
+            last_seen: Instant::now(),
+            node_type,
+            fail_count: 0,
+        }
     }
 
     pub fn update_latency(&mut self, sample_ms: f32) {
@@ -124,8 +144,12 @@ impl NodeEntry {
         self.fail_count = 0;
     }
 
-    pub fn record_failure(&mut self) { self.fail_count += 1; }
-    pub fn is_dead(&self) -> bool { self.fail_count >= MAX_FAILURES }
+    pub fn record_failure(&mut self) {
+        self.fail_count += 1;
+    }
+    pub fn is_dead(&self) -> bool {
+        self.fail_count >= MAX_FAILURES
+    }
 }
 
 // ─── K-Bucket ──────────────────────────────────────────────────
@@ -143,7 +167,12 @@ impl Default for KBucket {
 }
 
 impl KBucket {
-    pub fn new() -> Self { KBucket { entries: Vec::with_capacity(K), max_size: K } }
+    pub fn new() -> Self {
+        KBucket {
+            entries: Vec::with_capacity(K),
+            max_size: K,
+        }
+    }
 
     pub fn find(&self, id: &NodeId) -> Option<usize> {
         self.entries.iter().position(|e| e.id == *id)
@@ -165,7 +194,11 @@ impl KBucket {
             return true;
         }
         // Full: evict highest-latency if new node is faster
-        let worst = self.entries.last().map(|e| e.latency_ms).unwrap_or(f32::MAX);
+        let worst = self
+            .entries
+            .last()
+            .map(|e| e.latency_ms)
+            .unwrap_or(f32::MAX);
         if entry.latency_ms < worst {
             self.entries.pop();
             self.entries.push(entry);
@@ -177,7 +210,9 @@ impl KBucket {
 
     fn sort_by_latency(&mut self) {
         self.entries.sort_by(|a, b| {
-            a.latency_ms.partial_cmp(&b.latency_ms).unwrap_or(std::cmp::Ordering::Equal)
+            a.latency_ms
+                .partial_cmp(&b.latency_ms)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
@@ -200,12 +235,20 @@ impl KBucket {
     }
 
     /// Number of entries
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 
     /// Node with the lowest latency in this bucket
     pub fn fastest(&self) -> Option<&NodeEntry> {
-        self.entries.iter().min_by(|a, b| a.latency_ms.partial_cmp(&b.latency_ms).unwrap_or(std::cmp::Ordering::Equal))
+        self.entries.iter().min_by(|a, b| {
+            a.latency_ms
+                .partial_cmp(&b.latency_ms)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 }
 
@@ -223,7 +266,10 @@ impl RoutingTable {
     pub fn new(local_id: NodeId, local_addr: SocketAddr, local_type: NodeType) -> Self {
         RoutingTable {
             buckets: (0..256).map(|_| KBucket::new()).collect(),
-            local_id, local_addr, total_nodes: 0, local_type,
+            local_id,
+            local_addr,
+            total_nodes: 0,
+            local_type,
         }
     }
 
@@ -238,7 +284,9 @@ impl RoutingTable {
             None => return false,
         };
         let ok = self.buckets[idx].upsert(entry);
-        if ok { self.total_nodes = self.buckets.iter().map(|b| b.len()).sum(); }
+        if ok {
+            self.total_nodes = self.buckets.iter().map(|b| b.len()).sum();
+        }
         ok
     }
 
@@ -304,7 +352,9 @@ impl RoutingTable {
             let db = target.xor_distance(&b.id);
             for i in 0..32 {
                 let c = da[i].cmp(&db[i]);
-                if c != std::cmp::Ordering::Equal { return c; }
+                if c != std::cmp::Ordering::Equal {
+                    return c;
+                }
             }
             std::cmp::Ordering::Equal
         });
@@ -317,9 +367,15 @@ impl RoutingTable {
         let idx = self.local_id.bucket_index(target)? as usize;
         for offset in 0..256 {
             for dir in [1usize, 1usize.wrapping_neg()] {
-                let bi = if dir == 1 { idx.wrapping_add(offset) } else { idx.wrapping_sub(offset) };
+                let bi = if dir == 1 {
+                    idx.wrapping_add(offset)
+                } else {
+                    idx.wrapping_sub(offset)
+                };
                 if bi < 256 {
-                    if let Some(fastest) = self.buckets[bi].fastest() { return Some(fastest); }
+                    if let Some(fastest) = self.buckets[bi].fastest() {
+                        return Some(fastest);
+                    }
                 }
             }
         }
@@ -330,32 +386,34 @@ impl RoutingTable {
         self.buckets.iter().flat_map(|b| b.entries.iter()).collect()
     }
 
-    pub fn node_count(&self) -> usize { self.total_nodes }
+    pub fn node_count(&self) -> usize {
+        self.total_nodes
+    }
 }
 
 // ─── DHT Message Types ─────────────────────────────────────────
 
 pub mod dht_msg_type {
-    pub const PING: u8       = 7;
-    pub const PONG: u8       = 8;
-    pub const FIND_NODE: u8  = 9;
-    pub const NODES: u8      = 10;
+    pub const PING: u8 = 7;
+    pub const PONG: u8 = 8;
+    pub const FIND_NODE: u8 = 9;
+    pub const NODES: u8 = 10;
 }
 
 /// Field offsets for DHT FlatBuffer bodies
 pub mod dht_fields {
     use crate::HEADER_SIZE;
-    pub const SENDER_ID: usize     = HEADER_SIZE;
+    pub const SENDER_ID: usize = HEADER_SIZE;
     pub const SENDER_ID_END: usize = HEADER_SIZE + 32;
     // encode_addr produces 7 bytes for IPv4 (1+4+2), so NODE_TYPE is at
     // body offset 32+7 = 39, LATENCY_MS at 40, PING_SEQ at 44.
     // For IPv6 (1+16+2 = 19 body bytes) these will need revisiting.
-    pub const NODE_TYPE: usize     = HEADER_SIZE + 39;
-    pub const LATENCY_MS: usize    = HEADER_SIZE + 40;
-    pub const PING_SEQ: usize      = HEADER_SIZE + 44;
+    pub const NODE_TYPE: usize = HEADER_SIZE + 39;
+    pub const LATENCY_MS: usize = HEADER_SIZE + 40;
+    pub const PING_SEQ: usize = HEADER_SIZE + 44;
     pub const PING_BODY_SIZE: usize = 48;
     pub const PONG_BODY_SIZE: usize = 48;
-    pub const TARGET_ID: usize     = HEADER_SIZE;
+    pub const TARGET_ID: usize = HEADER_SIZE;
     pub const FIND_BODY_SIZE: usize = 32;
 }
 
@@ -378,32 +436,48 @@ fn encode_addr(addr: &SocketAddr, buf: &mut Vec<u8>) {
 
 fn serialized_addr_size(addr: &SocketAddr) -> usize {
     match addr {
-        SocketAddr::V4(_) => 1 + 4 + 2,   // family + ip + port
+        SocketAddr::V4(_) => 1 + 4 + 2, // family + ip + port
         SocketAddr::V6(_) => 1 + 16 + 2,
     }
 }
 
 fn decode_addr(data: &[u8], offset: &mut usize) -> Option<SocketAddr> {
-    if *offset + 1 > data.len() { return None; }
+    if *offset + 1 > data.len() {
+        return None;
+    }
     let af = data[*offset];
     *offset += 1;
     match af {
         4 => {
-            if *offset + 6 > data.len() { return None; }
-            let ip = std::net::Ipv4Addr::new(data[*offset], data[*offset+1], data[*offset+2], data[*offset+3]);
+            if *offset + 6 > data.len() {
+                return None;
+            }
+            let ip = std::net::Ipv4Addr::new(
+                data[*offset],
+                data[*offset + 1],
+                data[*offset + 2],
+                data[*offset + 3],
+            );
             *offset += 4;
-            let port = u16::from_be_bytes([data[*offset], data[*offset+1]]);
+            let port = u16::from_be_bytes([data[*offset], data[*offset + 1]]);
             *offset += 2;
             Some(SocketAddr::V4(std::net::SocketAddrV4::new(ip, port)))
         }
         6 => {
-            if *offset + 18 > data.len() { return None; }
+            if *offset + 18 > data.len() {
+                return None;
+            }
             let mut octs = [0u8; 16];
-            octs.copy_from_slice(&data[*offset..*offset+16]);
+            octs.copy_from_slice(&data[*offset..*offset + 16]);
             *offset += 16;
-            let port = u16::from_be_bytes([data[*offset], data[*offset+1]]);
+            let port = u16::from_be_bytes([data[*offset], data[*offset + 1]]);
             *offset += 2;
-            Some(SocketAddr::V6(std::net::SocketAddrV6::new(octs.into(), port, 0, 0)))
+            Some(SocketAddr::V6(std::net::SocketAddrV6::new(
+                octs.into(),
+                port,
+                0,
+                0,
+            )))
         }
         _ => None,
     }
@@ -424,19 +498,30 @@ pub fn serialized_node_size(entry: &NodeEntry) -> usize {
 
 /// Deserialize a NodeEntry from `data` starting at `offset`
 pub fn deserialize_node(data: &[u8], offset: &mut usize) -> Option<NodeEntry> {
-    if *offset + 32 > data.len() { return None; }
+    if *offset + 32 > data.len() {
+        return None;
+    }
     let mut id = [0u8; 32];
-    id.copy_from_slice(&data[*offset..*offset+32]);
+    id.copy_from_slice(&data[*offset..*offset + 32]);
     *offset += 32;
 
     let addr = decode_addr(data, offset)?;
 
-    if *offset + 1 > data.len() { return None; }
+    if *offset + 1 > data.len() {
+        return None;
+    }
     let nt = NodeType::from_u8(data[*offset]).unwrap_or(NodeType::General);
     *offset += 1;
 
-    if *offset + 4 > data.len() { return None; }
-    let _lat = u32::from_le_bytes([data[*offset], data[*offset+1], data[*offset+2], data[*offset+3]]) as f32;
+    if *offset + 4 > data.len() {
+        return None;
+    }
+    let _lat = u32::from_le_bytes([
+        data[*offset],
+        data[*offset + 1],
+        data[*offset + 2],
+        data[*offset + 3],
+    ]) as f32;
     *offset += 4;
 
     Some(NodeEntry::new(NodeId(id), addr, nt))
@@ -476,7 +561,7 @@ impl Default for FreshnessConfig {
         FreshnessConfig {
             enabled: false,
             base_interval_ms: 300_000, // 300s (matching STALE_PING_S)
-            half_life_ms: 60_000,       // 60s half-life
+            half_life_ms: 60_000,      // 60s half-life
             stretch_factor: 3.0,
         }
     }
@@ -518,7 +603,9 @@ impl FreshnessTracker {
     /// None if it was PING'd recently enough.
     pub fn should_ping(&self, addr: &SocketAddr, last_pong: Instant) -> Option<Duration> {
         let now = Instant::now();
-        let elapsed_since_ping = self.last_ping.get(addr)
+        let elapsed_since_ping = self
+            .last_ping
+            .get(addr)
             .map(|t| now.duration_since(*t))
             .unwrap_or(Duration::from_secs(u64::MAX));
         let interval = self.interval_ms(last_pong);
@@ -552,29 +639,36 @@ pub struct DhtHandler {
 
 impl DhtHandler {
     pub fn new(
-        local_id: NodeId, local_addr: SocketAddr, local_type: NodeType,
+        local_id: NodeId,
+        local_addr: SocketAddr,
+        local_type: NodeType,
         outbound_tx: Sender<OutgoingPacket>,
-        cache_path: Option<String>, seed_domain: String,
+        cache_path: Option<String>,
+        seed_domain: String,
     ) -> Self {
         DhtHandler {
             routing_table: RoutingTable::new(local_id, local_addr, local_type),
             outbound_tx,
             pending_pings: HashMap::new(),
             next_ping_seq: 1,
-            cache_path, seed_domain, bootstrapped: false,
- freshness_tracker: None,
- }
- }
+            cache_path,
+            seed_domain,
+            bootstrapped: false,
+            freshness_tracker: None,
+        }
+    }
 
- /// Enable Sparse Gradient Aging with the given config.
- pub fn enable_sga(&mut self, config: FreshnessConfig) {
- self.freshness_tracker = Some(FreshnessTracker::new(config));
- }
+    /// Enable Sparse Gradient Aging with the given config.
+    pub fn enable_sga(&mut self, config: FreshnessConfig) {
+        self.freshness_tracker = Some(FreshnessTracker::new(config));
+    }
 
     // ─── Bootstrap ──────────────────────────────────────────
 
     pub fn bootstrap(&mut self) {
-        if self.bootstrapped { return; }
+        if self.bootstrapped {
+            return;
+        }
         self.bootstrapped = true;
 
         // 1. Peer cache
@@ -582,7 +676,9 @@ impl DhtHandler {
             if let Ok(nodes) = load_peers(path) {
                 if !nodes.is_empty() {
                     eprintln!("[DHT] Loaded {} cached peers", nodes.len());
-                    for (addr, _id) in &nodes { self.ping_node(*addr); }
+                    for (addr, _id) in &nodes {
+                        self.ping_node(*addr);
+                    }
                     return;
                 }
             }
@@ -592,7 +688,9 @@ impl DhtHandler {
         let seeds = resolve_dns_seeds(&self.seed_domain);
         if !seeds.is_empty() {
             eprintln!("[DHT] DNS seeds resolved: {}", seeds.len());
-            for addr in seeds { self.ping_node(addr); }
+            for addr in seeds {
+                self.ping_node(addr);
+            }
             return;
         }
 
@@ -611,48 +709,61 @@ impl DhtHandler {
 
     pub fn handle_event(&mut self, event: &IngressEvent) {
         let payload = &event.nwp_payload;
-        if payload.len() < crate::HEADER_SIZE + 1 { return; }
+        if payload.len() < crate::HEADER_SIZE + 1 {
+            return;
+        }
         let msg_type = payload[5]; // offset in NWP header
         match msg_type {
-            dht_msg_type::PING      => self.handle_ping(event),
-            dht_msg_type::PONG      => self.handle_pong(event, payload),
+            dht_msg_type::PING => self.handle_ping(event),
+            dht_msg_type::PONG => self.handle_pong(event, payload),
             dht_msg_type::FIND_NODE => self.handle_find_node(event, payload),
-            dht_msg_type::NODES     => self.handle_nodes(payload),
+            dht_msg_type::NODES => self.handle_nodes(payload),
             _ => {}
         }
     }
 
     fn handle_ping(&mut self, event: &IngressEvent) {
         let payload = &event.nwp_payload;
-        if payload.len() < dht_fields::PING_BODY_SIZE { return; }
+        if payload.len() < dht_fields::PING_BODY_SIZE {
+            return;
+        }
         let mut sid = [0u8; 32];
         sid.copy_from_slice(&payload[dht_fields::SENDER_ID..dht_fields::SENDER_ID_END]);
         let sender = NodeId(sid);
-        let node_type = NodeType::from_u8(payload[dht_fields::NODE_TYPE]).unwrap_or(NodeType::General);
+        let node_type =
+            NodeType::from_u8(payload[dht_fields::NODE_TYPE]).unwrap_or(NodeType::General);
 
         let mut entry = NodeEntry::new(sender, event.src, node_type);
         entry.update_latency(100.0);
         self.routing_table.insert(entry);
 
         let seq = u32::from_le_bytes([
-            payload[dht_fields::PING_SEQ], payload[dht_fields::PING_SEQ+1],
-            payload[dht_fields::PING_SEQ+2], payload[dht_fields::PING_SEQ+3],
+            payload[dht_fields::PING_SEQ],
+            payload[dht_fields::PING_SEQ + 1],
+            payload[dht_fields::PING_SEQ + 2],
+            payload[dht_fields::PING_SEQ + 3],
         ]);
         self.send_pong(event.src, seq);
     }
 
     fn handle_pong(&mut self, event: &IngressEvent, payload: &[u8]) {
-        if payload.len() < dht_fields::PONG_BODY_SIZE { return; }
+        if payload.len() < dht_fields::PONG_BODY_SIZE {
+            return;
+        }
         let mut sid = [0u8; 32];
         sid.copy_from_slice(&payload[dht_fields::SENDER_ID..dht_fields::SENDER_ID_END]);
         let sender = NodeId(sid);
 
         let seq = u32::from_le_bytes([
-            payload[dht_fields::PING_SEQ], payload[dht_fields::PING_SEQ+1],
-            payload[dht_fields::PING_SEQ+2], payload[dht_fields::PING_SEQ+3],
+            payload[dht_fields::PING_SEQ],
+            payload[dht_fields::PING_SEQ + 1],
+            payload[dht_fields::PING_SEQ + 2],
+            payload[dht_fields::PING_SEQ + 3],
         ]);
 
-        let rtt = self.pending_pings.remove(&seq)
+        let rtt = self
+            .pending_pings
+            .remove(&seq)
             .map(|t| t.elapsed().as_millis() as f32)
             .unwrap_or(100.0);
 
@@ -678,29 +789,37 @@ impl DhtHandler {
     }
 
     fn handle_find_node(&mut self, event: &IngressEvent, payload: &[u8]) {
-        if payload.len() < dht_fields::FIND_BODY_SIZE { return; }
+        if payload.len() < dht_fields::FIND_BODY_SIZE {
+            return;
+        }
         let mut tid = [0u8; 32];
-        tid.copy_from_slice(&payload[dht_fields::TARGET_ID..dht_fields::TARGET_ID+32]);
+        tid.copy_from_slice(&payload[dht_fields::TARGET_ID..dht_fields::TARGET_ID + 32]);
         let target = NodeId(tid);
 
         // Clone results to avoid borrow conflict
         let nearest: Vec<(NodeId, SocketAddr, NodeType, f32)> = {
-            self.routing_table.nearest_nodes(&target, K).iter().map(|e| {
-                (e.id, e.addr, e.node_type, e.latency_ms)
-            }).collect()
+            self.routing_table
+                .nearest_nodes(&target, K)
+                .iter()
+                .map(|e| (e.id, e.addr, e.node_type, e.latency_ms))
+                .collect()
         };
         self.send_nodes(event.src, target, &nearest);
     }
 
     fn handle_nodes(&mut self, payload: &[u8]) {
-        if payload.len() <= crate::HEADER_SIZE { return; }
+        if payload.len() <= crate::HEADER_SIZE {
+            return;
+        }
         let mut offset = crate::HEADER_SIZE;
         let mut added = 0;
         while offset < payload.len() {
             if let Some(mut node) = deserialize_node(payload, &mut offset) {
                 if node.id != self.routing_table.local_id {
                     node.latency_ms = 100.0;
-                    if self.routing_table.insert(node) { added += 1; }
+                    if self.routing_table.insert(node) {
+                        added += 1;
+                    }
                 }
             } else {
                 break; // corrupt or end
@@ -727,7 +846,9 @@ impl DhtHandler {
 
         let frame = header::build_frame(dht_msg_type::PING, body, 0);
         let _ = self.outbound_tx.send(OutgoingPacket {
-            payload: frame, dst, mode: Reliability::Data,
+            payload: frame,
+            dst,
+            mode: Reliability::Data,
         });
     }
 
@@ -741,7 +862,9 @@ impl DhtHandler {
 
         let frame = header::build_frame(dht_msg_type::PONG, body, 0);
         let _ = self.outbound_tx.send(OutgoingPacket {
-            payload: frame, dst, mode: Reliability::Data,
+            payload: frame,
+            dst,
+            mode: Reliability::Data,
         });
     }
 
@@ -750,20 +873,36 @@ impl DhtHandler {
         body.extend_from_slice(&target.0);
         let frame = header::build_frame(dht_msg_type::FIND_NODE, body, 0);
         let _ = self.outbound_tx.send(OutgoingPacket {
-            payload: frame, dst, mode: Reliability::Data,
+            payload: frame,
+            dst,
+            mode: Reliability::Data,
         });
     }
 
-    fn send_nodes(&mut self, dst: SocketAddr, target: NodeId, nodes: &[(NodeId, SocketAddr, NodeType, f32)]) {
+    fn send_nodes(
+        &mut self,
+        dst: SocketAddr,
+        target: NodeId,
+        nodes: &[(NodeId, SocketAddr, NodeType, f32)],
+    ) {
         let mut body = Vec::new();
         body.extend_from_slice(&target.0);
         for (id, addr, nt, lat) in nodes {
-            let e = NodeEntry { id: *id, addr: *addr, latency_ms: *lat, last_seen: Instant::now(), node_type: *nt, fail_count: 0 };
+            let e = NodeEntry {
+                id: *id,
+                addr: *addr,
+                latency_ms: *lat,
+                last_seen: Instant::now(),
+                node_type: *nt,
+                fail_count: 0,
+            };
             serialize_node(&e, &mut body);
         }
         let frame = header::build_frame(dht_msg_type::NODES, body, 0);
         let _ = self.outbound_tx.send(OutgoingPacket {
-            payload: frame, dst, mode: Reliability::Data,
+            payload: frame,
+            dst,
+            mode: Reliability::Data,
         });
     }
 
@@ -775,7 +914,10 @@ impl DhtHandler {
         if let Some(ref mut tracker) = self.freshness_tracker {
             // ── Sparse Gradient Aging maintenance ─────────────
             // Each peer gets PING'd on its own freshness-adjusted schedule.
-            let due: Vec<SocketAddr> = self.routing_table.all_nodes().iter()
+            let due: Vec<SocketAddr> = self
+                .routing_table
+                .all_nodes()
+                .iter()
                 .filter_map(|e| {
                     if tracker.should_ping(&e.addr, e.last_seen).is_some() {
                         Some(e.addr)
@@ -795,15 +937,20 @@ impl DhtHandler {
                     tracker.record_ping(*addr);
                 }
                 if !due.is_empty() {
-                    eprintln!("[SGA] PING'd {} peers (total: {})",
-                        count, tracker.total_maintenance_pings);
+                    eprintln!(
+                        "[SGA] PING'd {} peers (total: {})",
+                        count, tracker.total_maintenance_pings
+                    );
                 }
             }
         } else {
             // ── Standard fixed-interval maintenance ───────────
             let cutoff = Duration::from_secs(STALE_PING_S);
 
-            let stale: Vec<SocketAddr> = self.routing_table.all_nodes().iter()
+            let stale: Vec<SocketAddr> = self
+                .routing_table
+                .all_nodes()
+                .iter()
                 .filter(|e| now.duration_since(e.last_seen) > cutoff)
                 .map(|e| e.addr)
                 .collect();
@@ -817,8 +964,11 @@ impl DhtHandler {
             save_peers(&self.routing_table, path).ok();
         }
 
-        eprintln!("[DHT] {} nodes, {} pending pings",
-            self.routing_table.node_count(), self.pending_pings.len());
+        eprintln!(
+            "[DHT] {} nodes, {} pending pings",
+            self.routing_table.node_count(),
+            self.pending_pings.len()
+        );
     }
 }
 
@@ -862,7 +1012,11 @@ fn save_peers(table: &RoutingTable, path: &str) -> std::io::Result<()> {
 mod tests {
     use super::*;
 
-    fn nid(b: u8) -> NodeId { let mut a=[0u8;32]; a[31]=b; NodeId(a) }
+    fn nid(b: u8) -> NodeId {
+        let mut a = [0u8; 32];
+        a[31] = b;
+        NodeId(a)
+    }
 
     #[test]
     fn test_xor_distance() {
@@ -885,8 +1039,9 @@ mod tests {
         let local = nid(0x00);
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let mut rt = RoutingTable::new(local, addr, NodeType::General);
-        for i in 0..K+1 {
-            let mut id = [0u8;32]; id[31] = i as u8;
+        for i in 0..K + 1 {
+            let mut id = [0u8; 32];
+            id[31] = i as u8;
             rt.insert(NodeEntry::new(NodeId(id), addr, NodeType::General));
         }
         assert!(rt.node_count() <= K);
@@ -899,7 +1054,8 @@ mod tests {
         let mut rt = RoutingTable::new(local, addr, NodeType::General);
         // All nodes differ at bit 7 (bucket 7): IDs 0x80..0x93
         for i in 0..K {
-            let mut id = [0u8;32]; id[31] = 0x80 + i as u8;
+            let mut id = [0u8; 32];
+            id[31] = 0x80 + i as u8;
             let mut e = NodeEntry::new(NodeId(id), addr, NodeType::General);
             e.latency_ms = 200.0 + (i as f32) * 10.0;
             rt.insert(e);
@@ -937,7 +1093,8 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:9000".parse().unwrap();
         let mut rt = RoutingTable::new(nid(0x00), addr, NodeType::General);
         for i in 0..10 {
-            let mut id = [0u8;32]; id[31] = i;
+            let mut id = [0u8; 32];
+            id[31] = i;
             rt.insert(NodeEntry::new(NodeId(id), addr, NodeType::General));
         }
         assert_eq!(rt.nearest_nodes(&nid(0x05), 3).len(), 3);

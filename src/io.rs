@@ -14,7 +14,9 @@ use crate::HEADER_SIZE;
 /// Returns the raw frame bytes for zero-copy parsing.
 pub fn read_frame(stream: &mut TcpStream, buf: &mut Vec<u8>) -> Result<(), IoError> {
     let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf).map_err(|e| io_error(e.kind()))?;
+    stream
+        .read_exact(&mut len_buf)
+        .map_err(|e| io_error(e.kind()))?;
     let frame_len = u32::from_le_bytes(len_buf) as usize;
 
     if frame_len > crate::MAX_BODY_SIZE as usize + HEADER_SIZE {
@@ -29,7 +31,9 @@ pub fn read_frame(stream: &mut TcpStream, buf: &mut Vec<u8>) -> Result<(), IoErr
 /// Write a complete framed message to a TCP stream.
 pub fn write_frame(stream: &mut TcpStream, msg: &[u8]) -> Result<(), IoError> {
     let frame_len = msg.len() as u32;
-    stream.write_all(&frame_len.to_le_bytes()).map_err(|e| io_error(e.kind()))?;
+    stream
+        .write_all(&frame_len.to_le_bytes())
+        .map_err(|e| io_error(e.kind()))?;
     stream.write_all(msg).map_err(|e| io_error(e.kind()))?;
     Ok(())
 }

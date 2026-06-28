@@ -254,6 +254,23 @@ Cross-platform notes:
 - Criterion baseline is cached between runs via `actions/cache`. On PR branches, the cache falls back to the most recent master baseline for automatic regression comparison.
 - `cargo audit` and `cargo deny` block CI on failure (no `|| echo` suppression).
 
+### Pre-commit Hook
+
+The repo ships a `.githooks/pre-commit` hook that enforces `cargo fmt --check` + `cargo clippy` on every commit:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This activates automatically for all new clones. The hook is aware of the Windows `dlltool` limitation — it runs `cargo clippy --lib` (not `--all-targets`) on git-bash/MSYS.
+
+### Release Workflow
+
+Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
+1. Builds `--release`, runs clippy + all tests
+2. Creates a GitHub Release with auto-extracted CHANGELOG section
+3. Publishes to [crates.io](https://crates.io/crates/neuron-wire) if `CARGO_REGISTRY_TOKEN` is set in repo secrets
+
 ---
 
 ## 8. Debugging Patterns

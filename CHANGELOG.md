@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ---
 
+## [Unreleased]
+
+### Added
+- Release workflow (`.github/workflows/release.yml`): auto-creates GitHub Release + optionally publishes to crates.io on `v*.*.*` tag push
+- Pre-commit hook (`.githooks/pre-commit`): `cargo fmt --check` + `cargo clippy` gate
+- Activate with: `git config core.hooksPath .githooks`
+
+### Changed
+- Reformatted entire codebase with `cargo fmt` (aligns with pre-commit enforcement)
+
+---
+
 ## [v0.3.0] — Quality Infrastructure (2026-06-28)
 
 > Git tag: `v0.3.0`

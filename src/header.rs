@@ -135,7 +135,7 @@ pub fn build_pong() -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HEADER_SIZE, MAGIC, VERSION, MAX_BODY_SIZE};
+    use crate::{HEADER_SIZE, MAGIC, MAX_BODY_SIZE, VERSION};
 
     #[test]
     fn test_header_new_validates_crc() {
@@ -198,7 +198,7 @@ mod tests {
         let bytes = h.to_bytes();
         let err = MessageHeader::from_bytes(&bytes).unwrap_err();
         match err {
-            HeaderError::BadCrc => {},
+            HeaderError::BadCrc => {}
             _ => panic!("expected BadCrc"),
         }
     }
@@ -253,7 +253,7 @@ mod tests {
         let e = HeaderError::ShortBuffer(4);
         let s = format!("{}", e);
         assert!(s.contains("4") && s.contains("16"));
-        let e = HeaderError::BadMagic([0;4]);
+        let e = HeaderError::BadMagic([0; 4]);
         assert!(format!("{}", e).contains("magic"));
         let e = HeaderError::BadVersion(99);
         assert!(format!("{}", e).contains("99"));

@@ -55,19 +55,19 @@
 #![allow(missing_docs)]
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::transport::{TransportHeader, UdpTransport};
 use crate::apoptosis::ApoptosisSystem;
 use crate::components::{ActivationMap, EntityId, SynapseMap};
 use crate::dht::{DhtHandler, FreshnessConfig, NodeId, NodeType};
 use crate::forward_pass::ForwardPassSystem;
 use crate::hebbian::HebbianLearningSystem;
 use crate::neurogenesis::NeurogenesisSystem;
+use crate::transport::{TransportHeader, UdpTransport};
 
 // ─── Configuration ─────────────────────────────────────────────
 
@@ -262,7 +262,9 @@ pub struct EngineLoop {
 impl EngineLoop {
     /// Create a new engine loop.
     /// Returns (engine, outbound_tx, events_rx).
-    pub fn new(config: EngineConfig) -> std::io::Result<(Self, Sender<OutgoingPacket>, Receiver<IngressEvent>)> {
+    pub fn new(
+        config: EngineConfig,
+    ) -> std::io::Result<(Self, Sender<OutgoingPacket>, Receiver<IngressEvent>)> {
         let transport = UdpTransport::bind(&config.bind_addr)?;
         let (outbound_tx, outbound_rx) = mpsc::channel();
         let (events_tx, events_rx) = mpsc::channel();
@@ -330,7 +332,8 @@ impl EngineLoop {
     /// The thread sleeps during idle via the UDP socket's read timeout.
     pub fn run(&mut self) {
         // Set 1ms read timeout so recv_from blocks for at most 1ms
-        if let Err(e) = self.transport
+        if let Err(e) = self
+            .transport
             .socket
             .set_read_timeout(Some(Duration::from_millis(self.config.tick_interval_ms)))
         {
@@ -346,7 +349,10 @@ impl EngineLoop {
 
             // ── SHUTDOWN CHECK ─────────────────────────────────
             if self.shutdown.load(Ordering::Relaxed) {
-                eprintln!("[ENGINE] Shutdown signal received at tick {}. Exiting.", self.tick);
+                eprintln!(
+                    "[ENGINE] Shutdown signal received at tick {}. Exiting.",
+                    self.tick
+                );
                 return;
             }
 
@@ -406,7 +412,8 @@ impl EngineLoop {
                                 self.config.gradient_half_life_ms,
                             )
                         } else {
-                            self.transport.send_best_effort(&packet.payload, &packet.dst)
+                            self.transport
+                                .send_best_effort(&packet.payload, &packet.dst)
                         };
 
                         match result {
@@ -437,7 +444,8 @@ impl EngineLoop {
                 // Collect observations from the ingress pipeline.
                 // In a full system, decoded NWP frames carry observed
                 // activation values from remote peers.
-                let observations: std::collections::HashMap<EntityId, f32> = std::collections::HashMap::new();
+                let observations: std::collections::HashMap<EntityId, f32> =
+                    std::collections::HashMap::new();
 
                 // Step 1: Forward pass (borrows activation_map + synapse_map + neurogenesis)
                 let fp_report = self.forward_pass.tick(
@@ -488,19 +496,16 @@ impl EngineLoop {
                 // Apoptosis sweep: evict dead DHT nodes, expired pings,
                 // orphaned transport frames. Reports total deaths this sweep.
                 if let Some(ref mut dht) = self.dht_handler {
-                    let report = self.apoptosis_system.tick(
-                        self.tick,
-                        dht,
-                        &mut self.transport,
-                    );
+                    let report = self
+                        .apoptosis_system
+                        .tick(self.tick, dht, &mut self.transport);
 
                     // Death spiral guardrail
                     if self.apoptosis_system.is_death_spiral(&report) {
                         eprintln!(
                             "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
                              Network partition or seed node failure.",
-                            report.total_deaths,
-                            self.tick,
+                            report.total_deaths, self.tick,
                         );
                     } else if report.total_deaths > 0 {
                         eprintln!(
@@ -543,7 +548,10 @@ impl EngineLoop {
         // Packet filter for failure injection (partition simulation).
         // When packet_filter_allowed is Some, only packets from those addresses are processed.
         {
-            let allowed = self.packet_filter_allowed.lock().map_err(|e| e.to_string())?;
+            let allowed = self
+                .packet_filter_allowed
+                .lock()
+                .map_err(|e| e.to_string())?;
             if let Some(ref allowed_set) = *allowed {
                 if !allowed_set.contains(&src) {
                     return Ok(()); // silently drop
@@ -561,13 +569,14 @@ impl EngineLoop {
         let transport_header = unsafe { TransportHeader::from_bytes(data) };
 
         // Update ACK tracker with the received sequence number
-        self.transport.ack_tracker.record(transport_header.sequence_number);
+        self.transport
+            .ack_tracker
+            .record(transport_header.sequence_number);
 
         // Process the ACK this packet carries (clear our reliable queue)
-        self.transport.reliable_queue.process_ack(
-            transport_header.ack_number,
-            transport_header.ack_bitfield,
-        );
+        self.transport
+            .reliable_queue
+            .process_ack(transport_header.ack_number, transport_header.ack_bitfield);
 
         // Strip transport header to get the NWP frame (frame_len + header + body)
         let nwp_frame = &data[TransportHeader::SIZE..];
@@ -627,12 +636,20 @@ impl EngineLoop {
             "[ENGINE] tick={} rate={:.0}Hz rx={} pkts ({:.2}MB) tx={} pkts ({:.2}MB) \
              idle={:.1}% reliable_q={} peers={}",
             self.tick,
-            if elapsed > 0.0 { self.tick as f64 / elapsed } else { 0.0 },
+            if elapsed > 0.0 {
+                self.tick as f64 / elapsed
+            } else {
+                0.0
+            },
             self.stats.packets_recv,
             mb_recv,
             self.stats.packets_sent,
             mb_sent,
-            if self.tick > 0 { self.stats.idle_ticks as f64 / self.tick as f64 * 100.0 } else { 0.0 },
+            if self.tick > 0 {
+                self.stats.idle_ticks as f64 / self.tick as f64 * 100.0
+            } else {
+                0.0
+            },
             self.stats.reliable_queue_depth,
             self.peer_rtt.len(),
         );
@@ -706,7 +723,8 @@ pub fn spawn_engine(
                 local_id: EntityId([0u8; 32]),
                 outbound_tx: outbound_tx.clone(),
                 brain_attached: false,
-                packet_filter_allowed: packet_filter_allowed.unwrap_or_else(|| Arc::new(Mutex::new(None))),
+                packet_filter_allowed: packet_filter_allowed
+                    .unwrap_or_else(|| Arc::new(Mutex::new(None))),
             };
 
             // Auto-create DHT handler if local peers configured but no handler given
@@ -716,7 +734,11 @@ pub fn spawn_engine(
                 rand::thread_rng().fill(&mut local_id);
                 let dht = DhtHandler::new(
                     NodeId::new(local_id),
-                    engine.config.bind_addr.parse().unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap()),
+                    engine
+                        .config
+                        .bind_addr
+                        .parse()
+                        .unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap()),
                     NodeType::General,
                     outbound_tx.clone(),
                     None,
@@ -730,8 +752,10 @@ pub fn spawn_engine(
                 if fconfig.enabled {
                     if let Some(ref mut dht) = engine.dht_handler {
                         dht.enable_sga(*fconfig);
-                        eprintln!("[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
-                            fconfig.half_life_ms, fconfig.stretch_factor, fconfig.base_interval_ms);
+                        eprintln!(
+                            "[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
+                            fconfig.half_life_ms, fconfig.stretch_factor, fconfig.base_interval_ms
+                        );
                     }
                 }
             }
@@ -752,7 +776,10 @@ pub fn spawn_engine(
             }
 
             // Set 1ms read timeout
-            let _ = engine.transport.socket.set_read_timeout(Some(Duration::from_millis(engine.config.tick_interval_ms)));
+            let _ = engine
+                .transport
+                .socket
+                .set_read_timeout(Some(Duration::from_millis(engine.config.tick_interval_ms)));
 
             let mut recv_buf = vec![0u8; engine.config.recv_buffer_size];
 
@@ -761,7 +788,10 @@ pub fn spawn_engine(
 
                 // ── SHUTDOWN CHECK ─────────────────────────────
                 if engine.shutdown.load(Ordering::Relaxed) {
-                    eprintln!("[ENGINE] Shutdown signal. Exiting after {} ticks.", engine.tick);
+                    eprintln!(
+                        "[ENGINE] Shutdown signal. Exiting after {} ticks.",
+                        engine.tick
+                    );
                     return;
                 }
 
@@ -784,13 +814,18 @@ pub fn spawn_engine(
                         }
                         Err(ref e)
                             if e.kind() == std::io::ErrorKind::WouldBlock
-                                || e.kind() == std::io::ErrorKind::TimedOut => break,
+                                || e.kind() == std::io::ErrorKind::TimedOut =>
+                        {
+                            break
+                        }
                         Err(e) => {
                             eprintln!("[ENGINE] recv: {}", e);
                             break;
                         }
                     }
-                    if ingress_count > 10_000 { break; }
+                    if ingress_count > 10_000 {
+                        break;
+                    }
                 }
 
                 if ingress_count == 0 {
@@ -805,7 +840,8 @@ pub fn spawn_engine(
                         Ok(pkt) => {
                             let result = if pkt.mode.is_reliable() {
                                 engine.transport.send_reliable(
-                                    &pkt.payload, &pkt.dst,
+                                    &pkt.payload,
+                                    &pkt.dst,
                                     pkt.mode.max_retries(),
                                     engine.config.gradient_half_life_ms,
                                 )
@@ -823,7 +859,9 @@ pub fn spawn_engine(
                 }
 
                 // Phase 3: Retransmit (every 10 ticks)
-                if engine.tick - engine.last_retransmit_tick >= engine.config.retransmit_interval_ticks {
+                if engine.tick - engine.last_retransmit_tick
+                    >= engine.config.retransmit_interval_ticks
+                {
                     engine.last_retransmit_tick = engine.tick;
                     let _ = engine.transport.retransmit_stale();
                 }
@@ -835,11 +873,10 @@ pub fn spawn_engine(
 
                     // Apoptosis sweep
                     if let Some(ref mut dht) = engine.dht_handler {
-                        let report = engine.apoptosis_system.tick(
-                            engine.tick,
-                            dht,
-                            &mut engine.transport,
-                        );
+                        let report =
+                            engine
+                                .apoptosis_system
+                                .tick(engine.tick, dht, &mut engine.transport);
                         if engine.apoptosis_system.is_death_spiral(&report) {
                             eprintln!(
                                 "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}.",

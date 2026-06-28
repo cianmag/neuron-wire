@@ -27,7 +27,10 @@ fn main() {
     bb.write_u32(types::cmd::CONTEXT_HASH, 0xDEAD_BEEF);
     bb.write_u32(types::cmd::DEADLINE_US, 500_000);
     bb.write_u64(types::cmd::SOURCE_ID, 0x0000_0000_0000_0001);
-    bb.write_u32(types::cmd::TARGET_MASK, types::regions::REASONING | types::regions::LANGUAGE);
+    bb.write_u32(
+        types::cmd::TARGET_MASK,
+        types::regions::REASONING | types::regions::LANGUAGE,
+    );
 
     // Optional: add a name string to the data area
     let name_offset = bb.push_data(b"code_generation_task");
@@ -37,11 +40,7 @@ fn main() {
     assert_eq!(body.len() as u32, types::cmd::SIZE as u32 + 4 + 20); // fixed + length prefix + "code_generation_task"
 
     // Frame it
-    let frame = header::build_frame(
-        types::MsgType::Command as u8,
-        body,
-        0,
-    );
+    let frame = header::build_frame(types::MsgType::Command as u8, body, 0);
 
     println!("  Frame size: {} bytes", frame.len());
     println!("  Command built ✅\n");
@@ -61,7 +60,11 @@ fn main() {
 
     println!("  Message type:   {:?}", hdr.msg_type);
     println!("  Command ID:     {}", cmd_id);
-    println!("  Prediction:     {} ({})", types::prediction::name(pred_code), pred_code);
+    println!(
+        "  Prediction:     {} ({})",
+        types::prediction::name(pred_code),
+        pred_code
+    );
     println!("  Confidence:     {:.1}%", confidence * 100.0);
     println!("  Source neuron:  0x{:016X}", source);
     println!("  Target mask:    0x{:08X}", target_mask);
@@ -84,10 +87,22 @@ fn main() {
     let (_, r_bytes) = header::parse_frame(&r_frame[4..]).unwrap();
     let r_reader = flat::BodyReader::new(r_bytes);
 
-    println!("  Neuron:         0x{:016X}", r_reader.read_u64(types::readiness::NEURON_ID));
-    println!("  Command:        {}", r_reader.read_u32(types::readiness::COMMAND_ID));
-    println!("  Latency:        {}μs", r_reader.read_u32(types::readiness::LATENCY_US));
-    println!("  Cache hit:      {}\n", r_reader.read_u32(types::readiness::CACHE_HIT) != 0);
+    println!(
+        "  Neuron:         0x{:016X}",
+        r_reader.read_u64(types::readiness::NEURON_ID)
+    );
+    println!(
+        "  Command:        {}",
+        r_reader.read_u32(types::readiness::COMMAND_ID)
+    );
+    println!(
+        "  Latency:        {}μs",
+        r_reader.read_u32(types::readiness::LATENCY_US)
+    );
+    println!(
+        "  Cache hit:      {}\n",
+        r_reader.read_u32(types::readiness::CACHE_HIT) != 0
+    );
 
     // ─── Step 4: Send data payload ────────────────────────────
     println!("[COMMAND BRAIN] Sending activation data...");
@@ -125,7 +140,8 @@ fn main() {
     let actual_len = d_reader.read_u32(types::data::PAYLOAD_LEN);
 
     // The payload starts right after the fixed header
-    let payload_slice = &d_bytes[types::data::HEADER_SIZE..types::data::HEADER_SIZE + actual_len as usize];
+    let payload_slice =
+        &d_bytes[types::data::HEADER_SIZE..types::data::HEADER_SIZE + actual_len as usize];
 
     // Verify CRC
     let computed_crc = crc::crc32(payload_slice);
@@ -133,8 +149,14 @@ fn main() {
 
     println!("  Sender:         0x{:016X}", sender);
     println!("  Content type:   {}", ct);
-    println!("  Payload:        {} bytes (original: {})", actual_len, original_len);
-    println!("  Data:           \"{}\"", std::str::from_utf8(payload_slice).unwrap());
+    println!(
+        "  Payload:        {} bytes (original: {})",
+        actual_len, original_len
+    );
+    println!(
+        "  Data:           \"{}\"",
+        std::str::from_utf8(payload_slice).unwrap()
+    );
     println!("  CRC stored:     0x{:08X}", stored_crc);
     println!("  CRC computed:   0x{:08X}", computed_crc);
     println!("  CRC valid:      {}\n", crc_valid);
@@ -154,10 +176,22 @@ fn main() {
     let (_, c_bytes) = header::parse_frame(&c_frame[4..]).unwrap();
     let c_reader = flat::BodyReader::new(c_bytes);
 
-    println!("  Proposal:       0x{:016X}", c_reader.read_u64(types::consensus::PROPOSAL_ID));
-    println!("  Voter:          0x{:016X}", c_reader.read_u64(types::consensus::VOTER_ID));
-    println!("  Confidence:     {:.1}%", types::conf_from_raw(c_reader.read_u32(types::consensus::CONFIDENCE)) * 100.0);
-    println!("  Vote:           {}\n", c_reader.read_u32(types::consensus::FLAGS));
+    println!(
+        "  Proposal:       0x{:016X}",
+        c_reader.read_u64(types::consensus::PROPOSAL_ID)
+    );
+    println!(
+        "  Voter:          0x{:016X}",
+        c_reader.read_u64(types::consensus::VOTER_ID)
+    );
+    println!(
+        "  Confidence:     {:.1}%",
+        types::conf_from_raw(c_reader.read_u32(types::consensus::CONFIDENCE)) * 100.0
+    );
+    println!(
+        "  Vote:           {}\n",
+        c_reader.read_u32(types::consensus::FLAGS)
+    );
 
     // ─── Summary ─────────────────────────────────────────────
     println!("═══ SUMMARY ═══");

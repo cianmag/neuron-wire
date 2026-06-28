@@ -146,10 +146,12 @@ impl ForwardPassSystem {
         // ── PHASE 3: APPLY PROPAGATION + SQUASH ───────────────
         // Merge propagated values into the activation map with squashing.
         for (id, raw_value) in propagation_buffer.drain() {
-            let entry = activations.entry(id).or_insert_with(|| ActivationComponent {
-                value: 0.0,
-                last_updated_tick: current_tick,
-            });
+            let entry = activations
+                .entry(id)
+                .or_insert_with(|| ActivationComponent {
+                    value: 0.0,
+                    last_updated_tick: current_tick,
+                });
             entry.value = squash_tanh(entry.value + raw_value);
             entry.last_updated_tick = current_tick;
         }
@@ -200,21 +202,24 @@ impl ForwardPassSystem {
             } else {
                 // Unknown neuron observed — novel entity.
                 // Register it locally with the observed value.
-                activations.insert(*observed_id, ActivationComponent {
-                    value: *observed_value,
-                    last_updated_tick: current_tick,
-                });
+                activations.insert(
+                    *observed_id,
+                    ActivationComponent {
+                        value: *observed_value,
+                        last_updated_tick: current_tick,
+                    },
+                );
 
                 // Novelty is surprising — feed into Neurogenesis
                 neuro.current_tick = current_tick;
                 let surprise = observed_value.abs() * 0.1; // scaled novelty
                 if neuro.track_error(surprise) {
                     let _new_id = NeurogenesisSystem::spawn_neuron(
-                            activations,
-                            synapses,
-                            vec![*observed_id],
-                            current_tick,
-                        );
+                        activations,
+                        synapses,
+                        vec![*observed_id],
+                        current_tick,
+                    );
                     neuro.total_spawned += 1;
                     report.neurons_spawned += 1;
                     report.surprise_events += 1;
@@ -230,9 +235,7 @@ impl ForwardPassSystem {
         //  they have non-zero activation from the forward pass.)
         let dead_ids: Vec<EntityId> = activations
             .iter()
-            .filter(|(id, act)| {
-                act.value.abs() < 0.001 && !synapses.contains_key(id)
-            })
+            .filter(|(id, act)| act.value.abs() < 0.001 && !synapses.contains_key(id))
             .map(|(id, _)| *id)
             .collect();
         report.orphans_cleaned = dead_ids.len();
@@ -254,27 +257,49 @@ mod tests {
     use crate::neurogenesis::NeurogenesisSystem;
     use std::collections::HashMap;
 
-    fn eid(b: u8) -> EntityId { let mut a = [0u8; 32]; a[31] = b; EntityId(a) }
+    fn eid(b: u8) -> EntityId {
+        let mut a = [0u8; 32];
+        a[31] = b;
+        EntityId(a)
+    }
 
     fn make_activations() -> ActivationMap {
         let mut m = HashMap::new();
-        m.insert(eid(1), ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        m.insert(eid(2), ActivationComponent { value: 0.8, last_updated_tick: 0 });
+        m.insert(
+            eid(1),
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        m.insert(
+            eid(2),
+            ActivationComponent {
+                value: 0.8,
+                last_updated_tick: 0,
+            },
+        );
         m
     }
 
     fn make_synapses() -> SynapseMap {
         let mut m = HashMap::new();
-        m.insert(eid(1), SynapseComponent {
-            target_entities: vec![eid(3)],
-            weights: vec![0.5],
-            accumulated_gradients: vec![0.0],
-        });
-        m.insert(eid(2), SynapseComponent {
-            target_entities: vec![eid(3)],
-            weights: vec![0.5],
-            accumulated_gradients: vec![0.0],
-        });
+        m.insert(
+            eid(1),
+            SynapseComponent {
+                target_entities: vec![eid(3)],
+                weights: vec![0.5],
+                accumulated_gradients: vec![0.0],
+            },
+        );
+        m.insert(
+            eid(2),
+            SynapseComponent {
+                target_entities: vec![eid(3)],
+                weights: vec![0.5],
+                accumulated_gradients: vec![0.0],
+            },
+        );
         m
     }
 

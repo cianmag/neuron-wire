@@ -1,7 +1,7 @@
 //! Integration tests for neuron-wire protocol roundtrips.
 //! These compile as a separate crate, testing the public library API.
 
-use neuron_wire::header::{self, MessageHeader, HeaderError};
+use neuron_wire::header::{self, HeaderError, MessageHeader};
 
 #[test]
 fn integration_ping_roundtrip() {
@@ -68,7 +68,7 @@ fn integration_bad_magic_rejected() {
     bytes[0..4].copy_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]); // corrupt magic
     let err = MessageHeader::from_bytes(&bytes).unwrap_err();
     match err {
-        HeaderError::BadMagic(_) => {},
+        HeaderError::BadMagic(_) => {}
         _ => panic!("expected BadMagic"),
     }
 }

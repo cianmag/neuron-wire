@@ -43,10 +43,7 @@ use std::sync::mpsc::Sender;
 
 use rand::Rng;
 
-use crate::components::{
-    ActivationMap, EntityId,
-    SynapseComponent, SynapseMap,
-};
+use crate::components::{ActivationMap, EntityId, SynapseComponent, SynapseMap};
 use crate::engine_loop::{OutgoingPacket, Reliability};
 use crate::header;
 
@@ -102,7 +99,12 @@ impl Default for HebbianLearningSystem {
 }
 
 impl HebbianLearningSystem {
-    pub fn new(learning_rate: f32, weight_decay: f32, prune_threshold: f32, gossip_interval: u64) -> Self {
+    pub fn new(
+        learning_rate: f32,
+        weight_decay: f32,
+        prune_threshold: f32,
+        gossip_interval: u64,
+    ) -> Self {
         HebbianLearningSystem {
             learning_rate,
             weight_decay,
@@ -185,11 +187,7 @@ impl HebbianLearningSystem {
             let targets = select_gossip_targets(peers, MAX_GOSSIP_TARGETS);
             for target in &targets {
                 if let Some(payload) = serialize_gossip_packet(local_id, &gossip_batch) {
-                    let frame = header::build_frame(
-                        crate::types::MsgType::Data as u8,
-                        payload,
-                        0,
-                    );
+                    let frame = header::build_frame(crate::types::MsgType::Data as u8, payload, 0);
                     let _ = outbound_tx.send(OutgoingPacket {
                         payload: frame,
                         dst: *target,
@@ -270,7 +268,13 @@ fn serialize_gossip_packet(local_id: EntityId, batch: &[(EntityId, Vec<u8>)]) ->
         return None;
     }
     let count = batch.len().min(MAX_SYNAPSES_PER_GOSSIP);
-    let total_size: usize = 32 + 2 + batch.iter().take(count).map(|(_, b)| b.len()).sum::<usize>();
+    let total_size: usize = 32
+        + 2
+        + batch
+            .iter()
+            .take(count)
+            .map(|(_, b)| b.len())
+            .sum::<usize>();
     let mut buf = Vec::with_capacity(total_size);
 
     buf.extend_from_slice(&local_id.0);
@@ -287,8 +291,12 @@ fn serialize_gossip_packet(local_id: EntityId, batch: &[(EntityId, Vec<u8>)]) ->
 /// Returns `(source_entity_id, Vec<(post_id, Vec<target_id>, Vec<weight>, Vec<gradient>)>)`
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
-pub fn deserialize_gossip_packet(data: &[u8]) -> Option<(EntityId, Vec<(EntityId, Vec<EntityId>, Vec<f32>, Vec<f32>)>)> {
-    if data.len() < 34 { return None; }
+pub fn deserialize_gossip_packet(
+    data: &[u8],
+) -> Option<(EntityId, Vec<(EntityId, Vec<EntityId>, Vec<f32>, Vec<f32>)>)> {
+    if data.len() < 34 {
+        return None;
+    }
 
     let mut offset = 0;
     let mut src_id = [0u8; 32];
@@ -302,7 +310,9 @@ pub fn deserialize_gossip_packet(data: &[u8]) -> Option<(EntityId, Vec<(EntityId
     let mut entries = Vec::with_capacity(num_synapses);
 
     for _ in 0..num_synapses {
-        if offset + 34 > data.len() { break; }
+        if offset + 34 > data.len() {
+            break;
+        }
 
         let mut pid = [0u8; 32];
         pid.copy_from_slice(&data[offset..offset + 32]);
@@ -313,7 +323,9 @@ pub fn deserialize_gossip_packet(data: &[u8]) -> Option<(EntityId, Vec<(EntityId
         offset += 2;
 
         let expected_size = num_targets * (32 + 4 + 4);
-        if offset + expected_size > data.len() { break; }
+        if offset + expected_size > data.len() {
+            break;
+        }
 
         let mut targets = Vec::with_capacity(num_targets);
         let mut weights = Vec::with_capacity(num_targets);
@@ -324,10 +336,20 @@ pub fn deserialize_gossip_packet(data: &[u8]) -> Option<(EntityId, Vec<(EntityId
             tid.copy_from_slice(&data[offset..offset + 32]);
             offset += 32;
 
-            let w = f32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+            let w = f32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]);
             offset += 4;
 
-            let g = f32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+            let g = f32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]);
             offset += 4;
 
             targets.push(EntityId(tid));
@@ -375,12 +397,16 @@ fn select_gossip_targets(peers: &[SocketAddr], max: usize) -> Vec<SocketAddr> {
 
 #[cfg(test)]
 mod tests {
-    use crate::components::ActivationComponent;
     use super::*;
+    use crate::components::ActivationComponent;
     use std::collections::HashMap;
     use std::sync::mpsc;
 
-    fn eid(b: u8) -> EntityId { let mut a=[0u8;32]; a[31]=b; EntityId(a) }
+    fn eid(b: u8) -> EntityId {
+        let mut a = [0u8; 32];
+        a[31] = b;
+        EntityId(a)
+    }
 
     fn make_synapse(targets: Vec<(u8, f32)>) -> SynapseComponent {
         let mut ids = Vec::with_capacity(targets.len());
@@ -390,7 +416,11 @@ mod tests {
             ids.push(eid(b));
             weights.push(w);
         }
-        SynapseComponent { target_entities: ids, weights, accumulated_gradients: grads }
+        SynapseComponent {
+            target_entities: ids,
+            weights,
+            accumulated_gradients: grads,
+        }
     }
 
     #[test]
@@ -405,8 +435,20 @@ mod tests {
     fn test_stdp_updates_weight() {
         let mut h = HebbianLearningSystem::new(1.0, 1.0, 0.001, 1000);
         let mut acts = HashMap::new();
-        acts.insert(eid(1), ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        acts.insert(eid(2), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(1),
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(2),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
 
         let mut syns = HashMap::new();
         syns.insert(eid(2), make_synapse(vec![(1, 0.1)]));
@@ -425,8 +467,20 @@ mod tests {
     fn test_weight_decay_applies() {
         let mut h = HebbianLearningSystem::new(0.0, 0.5, 0.001, 1000);
         let mut acts = HashMap::new();
-        acts.insert(eid(1), ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        acts.insert(eid(2), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(1),
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(2),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
 
         let mut syns = HashMap::new();
         syns.insert(eid(2), make_synapse(vec![(1, 0.5)]));
@@ -443,8 +497,20 @@ mod tests {
     fn test_micro_pruning_threshold() {
         let mut h = HebbianLearningSystem::new(0.0, 1.0, 0.3, 1000);
         let mut acts = HashMap::new();
-        acts.insert(eid(1), ActivationComponent { value: 1.0, last_updated_tick: 0 });
-        acts.insert(eid(2), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(1),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(2),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
 
         let mut syns = HashMap::new();
         // weight 0.2 < 0.3 threshold → should be pruned
@@ -461,8 +527,20 @@ mod tests {
     fn test_accumulated_gradients_reset_after_gossip() {
         let mut h = HebbianLearningSystem::new(1.0, 1.0, 0.001, 5);
         let mut acts = HashMap::new();
-        acts.insert(eid(1), ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        acts.insert(eid(2), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(1),
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(2),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
 
         let mut syns = HashMap::new();
         syns.insert(eid(2), make_synapse(vec![(1, 0.1)]));
@@ -481,8 +559,20 @@ mod tests {
     #[test]
     fn test_gossip_serialize_deserialize_roundtrip() {
         let mut acts = HashMap::new();
-        acts.insert(eid(1), ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        acts.insert(eid(2), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(1),
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(2),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
 
         let mut syns = HashMap::new();
         syns.insert(eid(2), make_synapse(vec![(1, 0.42)]));
@@ -527,15 +617,48 @@ mod tests {
     fn test_reverse_iteration_safe_removal() {
         let mut h = HebbianLearningSystem::new(0.0, 0.5, 0.01, 1000);
         let mut acts = HashMap::new();
-        acts.insert(eid(0), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(0),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
         // Three targets, all will decay below threshold
-        acts.insert(eid(0), ActivationComponent { value: 1.0, last_updated_tick: 0 });
-        acts.insert(eid(1), ActivationComponent { value: 1.0, last_updated_tick: 0 });
-        acts.insert(eid(2), ActivationComponent { value: 1.0, last_updated_tick: 0 });
-        acts.insert(eid(3), ActivationComponent { value: 1.0, last_updated_tick: 0 });
+        acts.insert(
+            eid(0),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(1),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(2),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
+        acts.insert(
+            eid(3),
+            ActivationComponent {
+                value: 1.0,
+                last_updated_tick: 0,
+            },
+        );
 
         let mut syns = HashMap::new();
-        syns.insert(eid(4), make_synapse(vec![(0, 0.5), (1, 0.5), (2, 0.5), (3, 0.5)]));
+        syns.insert(
+            eid(4),
+            make_synapse(vec![(0, 0.5), (1, 0.5), (2, 0.5), (3, 0.5)]),
+        );
 
         let (tx, _rx) = mpsc::channel();
         let report = h.tick(&acts, &mut syns, 1, &tx, &[], eid(0));

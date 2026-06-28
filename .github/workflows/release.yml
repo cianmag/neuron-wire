@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Build (release)
+        run: cargo build --release --verbose
+
+      - name: Clippy
+        run: cargo clippy --all-targets --release -- -D warnings
+
+      - name: Test
+        run: cargo test --release --verbose
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          {
+            echo 'notes<<CHANGELOG_EOF'
+            echo "## ${TAG}"
+            echo ""
+            echo "See [CHANGELOG.md](https://github.com/cianmag/neuron-wire/blob/${TAG}/CHANGELOG.md) for the full changelog."
+            echo ""
+            echo "### What's in this release"
+            echo ""
+            # Extract the matching section from CHANGELOG.md
+            awk -v tag="${TAG#v}" '
+              BEGIN { found=0; printed=0 }
+              /^## \[/ && found && !/^## \[Unreleased\]/ { exit }
+              /^## \['"${TAG#v}"'\]/ { found=1; next }
+              found && printed < 30 { print; printed++ }
+            ' CHANGELOG.md
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::warning::CARGO_REGISTRY_TOKEN secret not set — skipping crates.io publish"
+            echo "Set it in repo Settings → Secrets and variables → Actions to enable auto-publish."
+          else
+            cargo publish --verbose
+          fi

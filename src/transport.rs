@@ -237,15 +237,25 @@ impl ReliableQueue {
     }
 
     /// Enqueue a packet for reliable delivery
-    pub fn enqueue(&mut self, seq: u32, data: Vec<u8>, dst: SocketAddr, max_retries: u32, half_life_ms: f32) {
-        self.packets.insert(seq, ReliablePacket {
-            data,
-            dst,
-            first_sent: Instant::now(),
-            retries: 0,
-            max_retries,
-            half_life_ms,
-        });
+    pub fn enqueue(
+        &mut self,
+        seq: u32,
+        data: Vec<u8>,
+        dst: SocketAddr,
+        max_retries: u32,
+        half_life_ms: f32,
+    ) {
+        self.packets.insert(
+            seq,
+            ReliablePacket {
+                data,
+                dst,
+                first_sent: Instant::now(),
+                retries: 0,
+                max_retries,
+                half_life_ms,
+            },
+        );
     }
 
     /// Process an incoming ACK: remove acknowledged packets
@@ -395,7 +405,11 @@ impl UdpTransport {
 
     /// Send an NWP message with best-effort delivery (no retransmit).
     /// Returns the sequence number used.
-    pub fn send_best_effort(&mut self, payload: &[u8], dst: &std::net::SocketAddr) -> std::io::Result<u32> {
+    pub fn send_best_effort(
+        &mut self,
+        payload: &[u8],
+        dst: &std::net::SocketAddr,
+    ) -> std::io::Result<u32> {
         let seq = self.next_seq();
         let (ack_num, ack_bit) = self.ack_tracker.ack_state();
         let header = TransportHeader::new(seq, ack_num, ack_bit, self.now_ms());
@@ -433,7 +447,8 @@ impl UdpTransport {
         self.packets_sent += 1;
 
         // Enqueue for retransmission
-        self.reliable_queue.enqueue(seq, datagram, *dst, max_retries, half_life_ms);
+        self.reliable_queue
+            .enqueue(seq, datagram, *dst, max_retries, half_life_ms);
 
         Ok(seq)
     }
@@ -457,7 +472,8 @@ impl UdpTransport {
                 self.ack_tracker.record(header.sequence_number);
 
                 // Process the ACK this packet carries
-                self.reliable_queue.process_ack(header.ack_number, header.ack_bitfield);
+                self.reliable_queue
+                    .process_ack(header.ack_number, header.ack_bitfield);
 
                 // The payload starts after the transport header
                 let payload = &self.recv_buf[TransportHeader::SIZE..len];
@@ -468,9 +484,7 @@ impl UdpTransport {
                     src,
                 }))
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                Ok(None)
-            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
             Err(e) => Err(e),
         }
     }

@@ -44,7 +44,13 @@ fn bench_build_frame(c: &mut Criterion) {
     for &size in &body_sizes {
         let body = vec![0x42u8; size];
         c.bench_function(format!("build_frame_{}B", size), |b| {
-            b.iter(|| black_box(neuron_wire::header::build_frame(black_box(5), black_box(body.clone()), black_box(0))))
+            b.iter(|| {
+                black_box(neuron_wire::header::build_frame(
+                    black_box(5),
+                    black_box(body.clone()),
+                    black_box(0),
+                ))
+            })
         });
     }
 }
@@ -154,11 +160,13 @@ fn bench_hebbian_micro_pruning(c: &mut Criterion) {
     for i in 0..100 {
         let mut eid = [0u8; 32];
         eid[31] = i;
-        let targets: Vec<_> = (0..10).map(|j| {
-            let mut t = [0u8; 32];
-            t[31] = j;
-            neuron_wire::types::EntityId(t)
-        }).collect();
+        let targets: Vec<_> = (0..10)
+            .map(|j| {
+                let mut t = [0u8; 32];
+                t[31] = j;
+                neuron_wire::types::EntityId(t)
+            })
+            .collect();
         synapses.insert(
             neuron_wire::types::EntityId(eid),
             SynapseComponent {
@@ -172,11 +180,14 @@ fn bench_hebbian_micro_pruning(c: &mut Criterion) {
         b.iter_batched(
             || synapses.clone(),
             |mut syns| {
-                let dead: Vec<_> = syns.iter()
+                let dead: Vec<_> = syns
+                    .iter()
                     .filter(|(_, s)| s.weights.iter().all(|w| *w < prune_threshold))
                     .map(|(id, _)| *id)
                     .collect();
-                for id in dead { syns.remove(&id); }
+                for id in dead {
+                    syns.remove(&id);
+                }
                 black_box(syns.len());
             },
             BatchSize::SmallInput,
@@ -188,8 +199,8 @@ fn bench_hebbian_micro_pruning(c: &mut Criterion) {
 
 fn bench_forward_pass_tick_small(c: &mut Criterion) {
     use neuron_wire::components::*;
-    use neuron_wire::neurogenesis::NeurogenesisSystem;
     use neuron_wire::forward_pass::ForwardPassSystem;
+    use neuron_wire::neurogenesis::NeurogenesisSystem;
     use std::collections::HashMap;
 
     let mut fp = ForwardPassSystem::new(0.9, 0.1);
@@ -202,17 +213,29 @@ fn bench_forward_pass_tick_small(c: &mut Criterion) {
         let mut eid = [0u8; 32];
         eid[31] = i;
         let id = EntityId(eid);
-        activations.insert(id, ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        let targets: Vec<_> = (0..10).filter(|&j| j != i).map(|j| {
-            let mut t = [0u8; 32];
-            t[31] = j;
-            EntityId(t)
-        }).collect();
-        synapses.insert(id, SynapseComponent {
-            target_entities: targets,
-            weights: vec![0.5; 9],
-            accumulated_gradients: vec![0.0; 9],
-        });
+        activations.insert(
+            id,
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        let targets: Vec<_> = (0..10)
+            .filter(|&j| j != i)
+            .map(|j| {
+                let mut t = [0u8; 32];
+                t[31] = j;
+                EntityId(t)
+            })
+            .collect();
+        synapses.insert(
+            id,
+            SynapseComponent {
+                target_entities: targets,
+                weights: vec![0.5; 9],
+                accumulated_gradients: vec![0.0; 9],
+            },
+        );
     }
 
     let observations = HashMap::new();
@@ -231,8 +254,8 @@ fn bench_forward_pass_tick_small(c: &mut Criterion) {
 
 fn bench_forward_pass_tick_50n(c: &mut Criterion) {
     use neuron_wire::components::*;
-    use neuron_wire::neurogenesis::NeurogenesisSystem;
     use neuron_wire::forward_pass::ForwardPassSystem;
+    use neuron_wire::neurogenesis::NeurogenesisSystem;
     use std::collections::HashMap;
 
     let mut fp = ForwardPassSystem::new(0.9, 0.1);
@@ -246,17 +269,28 @@ fn bench_forward_pass_tick_50n(c: &mut Criterion) {
         let mut eid = [0u8; 32];
         eid[31] = i;
         let id = EntityId(eid);
-        activations.insert(id, ActivationComponent { value: 0.5, last_updated_tick: 0 });
-        let targets: Vec<_> = (0..k).map(|j| {
-            let mut t = [0u8; 32];
-            t[31] = (i + j) % n;
-            EntityId(t)
-        }).collect();
-        synapses.insert(id, SynapseComponent {
-            target_entities: targets,
-            weights: vec![0.5; k],
-            accumulated_gradients: vec![0.0; k],
-        });
+        activations.insert(
+            id,
+            ActivationComponent {
+                value: 0.5,
+                last_updated_tick: 0,
+            },
+        );
+        let targets: Vec<_> = (0..k)
+            .map(|j| {
+                let mut t = [0u8; 32];
+                t[31] = (i + j) % n;
+                EntityId(t)
+            })
+            .collect();
+        synapses.insert(
+            id,
+            SynapseComponent {
+                target_entities: targets,
+                weights: vec![0.5; k],
+                accumulated_gradients: vec![0.0; k],
+            },
+        );
     }
 
     let observations = HashMap::new();

@@ -179,7 +179,9 @@ impl ApoptosisSystem {
 
         // ── PHASE 4: EXPIRE PENDING PINGS ────────────────────
         let ping_timeout = Duration::from_secs(PENDING_PING_TIMEOUT_S);
-        let expired_seqs: Vec<u32> = dht.pending_pings.iter()
+        let expired_seqs: Vec<u32> = dht
+            .pending_pings
+            .iter()
             .filter(|(_, sent_at)| sent_at.elapsed() > ping_timeout)
             .map(|(seq, _)| *seq)
             .collect();
@@ -198,9 +200,8 @@ impl ApoptosisSystem {
         report.data_frames_purged = 0; // tracked internally by transport
 
         // ── COMPILE REPORT ──────────────────────────────────
-        report.total_deaths = report.dht_nodes_evicted
-            + report.pending_pings_expired
-            + report.data_frames_purged;
+        report.total_deaths =
+            report.dht_nodes_evicted + report.pending_pings_expired + report.data_frames_purged;
 
         self.cumulative_deaths += report.total_deaths as u64;
         if report.total_deaths > self.peak_deaths_per_sweep {

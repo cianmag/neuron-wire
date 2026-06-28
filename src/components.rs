@@ -21,14 +21,20 @@ use std::fmt;
 pub struct EntityId(pub [u8; 32]);
 
 impl EntityId {
-    pub fn new(bytes: [u8; 32]) -> Self { EntityId(bytes) }
+    pub fn new(bytes: [u8; 32]) -> Self {
+        EntityId(bytes)
+    }
 
     /// Abbreviated hex for display
     pub fn hex(&self) -> String {
         let mut s = String::with_capacity(10);
-        for &b in &self.0[..4] { s.push_str(&format!("{:02x}", b)); }
+        for &b in &self.0[..4] {
+            s.push_str(&format!("{:02x}", b));
+        }
         s.push('…');
-        for &b in &self.0[28..] { s.push_str(&format!("{:02x}", b)); }
+        for &b in &self.0[28..] {
+            s.push_str(&format!("{:02x}", b));
+        }
         s
     }
 }
@@ -153,7 +159,10 @@ mod tests {
 
     #[test]
     fn test_activation_value() {
-        let mut a = ActivationComponent { value: 0.0, last_updated_tick: 0 };
+        let mut a = ActivationComponent {
+            value: 0.0,
+            last_updated_tick: 0,
+        };
         a.value = 0.85;
         a.last_updated_tick = 100;
         assert!((a.value - 0.85).abs() < 0.001);

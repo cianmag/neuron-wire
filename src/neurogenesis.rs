@@ -38,8 +38,7 @@
 use rand::RngCore;
 
 use crate::components::{
-    ActivationComponent, EntityId, PredictionComponent,
-    SynapseComponent, ActivationMap, SynapseMap,
+    ActivationComponent, ActivationMap, EntityId, PredictionComponent, SynapseComponent, SynapseMap,
 };
 
 // ─── Constants — sensible defaults ──────────────────────────────
@@ -152,23 +151,27 @@ impl NeurogenesisSystem {
         let new_id = EntityId(id_bytes);
 
         // Initialize activation at 0 (resting potential)
-        activations.insert(new_id, ActivationComponent {
-            value: 0.0,
-            last_updated_tick: current_tick,
-        });
+        activations.insert(
+            new_id,
+            ActivationComponent {
+                value: 0.0,
+                last_updated_tick: current_tick,
+            },
+        );
 
         // Limit wiring to prevent over-connection
-        let inputs: Vec<EntityId> = causal_inputs.into_iter()
-            .take(MAX_CAUSAL_INPUTS)
-            .collect();
+        let inputs: Vec<EntityId> = causal_inputs.into_iter().take(MAX_CAUSAL_INPUTS).collect();
         let count = inputs.len();
 
         // Wire to causal upstream with low initial weights
-        synapses.insert(new_id, SynapseComponent {
-            target_entities: inputs,
-            weights: vec![0.1; count],
-            accumulated_gradients: vec![0.0; count],
-        });
+        synapses.insert(
+            new_id,
+            SynapseComponent {
+                target_entities: inputs,
+                weights: vec![0.1; count],
+                accumulated_gradients: vec![0.0; count],
+            },
+        );
 
         new_id
     }
@@ -219,7 +222,11 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn eid(b: u8) -> EntityId { let mut a=[0u8;32]; a[31]=b; EntityId(a) }
+    fn eid(b: u8) -> EntityId {
+        let mut a = [0u8; 32];
+        a[31] = b;
+        EntityId(a)
+    }
 
     #[test]
     fn test_new_system_defaults() {
@@ -276,7 +283,10 @@ mod tests {
         let mut syns = HashMap::new();
 
         let id = NeurogenesisSystem::spawn_neuron(
-            &mut acts, &mut syns, vec![eid(1), eid(2), eid(3)], 100,
+            &mut acts,
+            &mut syns,
+            vec![eid(1), eid(2), eid(3)],
+            100,
         );
 
         let act = &acts[&id];

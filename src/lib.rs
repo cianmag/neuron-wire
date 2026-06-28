@@ -14,27 +14,27 @@
 
 #![deny(missing_docs)]
 
-pub mod flat;
-pub mod header;
-pub mod types;
-pub mod io;
-pub mod transport;
-pub mod engine_loop;
-pub mod dht;
+pub mod adversary;
 pub mod apoptosis;
 pub mod components;
-pub mod neurogenesis;
-pub mod hebbian;
-pub mod forward_pass;
-pub mod zerocopy;
-pub mod simulator;
-pub mod adversary;
 pub mod crc;
+pub mod dht;
+pub mod engine_loop;
+pub mod flat;
+pub mod forward_pass;
+pub mod header;
+pub mod hebbian;
+pub mod io;
+pub mod neurogenesis;
+pub mod simulator;
+pub mod transport;
+pub mod types;
+pub mod zerocopy;
 
 pub use flat::*;
 pub use header::*;
-pub use types::*;
 pub use io::*;
+pub use types::*;
 
 /// Magic: "NWP\0"
 pub const MAGIC: [u8; 4] = [0x4E, 0x57, 0x50, 0x00];

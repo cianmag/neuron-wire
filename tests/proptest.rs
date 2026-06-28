@@ -2,10 +2,10 @@
 //! Run with: cargo test --features proptest
 //! (or just cargo test on CI where proptest is a dev-dependency)
 
-use proptest::prelude::*;
-use neuron_wire::header::{self, MessageHeader};
-use neuron_wire::types::{MsgType, conf_to_raw, conf_from_raw};
 use neuron_wire::crc::crc32;
+use neuron_wire::header::{self, MessageHeader};
+use neuron_wire::types::{conf_from_raw, conf_to_raw, MsgType};
+use proptest::prelude::*;
 
 // ─── Header property tests ──────────────────────────────────────
 

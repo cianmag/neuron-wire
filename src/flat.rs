@@ -97,7 +97,8 @@ impl BodyBuilder {
     #[inline]
     pub fn push_data(&mut self, bytes: &[u8]) -> u32 {
         let offset = self.fixed.len() as u32;
-        self.fixed.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+        self.fixed
+            .extend_from_slice(&(bytes.len() as u32).to_le_bytes());
         self.fixed.extend_from_slice(bytes);
         offset
     }
@@ -155,9 +156,7 @@ impl<'a> BodyReader<'a> {
             return None;
         }
         let len = read_u32(self.buf, relative) as usize;
-        Some(unsafe {
-            core::str::from_utf8_unchecked(&self.buf[relative + 4..relative + 4 + len])
-        })
+        Some(unsafe { core::str::from_utf8_unchecked(&self.buf[relative + 4..relative + 4 + len]) })
     }
 
     /// Read a raw byte slice at `offset`.
@@ -195,10 +194,10 @@ mod tests {
     fn test_body_roundtrip() {
         // Build a body with fixed fields + a string
         let mut bb = BodyBuilder::new(16);
-        bb.write_u32(0, 42);               // field 0: u32
-        bb.write_u64(4, 0xDEAD_BEEF);       // field 1: u64
+        bb.write_u32(0, 42); // field 0: u32
+        bb.write_u64(4, 0xDEAD_BEEF); // field 1: u64
         let str_offset = bb.push_data(b"hello neuron");
-        bb.write_u32(12, str_offset);       // field 2: string offset
+        bb.write_u32(12, str_offset); // field 2: string offset
 
         let body = bb.finish();
         assert!(body.len() >= 16);
