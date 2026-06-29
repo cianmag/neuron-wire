@@ -52,7 +52,6 @@
 //! - **`events_tx`**: `Sender<IngressEvent>` — the engine dispatches fully
 //!   validated, ACK-tracked messages here. Subscribers process them.
 
-#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};

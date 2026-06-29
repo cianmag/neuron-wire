@@ -16,7 +16,6 @@
 //! into the network, bypassing the normal outbound channel. For state
 //! corruption, it mutates node state through shared references.
 
-#![allow(missing_docs)]
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -69,6 +68,16 @@ impl std::fmt::Display for AdversaryMode {
 }
 
 impl AdversaryMode {
+    /// Parse an `AdversaryMode` from a string label.
+    ///
+    /// Recognised aliases:
+    /// - `"none"` → `None`
+    /// - `"bad-packets"`, `"badpackets"`, `"corrupt"` → `BadPackets`
+    /// - `"corrupted-state"`, `"corrupt-state"`, `"state"` → `CorruptedState`
+    /// - `"spoofed-identity"`, `"spoof"`, `"identity"` → `SpoofedIdentity`
+    /// - `"replay-attack"`, `"replay"` → `ReplayAttack`
+    /// - `"all"`, `"everything"` → `All`
+    /// - Anything else → `None`
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {

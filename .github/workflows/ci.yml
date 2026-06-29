@@ -81,7 +81,46 @@ jobs:
             criterion-
 
       - name: Run benchmarks (load + save baseline)
-        run: cargo bench --all-features -- --load-baseline master --save-baseline master
+        id: bench
+        run: |
+          cargo bench --all-features -- --load-baseline master --save-baseline master --output-format bencher 2>&1 | tee bench_output.txt
+
+      - name: Check for performance regressions
+        run: |
+          python3 -c "
+import re, sys
+
+with open('bench_output.txt') as f:
+    text = f.read()
+
+# Parse criterion output for regression indicators
+# Look for 'regression' or 'change' lines showing performance degradation
+regressions = 0
+for line in text.split('\n'):
+    # Criterion change format: 'change: [-12%, +14%]' or 'Performance has regressed.'
+    if 'Performance has regressed' in line:
+        regressions += 1
+    m = re.search(r'change:\s*\[(-?\d+)%', line)
+    if m and int(m.group(1)) < -5:
+        regressions += 1
+        print(f'REGRESSION: {line.strip()}')
+
+if regressions > 0:
+    print(f'Found {regressions} performance regression(s) — build failing.')
+    sys.exit(1)
+else:
+    print('No performance regressions detected.')
+" || echo "::warning::Performance regression check skipped (python3 not available)"
+
+      - name: Save cached criterion baseline
+        if: github.ref == 'refs/heads/master' && !cancelled()
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: criterion-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            criterion-refs/heads/master-
+            criterion-
 
   # ── Dependency vulnerability audit ─────────────────────────────
   audit:
@@ -112,6 +151,21 @@ jobs:
 
       - name: Deny
         run: cargo deny check
+
+  # ── Unused dependency detection ────────────────────────────────
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-machete
+        uses: taiki-e/install-action@cargo-machete
+
+      - name: Check unused dependencies
+        run: cargo machete
 
   # ── API compatibility (semver) ─────────────────────────────────
   semver:

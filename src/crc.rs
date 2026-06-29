@@ -1,7 +1,10 @@
 //! CRC32 helper
-#![allow(missing_docs)]
 use crc32fast::Hasher;
 
+/// Compute a CRC-32/ISO-HDLC checksum over `data`.
+///
+/// Uses the `crc32fast` crate for a hardware-accelerated implementation.
+/// Returns the CRC-32 checksum (ISO-HDLC / PKZIP variant).
 #[inline]
 pub fn crc32(data: &[u8]) -> u32 {
     let mut h = Hasher::new();

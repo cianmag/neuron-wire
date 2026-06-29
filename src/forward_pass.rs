@@ -23,7 +23,6 @@
 //! separated: ForwardPass handles activation flow, Hebbian handles weight
 //! adaptation.
 
-#![allow(missing_docs)]
 use std::collections::HashMap;
 
 use crate::components::{
@@ -88,6 +87,7 @@ impl Default for ForwardPassSystem {
 }
 
 impl ForwardPassSystem {
+    /// Create a new `ForwardPassSystem` with a custom activation leak and prediction horizon.
     pub fn new(activation_leak: f32, prediction_horizon: f32) -> Self {
         ForwardPassSystem {
             activation_leak,

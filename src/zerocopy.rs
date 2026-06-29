@@ -15,7 +15,6 @@
 //! No memory was allocated. No data was copied. The entire message was
 //! "deserialized" by reading bytes that were already in memory.
 
-#![allow(missing_docs)]
 use crate::header::{HeaderError, MessageHeader};
 use crate::types::MsgType;
 use crate::HEADER_SIZE;

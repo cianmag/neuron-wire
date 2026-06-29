@@ -34,7 +34,6 @@
 //! | CONSENSUS | Up to 5 retries | Reliable |
 //! | GOSSIP | Never (next cycle) | Best-effort |
 
-#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -60,6 +59,7 @@ pub struct TransportHeader {
 }
 
 impl TransportHeader {
+    /// Size of the transport header in bytes (16).
     pub const SIZE: usize = 16;
 
     /// Create a new transport header with the given sequence and ack state
@@ -110,6 +110,7 @@ impl Default for AckTracker {
 }
 
 impl AckTracker {
+    /// Create a new AckTracker with empty state.
     pub fn new() -> Self {
         AckTracker {
             last_contiguous: 0,
@@ -230,6 +231,7 @@ impl Default for ReliableQueue {
 }
 
 impl ReliableQueue {
+    /// Create a new empty reliable packet queue.
     pub fn new() -> Self {
         ReliableQueue {
             packets: HashMap::new(),
@@ -353,6 +355,7 @@ pub fn calculate_gradient_weight(age_ms: u32, half_life_ms: f32) -> f32 {
 /// This is the event loop core. Each node runs one of these per peer connection
 /// (or one per socket in a multi-peer setup).
 pub struct UdpTransport {
+    /// The UDP socket used for all send/receive operations.
     pub socket: UdpSocket,
     /// Local sequence counter (atomic for cross-thread increment)
     local_seq: AtomicU32,
@@ -514,8 +517,11 @@ impl UdpTransport {
 /// A received message with parsed transport header
 #[derive(Debug, Clone)]
 pub struct ReceivedMessage {
+    /// Parsed transport header (seq, ack, timestamp)
     pub header: TransportHeader,
+    /// Raw message payload bytes
     pub payload: Vec<u8>,
+    /// Source socket address of the sender
     pub src: std::net::SocketAddr,
 }
 

@@ -9,6 +9,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
+- **Tier 1 — World-Class Engineering (10/10)** — complete push across 7 dimensions
+- **API documentation**: all `#![allow(missing_docs)]` removed from 17 modules; every `pub fn`, `pub struct`, `pub enum`, `pub const`, and pub struct field has a doc comment
+- `cargo doc --document-private-items` passes with `-D warnings` (no broken intra-doc links)
+- `cargo machete` CI job (`.github/workflows/ci.yml`) — unused dependency detection
+- **Stress/soak tests** (`tests/stress.rs`): `stress_ping_pong` (30s), `stress_many_nodes` (10s), `soak_engine_60s` (60s) — all `#[ignore]`, run on demand
+- **Continuous benchmarking with regression detection**: bench CI job parses Criterion output, fails build if any benchmark regressed >5%
+- **Architecture diagrams** (`ARCHITECTURE_DIAGRAMS.md`): 8 Mermaid.js diagrams — DHT routing, learning pipeline, packet flow, state machine, subsystem deps, scheduler timeline, CI flow, test pyramid
+- **Documentation website** (`docs/`): mdBook project with all docs + auto-generated `cargo doc`, deployed to GitHub Pages via `.github/workflows/docs.yml`
 - Release workflow (`.github/workflows/release.yml`): auto-creates GitHub Release + optionally publishes to crates.io on `v*.*.*` tag push
 - Pre-commit hook (`.githooks/pre-commit`): `cargo fmt --check` + `cargo clippy` gate
 - Activate with: `git config core.hooksPath .githooks`

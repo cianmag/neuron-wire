@@ -10,7 +10,6 @@
 //! 3. Hardcoded seed VPS addresses
 //! 4. Passive listening (wait for gossip)
 
-#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::fmt;
 use std::net::SocketAddr;
@@ -36,15 +35,17 @@ const SEED_NODES: &[&str] = &[
 
 // ─── NodeId (256-bit) ──────────────────────────────────────────
 
+/// A 256-bit node identifier used throughout the DHT for XOR-distance routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId(pub [u8; 32]);
 
 impl NodeId {
+    /// Create a new `NodeId` from its raw 32-byte representation.
     pub fn new(bytes: [u8; 32]) -> Self {
         NodeId(bytes)
     }
 
-    /// XOR distance
+    /// XOR distance between two node IDs.
     pub fn xor_distance(&self, other: &NodeId) -> [u8; 32] {
         let mut d = [0u8; 32];
         for (i, item) in d.iter_mut().enumerate() {
@@ -53,7 +54,7 @@ impl NodeId {
         d
     }
 
-    /// Bucket index (0=furthest, 255=nearest), None if same node
+    /// Bucket index (0 = furthest, 255 = nearest), `None` if the same node.
     pub fn bucket_index(&self, other: &NodeId) -> Option<u8> {
         let dist = self.xor_distance(other);
         for (i, &byte) in dist.iter().enumerate() {
@@ -65,6 +66,8 @@ impl NodeId {
         None
     }
 
+    /// Return a truncated hex string (first 8 hex chars + ellipsis + last 8 hex chars)
+    /// suitable for logging and display.
     pub fn hex(&self) -> String {
         let mut s = String::with_capacity(64);
         for &b in &self.0[..4] {
@@ -86,19 +89,34 @@ impl fmt::Display for NodeId {
 
 // ─── Node Type ─────────────────────────────────────────────────
 
+/// Role or capability category of a node in the DHT network.
+///
+/// Each node advertises its type so peers can route queries to
+/// nodes capable of handling specific workloads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
+    /// General-purpose node (no specialised role).
     General = 0,
+    /// Language-processing node.
     Language = 1,
+    /// Reasoning / inference node.
     Reasoning = 2,
+    /// Memory-storage node.
     Memory = 3,
+    /// Vision-processing node.
     Vision = 4,
+    /// Audio-processing node.
     Audio = 5,
+    /// Consensus / validator node.
     Consensus = 6,
+    /// Network gateway node.
     Gateway = 7,
 }
 
 impl NodeType {
+    /// Decode a `NodeType` from its raw `u8` discriminant.
+    ///
+    /// Returns `None` if the value does not match any known variant.
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0 => Some(NodeType::General),
@@ -116,17 +134,28 @@ impl NodeType {
 
 // ─── Node Entry ────────────────────────────────────────────────
 
+/// A peer node known to the local routing table.
+///
+/// Stores the node's identity, network address, measured latency,
+/// last-seen timestamp, role type, and consecutive failure count.
 #[derive(Debug, Clone)]
 pub struct NodeEntry {
+    /// 256-bit node identifier.
     pub id: NodeId,
+    /// Network socket address (IP + port).
     pub addr: SocketAddr,
+    /// Exponentially-weighted moving average latency in milliseconds.
     pub latency_ms: f32,
+    /// [`Instant`] when this node was last heard from (PONG or direct message).
     pub last_seen: Instant,
+    /// Role / capability category advertised by this node.
     pub node_type: NodeType,
+    /// Consecutive communication failures (incremented on timeout / no reply).
     pub fail_count: u32,
 }
 
 impl NodeEntry {
+    /// Create a new `NodeEntry` with a default latency of 100 ms and zero failures.
     pub fn new(id: NodeId, addr: SocketAddr, node_type: NodeType) -> Self {
         NodeEntry {
             id,
@@ -138,15 +167,22 @@ impl NodeEntry {
         }
     }
 
+    /// Update the EWMA latency sample and reset the failure counter.
+    ///
+    /// Smoothing: `new_latency = 0.7 × old + 0.3 × sample`.
     pub fn update_latency(&mut self, sample_ms: f32) {
         self.latency_ms = self.latency_ms * 0.7 + sample_ms * 0.3;
         self.last_seen = Instant::now();
         self.fail_count = 0;
     }
 
+    /// Increment the consecutive failure count.
     pub fn record_failure(&mut self) {
         self.fail_count += 1;
     }
+
+    /// Returns `true` when the failure count has reached MAX_FAILURES (3).
+    #[inline]
     pub fn is_dead(&self) -> bool {
         self.fail_count >= MAX_FAILURES
     }
@@ -154,9 +190,15 @@ impl NodeEntry {
 
 // ─── K-Bucket ──────────────────────────────────────────────────
 
+/// A Kademlia k-bucket sorted by latency (lowest first).
+///
+/// Contains up to `K` entries. When full, the highest-latency entry
+/// is evicted to make room for a faster node.
 #[derive(Debug, Clone)]
 pub struct KBucket {
+    /// Entries sorted by latency (ascending — fastest first).
     pub entries: Vec<NodeEntry>,
+    /// Maximum number of entries (typically K = 20).
     pub max_size: usize,
 }
 
@@ -167,6 +209,7 @@ impl Default for KBucket {
 }
 
 impl KBucket {
+    /// Create an empty k-bucket with capacity K (default 20).
     pub fn new() -> Self {
         KBucket {
             entries: Vec::with_capacity(K),
@@ -174,11 +217,12 @@ impl KBucket {
         }
     }
 
+    /// Find the index of an entry by `NodeId`, if present.
     pub fn find(&self, id: &NodeId) -> Option<usize> {
         self.entries.iter().position(|e| e.id == *id)
     }
 
-    /// Insert or update. Returns true if accepted.
+    /// Insert or update a node entry. Returns `true` if accepted.
     pub fn upsert(&mut self, entry: NodeEntry) -> bool {
         if let Some(idx) = self.find(&entry.id) {
             let e = &mut self.entries[idx];
@@ -216,7 +260,7 @@ impl KBucket {
         });
     }
 
-    /// Remove entry at index
+    /// Remove entry at the given index. Returns `true` if removed.
     pub fn remove_at(&mut self, idx: usize) -> bool {
         if idx < self.entries.len() {
             self.entries.remove(idx);
@@ -225,7 +269,7 @@ impl KBucket {
         false
     }
 
-    /// Remove entry by NodeId
+    /// Remove entry by `NodeId`. Returns `true` if removed.
     pub fn remove(&mut self, id: &NodeId) -> bool {
         if let Some(idx) = self.find(id) {
             self.entries.remove(idx);
@@ -234,15 +278,17 @@ impl KBucket {
         false
     }
 
-    /// Number of entries
+    /// Number of entries currently in this bucket.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+
+    /// Returns `true` if the bucket has no entries.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
-    /// Node with the lowest latency in this bucket
+    /// Node with the lowest latency in this bucket.
     pub fn fastest(&self) -> Option<&NodeEntry> {
         self.entries.iter().min_by(|a, b| {
             a.latency_ms
@@ -254,15 +300,24 @@ impl KBucket {
 
 // ─── Routing Table ─────────────────────────────────────────────
 
+/// The full DHT routing table, consisting of 256 k-buckets.
+///
+/// Bucket placement is determined by XOR distance between [`local_id`](RoutingTable::local_id)
+/// and the target node; within each bucket entries are ranked by latency.
 pub struct RoutingTable {
     buckets: Vec<KBucket>,
+    /// This node's own 256-bit identifier.
     pub local_id: NodeId,
+    /// This node's publicly-reachable socket address.
     pub local_addr: SocketAddr,
+    /// Total number of peers across all buckets (cached).
     pub total_nodes: usize,
+    /// The role type advertised by this node.
     pub local_type: NodeType,
 }
 
 impl RoutingTable {
+    /// Create a new routing table with 256 empty buckets.
     pub fn new(local_id: NodeId, local_addr: SocketAddr, local_type: NodeType) -> Self {
         RoutingTable {
             buckets: (0..256).map(|_| KBucket::new()).collect(),
@@ -277,7 +332,7 @@ impl RoutingTable {
         self.local_id.bucket_index(target).map(|i| i as usize)
     }
 
-    /// Insert or update. Returns true if accepted.
+    /// Insert or update a node entry. Returns `true` if accepted.
     pub fn insert(&mut self, entry: NodeEntry) -> bool {
         let idx = match self.bucket_idx(&entry.id) {
             Some(i) => i,
@@ -290,6 +345,7 @@ impl RoutingTable {
         ok
     }
 
+    /// Remove a node by its `NodeId`. Returns `true` if it was present.
     pub fn remove(&mut self, id: &NodeId) -> bool {
         let idx = match self.bucket_idx(id) {
             Some(i) => i,
@@ -303,7 +359,7 @@ impl RoutingTable {
     }
 
     /// Remove any entry with this address (used to clean up ghost entries
-    /// after a PONG confirms the real NodeId).
+    /// after a PONG confirms the real `NodeId`).
     pub fn remove_by_addr(&mut self, addr: &SocketAddr) -> bool {
         for b in &mut self.buckets {
             let before = b.len();
@@ -323,6 +379,7 @@ impl RoutingTable {
         })
     }
 
+    /// Update the EWMA latency for a known node and re-sort its bucket.
     pub fn record_latency(&mut self, id: &NodeId, sample: f32) {
         if let Some((_, bucket)) = self.bucket_mut(id) {
             if let Some(idx) = bucket.find(id) {
@@ -332,6 +389,7 @@ impl RoutingTable {
         }
     }
 
+    /// Record a communication failure for a node; evicts it if MAX_FAILURES (3) is reached.
     pub fn record_failure(&mut self, id: &NodeId) {
         if let Some((_, bucket)) = self.bucket_mut(id) {
             if let Some(idx) = bucket.find(id) {
@@ -344,7 +402,7 @@ impl RoutingTable {
         }
     }
 
-    /// All nodes sorted by XOR distance to local_id (iterative lookup order)
+    /// All nodes sorted by XOR distance to `target` (iterative lookup order).
     pub fn nearest_nodes(&self, target: &NodeId, count: usize) -> Vec<&NodeEntry> {
         let mut all: Vec<&NodeEntry> = self.buckets.iter().flat_map(|b| b.entries.iter()).collect();
         all.sort_by(|a, b| {
@@ -362,7 +420,7 @@ impl RoutingTable {
         all
     }
 
-    /// Lowest-latency node in the nearest populated bucket to target
+    /// Lowest-latency node in the nearest populated bucket to `target`.
     pub fn closest_fast(&self, target: &NodeId) -> Option<&NodeEntry> {
         let idx = self.local_id.bucket_index(target)? as usize;
         for offset in 0..256 {
@@ -382,10 +440,12 @@ impl RoutingTable {
         None
     }
 
+    /// Return references to every peer in the routing table.
     pub fn all_nodes(&self) -> Vec<&NodeEntry> {
         self.buckets.iter().flat_map(|b| b.entries.iter()).collect()
     }
 
+    /// Total number of peers across all buckets.
     pub fn node_count(&self) -> usize {
         self.total_nodes
     }
@@ -393,27 +453,41 @@ impl RoutingTable {
 
 // ─── DHT Message Types ─────────────────────────────────────────
 
+/// DHT message-type identifiers used in the NWP header byte at offset 5.
 pub mod dht_msg_type {
+    /// Ping request (probe a peer's liveness).
     pub const PING: u8 = 7;
+    /// Pong reply (acknowledges a ping, carries sender identity).
     pub const PONG: u8 = 8;
+    /// Find-node query (ask a peer for nodes close to a target ID).
     pub const FIND_NODE: u8 = 9;
+    /// Nodes response (carries serialised node entries).
     pub const NODES: u8 = 10;
 }
 
-/// Field offsets for DHT FlatBuffer bodies
+/// Field offsets for DHT FlatBuffer bodies.
 pub mod dht_fields {
     use crate::HEADER_SIZE;
+    /// Byte offset of the sender's [`NodeId`](super::NodeId) (32 bytes).
     pub const SENDER_ID: usize = HEADER_SIZE;
+    /// Byte offset just past the sender's [`NodeId`](super::NodeId).
     pub const SENDER_ID_END: usize = HEADER_SIZE + 32;
     // encode_addr produces 7 bytes for IPv4 (1+4+2), so NODE_TYPE is at
     // body offset 32+7 = 39, LATENCY_MS at 40, PING_SEQ at 44.
     // For IPv6 (1+16+2 = 19 body bytes) these will need revisiting.
+    /// Byte offset of the sender's [`NodeType`](super::NodeType) (1 byte).
     pub const NODE_TYPE: usize = HEADER_SIZE + 39;
+    /// Byte offset of latency-ms placeholder (4 bytes, little-endian u32).
     pub const LATENCY_MS: usize = HEADER_SIZE + 40;
+    /// Byte offset of ping sequence number (4 bytes, little-endian u32).
     pub const PING_SEQ: usize = HEADER_SIZE + 44;
+    /// Total body size for a PING message.
     pub const PING_BODY_SIZE: usize = 48;
+    /// Total body size for a PONG message.
     pub const PONG_BODY_SIZE: usize = 48;
+    /// Byte offset of the target [`NodeId`](super::NodeId) in a FIND_NODE body.
     pub const TARGET_ID: usize = HEADER_SIZE;
+    /// Total body size for a FIND_NODE message (just the 32-byte target ID).
     pub const FIND_BODY_SIZE: usize = 32;
 }
 
@@ -483,7 +557,7 @@ fn decode_addr(data: &[u8], offset: &mut usize) -> Option<SocketAddr> {
     }
 }
 
-/// Serialize a NodeEntry into the buffer (for NODES responses)
+/// Serialize a [`NodeEntry`] into the buffer (for NODES responses).
 pub fn serialize_node(entry: &NodeEntry, buf: &mut Vec<u8>) {
     buf.extend_from_slice(&entry.id.0);
     encode_addr(&entry.addr, buf);
@@ -491,12 +565,14 @@ pub fn serialize_node(entry: &NodeEntry, buf: &mut Vec<u8>) {
     buf.extend_from_slice(&(entry.latency_ms as u32).to_le_bytes());
 }
 
-/// Compute the serialized size of this entry
+/// Compute the serialized size of this entry.
 pub fn serialized_node_size(entry: &NodeEntry) -> usize {
     32 + serialized_addr_size(&entry.addr) + 1 + 4
 }
 
-/// Deserialize a NodeEntry from `data` starting at `offset`
+/// Deserialize a [`NodeEntry`] from `data` starting at `offset`.
+///
+/// Advances `offset` past the consumed bytes on success.
 pub fn deserialize_node(data: &[u8], offset: &mut usize) -> Option<NodeEntry> {
     if *offset + 32 > data.len() {
         return None;
@@ -576,6 +652,7 @@ pub struct FreshnessTracker {
 }
 
 impl FreshnessTracker {
+    /// Create a new freshness tracker using the given configuration.
     pub fn new(config: FreshnessConfig) -> Self {
         FreshnessTracker {
             config,
@@ -599,8 +676,8 @@ impl FreshnessTracker {
         self.config.base_interval_ms as f32 * (1.0 + self.config.stretch_factor * freshness)
     }
 
-    /// Returns Some(elapsed_since_last_ping) if the peer is due for maintenance,
-    /// None if it was PING'd recently enough.
+    /// Returns `Some(elapsed_since_last_ping)` if the peer is due for maintenance,
+    /// `None` if it was PING'd recently enough.
     pub fn should_ping(&self, addr: &SocketAddr, last_pong: Instant) -> Option<Duration> {
         let now = Instant::now();
         let elapsed_since_ping = self
@@ -625,9 +702,16 @@ impl FreshnessTracker {
 
 // ─── DHT Handler ───────────────────────────────────────────────
 
+/// The main DHT protocol handler.
+///
+/// Owns the routing table, manages pending ping timeouts, handles
+/// bootstrap, ingress event dispatch, outbound PING / FIND_NODE messages,
+/// and periodic maintenance (standard or SGA-based).
 pub struct DhtHandler {
+    /// Routing table holding all known peers.
     pub routing_table: RoutingTable,
     outbound_tx: Sender<OutgoingPacket>,
+    /// Map from ping sequence number → time of PING transmission.
     pub pending_pings: HashMap<u32, Instant>,
     next_ping_seq: u32,
     cache_path: Option<String>,
@@ -638,6 +722,11 @@ pub struct DhtHandler {
 }
 
 impl DhtHandler {
+    /// Construct a new `DhtHandler`.
+    ///
+    /// `outbound_tx` is the channel used to send NWP frames onto the wire.
+    /// `cache_path` optionally points to a file for persisting the peer table.
+    /// `seed_domain` is the DNS name to query for seed nodes.
     pub fn new(
         local_id: NodeId,
         local_addr: SocketAddr,
@@ -658,13 +747,22 @@ impl DhtHandler {
         }
     }
 
-    /// Enable Sparse Gradient Aging with the given config.
+    /// Enable Sparse Gradient Aging with the given configuration.
     pub fn enable_sga(&mut self, config: FreshnessConfig) {
         self.freshness_tracker = Some(FreshnessTracker::new(config));
     }
 
     // ─── Bootstrap ──────────────────────────────────────────
 
+    /// Run the bootstrap sequence to discover initial peers.
+    ///
+    /// Tries, in order:
+    /// 1. Load peers from the on-disk cache file.
+    /// 2. Resolve DHT seed records via DNS (`_dht.seeds.<domain>`).
+    /// 3. Use hardcoded seed VPS addresses.
+    /// 4. Fall back to passive listening.
+    ///
+    /// Only runs once; subsequent calls are no-ops.
     pub fn bootstrap(&mut self) {
         if self.bootstrapped {
             return;
@@ -707,6 +805,8 @@ impl DhtHandler {
 
     // ─── Ingress ────────────────────────────────────────────
 
+    /// Dispatch an incoming NWP event to the appropriate handler based on
+    /// the message-type byte at payload offset 5.
     pub fn handle_event(&mut self, event: &IngressEvent) {
         let payload = &event.nwp_payload;
         if payload.len() < crate::HEADER_SIZE + 1 {
@@ -832,6 +932,7 @@ impl DhtHandler {
 
     // ─── Outbound ──────────────────────────────────────────
 
+    /// Send a PING message to `dst` and record the sequence number for RTT tracking.
     pub fn ping_node(&mut self, dst: SocketAddr) {
         let seq = self.next_ping_seq;
         self.next_ping_seq = self.next_ping_seq.wrapping_add(1);
@@ -868,6 +969,7 @@ impl DhtHandler {
         });
     }
 
+    /// Send a FIND_NODE query to `dst`, asking for nodes close to `target`.
     pub fn find_node(&mut self, target: NodeId, dst: SocketAddr) {
         let mut body = Vec::with_capacity(32);
         body.extend_from_slice(&target.0);
@@ -908,6 +1010,11 @@ impl DhtHandler {
 
     // ─── Maintenance ──────────────────────────────────────
 
+    /// Periodic DHT maintenance: PING stale peers, persist cache.
+    ///
+    /// Behaviour depends on whether [Sparse Gradient Aging](FreshnessConfig) is enabled:
+    /// - **SGA mode**: each peer is PING'd on its own freshness-adjusted schedule.
+    /// - **Standard mode**: all peers not heard from in STALE_PING_S (300s) are PING'd.
     pub fn periodic_maintenance(&mut self) {
         let now = Instant::now();
 
@@ -974,7 +1081,7 @@ impl DhtHandler {
 
 // ─── Free Functions ────────────────────────────────────────────
 
-/// Resolve DNS hostname to IP:9000 addresses
+/// Resolve DNS hostname to IP:9000 addresses.
 fn resolve_dns_seeds(domain: &str) -> Vec<SocketAddr> {
     use std::net::ToSocketAddrs;
     let host_port = format!("{}:9000", domain);

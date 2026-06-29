@@ -5,7 +5,6 @@
 //! each neuron is an independent entity identified by a cryptographic
 //! 256-bit ID — spawnable, pruneable, and routable over the NWP network.
 
-#![allow(missing_docs)]
 use std::fmt;
 
 // ─── EntityId (256-bit Cryptographic) ──────────────────────────
@@ -21,6 +20,7 @@ use std::fmt;
 pub struct EntityId(pub [u8; 32]);
 
 impl EntityId {
+    /// Create a new `EntityId` from raw 32 bytes.
     pub fn new(bytes: [u8; 32]) -> Self {
         EntityId(bytes)
     }
@@ -94,6 +94,9 @@ pub struct PredictionComponent {
 }
 
 impl PredictionComponent {
+    /// Create a new `PredictionComponent` from a predicted and actual value.
+    ///
+    /// `error` and `error_sq` are computed automatically.
     pub fn new(predicted: f32, actual: f32) -> Self {
         let error = (predicted - actual).abs();
         PredictionComponent {

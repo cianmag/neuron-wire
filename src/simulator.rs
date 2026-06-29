@@ -41,7 +41,6 @@
 //! | partition | Split network into two groups | Packet filter blocks cross-group traffic |
 //! | malicious | One node sends garbage | Corrupt payloads, high retransmit, network flood |
 
-#![allow(missing_docs)]
 use std::collections::HashMap;
 use std::fs;
 use std::net::{SocketAddr, TcpListener};
@@ -85,6 +84,12 @@ impl std::fmt::Display for FailureMode {
 
 impl FailureMode {
     #[allow(clippy::should_implement_trait)]
+    /// Parse a failure mode from a CLI string argument.
+    ///
+    /// Accepts `"node-death"`, `"node_death"`, `"death"` for [`FailureMode::NodeDeath`];
+    /// `"partition"`, `"split"` for [`FailureMode::Partition`];
+    /// `"malicious"`, `"malice"`, `"evil"` for [`FailureMode::MaliciousNode`];
+    /// any other value returns [`FailureMode::None`].
     pub fn from_str(s: &str) -> Self {
         match s {
             "node-death" | "node_death" | "death" => FailureMode::NodeDeath,
@@ -159,6 +164,7 @@ impl Default for SimulationConfig {
     }
 }
 
+/// Criteria for determining when a simulation run has converged.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConvergenceCriteria {
     /// Max standard deviation of edge weights over window (converged if below)
@@ -217,15 +223,25 @@ impl Default for FailureConfig {
 /// A snapshot of one node's metrics at a given tick.
 #[derive(Debug, Clone, Serialize)]
 pub struct NodeMetrics {
+    /// Current simulation tick number
     pub tick: u64,
+    /// Cumulative packets received by this node
     pub packets_recv: u64,
+    /// Cumulative packets sent by this node
     pub packets_sent: u64,
+    /// Cumulative bytes received
     pub bytes_recv: u64,
+    /// Cumulative bytes sent
     pub bytes_sent: u64,
+    /// Number of peers currently in routing table
     pub peer_count: usize,
+    /// Number of packets awaiting retransmission
     pub reliable_queue_depth: usize,
+    /// Cumulative neuron deaths from apoptosis
     pub apoptosis_deaths: u64,
+    /// Ticks where engine found no work (idle)
     pub idle_ticks: u64,
+    /// Ticks where engine was busy processing
     pub busy_ticks: u64,
 }
 
@@ -234,20 +250,35 @@ pub struct NodeMetrics {
 /// One trial's worth of aggregated results.
 #[derive(Debug, Clone, Serialize)]
 pub struct TrialResult {
+    /// Index of this trial (0-based for multi-trial runs)
     pub trial_index: u32,
+    /// Random seed used for this trial
     pub seed: u64,
+    /// Number of nodes in the simulation
     pub node_count: u32,
+    /// Simulation duration in wall-clock seconds
     pub duration_secs: f64,
+    /// Total engine ticks executed
     pub total_ticks: u64,
+    /// Total packets received across all nodes
     pub total_packets_recv: u64,
+    /// Total packets sent across all nodes
     pub total_packets_sent: u64,
+    /// Total bytes received across all nodes
     pub total_bytes_recv: u64,
+    /// Total bytes sent across all nodes
     pub total_bytes_sent: u64,
+    /// Aggregate network bandwidth in kbps
     pub bandwidth_kbps: f64,
+    /// Average peer count per node across all samples
     pub avg_peers: f64,
+    /// Maximum peer count achieved by any node
     pub max_peers: usize,
+    /// Cumulative neuron deaths from apoptosis across all nodes
     pub total_apoptosis_deaths: u64,
+    /// Whether the network converged (full connectivity or stability criterion)
     pub converged: bool,
+    /// Seconds until convergence was achieved (None if never converged)
     pub convergence_time_secs: Option<f64>,
     // ── Failure metrics ──
     /// The failure mode used (null/none for baseline)

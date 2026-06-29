@@ -34,7 +34,6 @@
 //! observed reality. The DHT handler and transport layer also feed into it:
 //! a CONSENSUS frame that fails to converge is a form of prediction error.
 
-#![allow(missing_docs)]
 use rand::RngCore;
 
 use crate::components::{
@@ -83,6 +82,7 @@ impl Default for NeurogenesisSystem {
 }
 
 impl NeurogenesisSystem {
+    /// Create a new neurogenesis system with the given surprise threshold and decay rate.
     pub fn new(spawn_threshold: f32, decay_rate: f32) -> Self {
         NeurogenesisSystem {
             surprise_accumulator: 0.0,

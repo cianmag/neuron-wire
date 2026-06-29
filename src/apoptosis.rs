@@ -30,7 +30,6 @@
 //! It returns an `ApoptosisReport` that feeds into EngineStats for real-time
 //! observability.
 
-#![allow(missing_docs)]
 use std::time::{Duration, Instant};
 
 use crate::dht::DhtHandler;
@@ -92,6 +91,7 @@ impl Default for ApoptosisSystem {
 }
 
 impl ApoptosisSystem {
+    /// Create a new ApoptosisSystem with default timers.
     pub fn new() -> Self {
         ApoptosisSystem {
             last_sweep_tick: 0,

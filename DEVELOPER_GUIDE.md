@@ -229,7 +229,7 @@ fn test_partition() { /* isolate a node, verify reconnection */ }
 ### Running tests
 
 ```bash
-cargo test                    # All 125 tests
+cargo test                    # All 126 tests
 cargo test dht                # DHT subsystem tests only
 cargo test -- --show-output   # See stdout from tests
 cargo clippy -D warnings      # Zero-warnings enforcement
@@ -237,16 +237,18 @@ cargo clippy -D warnings      # Zero-warnings enforcement
 
 ### CI pipeline
 
-The GitHub Actions CI runs **7 parallel jobs**:
+The GitHub Actions CI runs **8 parallel jobs** (7 standard + 1 on tag push):
 
 | Job | Description | Platform |
 |-----|-------------|----------|
 | `test` | Build + clippy + unit/integration tests + WASM compile check | ubuntu / macos / windows × stable |
 | `coverage` | `cargo-llvm-cov` code coverage (codecov JSON output) | ubuntu |
-| `bench` | Criterion benchmarks with cached baseline comparison | ubuntu |
-| `audit` | `cargo-audit` dependency vulnerability scan | ubuntu |
-| `deny` | `cargo-deny` license & duplicate-dependency policy | ubuntu |
+| `bench` | Criterion benchmarks with cached baseline + automatic **regression detection** (fails on >5% degradation) | ubuntu |
+| `audit` | `cargo-audit` dependency vulnerability scan (blocks on failure) | ubuntu |
+| `deny` | `cargo-deny` license & duplicate-dependency policy (blocks on failure) | ubuntu |
+| `machete` | `cargo-machete` unused dependency detection | ubuntu |
 | `semver` | `cargo-semver-checks` API compatibility against latest tag | ubuntu |
+| `release` | (tag push only) GitHub Release + crates.io publish | ubuntu |
 
 Cross-platform notes:
 - Windows skips test **execution** (`cargo test` fails on git-bash due to missing `dlltool.exe` for `windows-sys`) and runs `cargo check --tests` instead for compile verification.
@@ -270,6 +272,70 @@ Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which:
 1. Builds `--release`, runs clippy + all tests
 2. Creates a GitHub Release with auto-extracted CHANGELOG section
 3. Publishes to [crates.io](https://crates.io/crates/neuron-wire) if `CARGO_REGISTRY_TOKEN` is set in repo secrets
+
+### Documentation Website
+
+The project ships an **mdBook documentation website** at `docs/` that combines all engineering and research documents plus the auto-generated Rust API docs. The website is deployed to GitHub Pages on every push to `master` via `.github/workflows/docs.yml`:
+
+```bash
+# Build locally (requires mdbook)
+mdbook build docs
+# Output: docs/book/
+```
+
+The website includes:
+- All architecture, protocol, and engineering documents
+- Mermaid.js interactive architecture diagrams
+- Architecture Decision Records (ADRs)
+- Auto-generated `cargo doc` Rust API reference
+- Full-text search across all documents
+
+[View the live docs →](https://cianmag.github.io/neuron-wire)
+
+### Architecture Diagrams
+
+The `ARCHITECTURE_DIAGRAMS.md` file contains **8 Mermaid.js diagrams** covering the full system:
+
+| Diagram | Content |
+|---------|---------|
+| DHT Routing | Node discovery, bucket maintenance, XOR distance flow |
+| Learning Pipeline | ForwardPass → Hebbian STDP → Neurogenesis → Apoptosis |
+| Packet Flow | Send & receive lifecycle with sequence diagram |
+| Node State Machine | Booting → Discovering → Active → Degraded → Shutdown |
+| Subsystem Dependencies | 17-module dependency graph |
+| Scheduler Timeline | 6-phase engine tick gantt chart |
+| CI Pipeline Flow | 8 parallel CI jobs |
+| Test Pyramid | 126 tests, 14 benchmarks, enforcement layers |
+
+Render these on GitHub, in the mdBook website, or at [mermaid.live](https://mermaid.live).
+
+### Stress & Soak Testing
+
+The `tests/stress.rs` file contains long-running integration tests marked with `#[ignore]`:
+
+| Test | Duration | Purpose |
+|------|----------|---------|
+| `stress_ping_pong` | 30s | Sustained ping/pong between 2 nodes, checks throughput >100 pkts/sec |
+| `stress_many_nodes` | 10s | 10-node DHT convergence + steady-state traffic |
+| `soak_engine_60s` | 60s | Full engine loop with 10-node simulation in paper mode |
+
+Run them with:
+
+```bash
+cargo test --test stress -- --nocapture --include-ignored
+```
+
+These tests are excluded from CI by default (too long for PR checks) but should be run before releases and after major refactors.
+
+### Continuous Benchmarking with Regression Detection
+
+The `bench` CI job saves Criterion baselines to the GitHub Actions cache. On every commit:
+1. Restores the most recent `master` baseline from cache
+2. Runs all 14 Criterion benchmarks with `--load-baseline master --save-baseline master`
+3. Parses the output for regression indicators (`change: [-N%, ...]` where `N > 5`)
+4. **Fails the build** if any benchmark regressed >5%
+
+A Python regression checker at `scripts/check_bench_regressions.py` handles the parsing. Verified regressions produce explicit error messages in CI logs. This ensures **performance is measured and defended** on every commit, not just checked periodically.
 
 ---
 

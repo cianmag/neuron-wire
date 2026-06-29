@@ -3,7 +3,6 @@
 //! Each connection runs in its own thread. Messages are framed
 //! with a 4-byte length prefix for zero-copy reading.
 
-#![allow(missing_docs)]
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
@@ -57,13 +56,18 @@ fn io_error(kind: std::io::ErrorKind) -> IoError {
     }
 }
 
-/// Errors
+/// Errors that can occur during framed I/O on a TCP stream.
 #[derive(Debug)]
 pub enum IoError {
+    /// An I/O error occurred while reading from the stream.
     Read(std::io::Error),
+    /// An I/O error occurred while writing to the stream.
     Write(std::io::Error),
+    /// The received frame contained an invalid or corrupt message header.
     BadHeader(HeaderError),
+    /// The received frame had an advertised length exceeding `MAX_BODY_SIZE + HEADER_SIZE`.
     FrameTooLarge(usize),
+    /// The remote peer closed the connection (unexpected EOF).
     ConnectionClosed,
 }
 

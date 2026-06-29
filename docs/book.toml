@@ -1,0 +1,18 @@
+[book]
+title = "Neuron-Wire Documentation"
+authors = ["cianmag"]
+language = "en"
+description = "Comprehensive documentation for the Neuron Wire Protocol v2 — P2P neural computation fabric"
+
+[output.html]
+default-theme = "ayu"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/cianmag/neuron-wire"
+edit-url-template = "https://github.com/cianmag/neuron-wire/edit/master/docs/{path}"
+additional-css = ["theme/custom.css"]
+
+[output.html.search]
+limit-results = 30
+
+[preprocessor]
+[preprocessor.links]

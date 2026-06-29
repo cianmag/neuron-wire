@@ -37,7 +37,6 @@
 //! This converges gradients faster within expert clusters (vision nodes share
 //! vision weights) while still propagating globally.
 
-#![allow(missing_docs)]
 use std::net::SocketAddr;
 use std::sync::mpsc::Sender;
 
@@ -77,9 +76,13 @@ pub const MAX_SYNAPSES_PER_GOSSIP: usize = 19;
 /// HebbianLearningSystem is `Sync` — its state is read-only during a tick.
 /// All mutable state lives in the SynapseMap passed to `tick()`.
 pub struct HebbianLearningSystem {
+    /// Learning rate (η) for STDP weight updates. Default: 0.01.
     pub learning_rate: f32,
+    /// Per-tick exponential decay factor applied to all weights. Default: 0.999.
     pub weight_decay: f32,
+    /// Weights with absolute value below this threshold are pruned. Default: 0.001.
     pub prune_threshold: f32,
+    /// Number of ticks between gossip exchanges. Default: 10.
     pub gossip_tick_interval: u64,
     /// Total weights pruned since boot (micro-pruning counter)
     pub total_micro_pruned: u64,
@@ -99,6 +102,7 @@ impl Default for HebbianLearningSystem {
 }
 
 impl HebbianLearningSystem {
+    /// Create a new Hebbian STDP learning engine with the given hyper-parameters.
     pub fn new(
         learning_rate: f32,
         weight_decay: f32,

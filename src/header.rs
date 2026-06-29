@@ -10,22 +10,30 @@
 //! [12-15] header_crc: u32   = CRC32 of bytes [0..12)
 //! ```
 
-#![allow(missing_docs)]
 use crate::{HEADER_SIZE, MAGIC, MAX_BODY_SIZE, VERSION};
 
 /// 16-byte message header — zero-copy accessible via repr(C)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct MessageHeader {
+    /// 4-byte protocol magic (`NWP\0`) — validated on deserialization.
     pub magic: [u8; 4],
+    /// Wire-format version — must match [`VERSION`].
     pub version: u8,
+    /// Message-type discriminator (e.g. 0 = Ping, 1 = Pong).
     pub msg_type: u8,
+    /// Bit-flag field for control flags.
     pub flags: u16,
+    /// Length of the message body (payload) in bytes.
     pub body_len: u32,
+    /// CRC32 of header bytes `[0..12)` — covers magic through body_len.
     pub header_crc: u32,
 }
 
 impl MessageHeader {
+    /// Construct a new `MessageHeader` with the given fields.
+    ///
+    /// Automatically computes and sets `header_crc` from the other fields.
     pub fn new(msg_type: u8, body_len: u32, flags: u16) -> Self {
         let mut h = MessageHeader {
             magic: MAGIC,
@@ -63,6 +71,10 @@ impl MessageHeader {
         self.header_crc == self.compute_crc()
     }
 
+    /// Validate the header: checks magic, version, CRC, and body size.
+    ///
+    /// Returns `Ok(())` on success, or a [`HeaderError`] describing the
+    /// first validation failure encountered.
     pub fn validate(&self) -> Result<(), HeaderError> {
         if self.magic != MAGIC {
             return Err(HeaderError::BadMagic(self.magic));
@@ -79,6 +91,7 @@ impl MessageHeader {
         Ok(())
     }
 
+    /// Total on-wire size: header size plus body length.
     pub fn total_size(&self) -> usize {
         HEADER_SIZE + self.body_len as usize
     }
@@ -89,12 +102,18 @@ pub fn read_header(buf: &[u8]) -> Result<&MessageHeader, HeaderError> {
     MessageHeader::from_bytes(buf)
 }
 
+/// Errors that can occur when parsing or validating a [`MessageHeader`].
 #[derive(Debug)]
 pub enum HeaderError {
+    /// The input buffer is shorter than [`HEADER_SIZE`].
     ShortBuffer(usize),
+    /// The magic bytes do not match the expected protocol magic.
     BadMagic([u8; 4]),
+    /// The wire-format version does not match the expected [`VERSION`].
     BadVersion(u8),
+    /// The header CRC does not match the computed CRC of bytes `[0..12)`.
     BadCrc,
+    /// The declared body length exceeds [`MAX_BODY_SIZE`].
     BodyTooLarge(u32),
 }
 
@@ -124,12 +143,21 @@ pub fn build_frame(msg_type: u8, body: Vec<u8>, flags: u16) -> Vec<u8> {
     frame
 }
 
+/// Build a Ping frame (msg_type = 0) with an empty body.
 pub fn build_ping() -> Vec<u8> {
     build_frame(0, Vec::new(), 0)
 }
 
+/// Build a Pong frame (msg_type = 1) with an empty body.
 pub fn build_pong() -> Vec<u8> {
     build_frame(1, Vec::new(), 0)
+}
+
+/// Parse a complete frame: returns (header, body_slice)
+pub fn parse_frame(buf: &[u8]) -> Result<(&MessageHeader, &[u8]), HeaderError> {
+    let header = MessageHeader::from_bytes(buf)?;
+    let body = &buf[HEADER_SIZE..header.total_size()];
+    Ok((header, body))
 }
 
 #[cfg(test)]
@@ -260,11 +288,4 @@ mod tests {
         let e = HeaderError::BadCrc;
         assert!(format!("{}", e).contains("CRC"));
     }
-}
-
-/// Parse a complete frame: returns (header, body_slice)
-pub fn parse_frame(buf: &[u8]) -> Result<(&MessageHeader, &[u8]), HeaderError> {
-    let header = MessageHeader::from_bytes(buf)?;
-    let body = &buf[HEADER_SIZE..header.total_size()];
-    Ok((header, body))
 }
