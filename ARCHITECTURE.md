@@ -1057,17 +1057,20 @@ Load trace files by clicking the 📁 button in the HUD, or by dragging the `.nd
 
 All complexity bounds are stated for a system of $n$ nodes. Constants assume default configuration (K = 20, tick rate = 1 KHz, packet size = 68 bytes).
 
+> **Formal proofs** for every bound are in the [Formal Mathematical Model](FORMAL_MODEL.md). See particularly:
+> - Lookup complexity: §5.3
+> - Communication complexity: §6
+> - Memory complexity: §7
+> - Convergence time: §9.1
+> - Summary table: §11
+
 ### 8.1 Routing Table Memory (per node)
 
 The routing table is partitioned into $b = 256$ k-buckets indexed by XOR prefix length:
 
 $$M_{\text{routing}} = O(K \cdot b) = O(K \cdot \log_2 n)$$
 
-With $K = 20$ and $b = 256$:
-
-$$M_{\text{max}} = K \cdot b \cdot \text{sizeof}(\text{NodeEntry}) = 20 \times 256 \times \sim 80\,\text{B} \approx 400\,\text{KB}$$
-
-In expectation, random 256-bit NodeIds distribute uniformly across all $b$ buckets, so each node holds entries in only $O(\log n)$ distinct buckets. For $n = 10^6$, a node stores entries in roughly $\log_2 10^6 \approx 20$ buckets, with $K$ entries each → $O(K \log n)$ bound holds empirically.
+**Proof.** See [Formal Model §7.1](FORMAL_MODEL.md#71-routing-table). For random 256-bit NodeIDs, the expected number of occupied buckets is $\lceil \log_2 n \rceil$ (birthday-problem geometric distribution). Each bucket holds at most $K = 20$ entries, yielding $O(K \log n)$ expected memory. The worst-case $O(Kb)$ bound requires adversarial NodeID placement, prevented by random 256-bit ID generation (§4.1).
 
 | $n$ | Expected buckets occupied | Expected entries | Memory |
 |-----|--------------------------|-----------------|--------|

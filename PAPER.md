@@ -81,28 +81,35 @@ The transport supports two delivery modes:
 ### 2.4 Neural Computation
 
 **ForwardPassSystem** (6-phase internal pipeline):
-1. **Leak**: Apply global decay to all activations
-2. **Propagate**: Matrix-multiply input activations through synapses
-3. **Squash**: tanh activation on aggregated input
-4. **Predict**: Tanh output → predicted next state
-5. **Observe**: Compute surprise = MSE(predicted, observed)
+1. **Leak**: Apply global decay $\mathbf{a}^{(t)} \gets 0.999 \cdot \mathbf{a}^{(t-1)}$ to all activations
+2. **Propagate**: $\mathbf{x}^{(t)} \gets \mathbf{W}^{(t)}\mathbf{a}^{(t-1)}$ — weighted sum of inputs
+3. **Squash**: $a_i^{(t)} = \tanh(x_i^{(t)})$ — non-linear activation
+4. **Predict**: $\hat{o}^{(t)} \gets \sum w_{\text{readout},j} a_j^{(t)}$ — readout prediction
+5. **Observe**: $\gamma^{(t)} \gets |\hat{o}^{(t)} - o^{(t)}|$ — surprise (L1 prediction error)
 6. **Cleanup**: Zero temporary buffers
 
 **HebbianLearningSystem** (Spike-Timing-Dependent Plasticity):
-- Pre-synaptic activity × post-synaptic activity → weight delta
-- Learning rate: 0.01
-- Weight decay per tick: 0.999
-- Micro-pruning: synapses below 0.001 threshold are removed
-- Periodic gossip: serialize learned weights for neighbor exchange
+The weight update at each tick $t$ follows:
+
+$$w_{ij}^{(t+1)} = w_{ij}^{(t)} + \eta \cdot a_i^{(t)} \cdot a_j^{(t)} - \lambda \cdot w_{ij}^{(t)}$$
+
+where $\eta = 0.01$ is the learning rate and $\lambda = 0.001$ is the weight decay factor. The steady-state weight matrix converges to the input covariance scaled by $\eta/\lambda$:
+
+$$\mathbf{W}^{(\infty)} = \frac{\eta}{\lambda} \boldsymbol{\Sigma}_{\text{input}}$$
+
+See [Formal Model §1](FORMAL_MODEL.md#1-hebbian-stdp-learning) for convergence proof, weight bounds, and micro-pruning analysis.
 
 **NeurogenesisSystem** (surprise-driven neuron birth):
-- When prediction error exceeds adaptive threshold, spawn a new neuron
-- New neuron is initialized with small random weights to connected neighbors
-- Curiosity bonus: decaying noise added for N ticks after birth to encourage exploration
+
+$$\text{spawn}_i \sim \text{Bernoulli}\bigl(1 - e^{-\beta(\Gamma_i - \sigma)_+}\bigr)$$
+
+where $\Gamma$ is cumulative prediction error over a sliding window, $\sigma$ is the spawn threshold, and $\beta$ is the spawn rate. See [Formal Model §3](FORMAL_MODEL.md#3-neurogenesis) for steady-state neuron count and spawn timing distribution.
 
 **ApoptosisSystem** (programmed neuron death):
-- Dormant neurons (no activation for T ticks) are culled
-- Death spiral detection: if deaths/tick exceed configurable ratio, emit warning (network partition indicator)
+
+$$\text{dead}_i^{(t)} = \mathbb{1}\left[\sum_{\tau = t-\pi+1}^{t} \mathbb{1}[|a_i^{(\tau)}| < \epsilon_a] = \pi\right]$$
+
+A neuron dies if inactive for $\pi = 1000$ consecutive ticks ($\sim 1$ second). See [Formal Model §4](FORMAL_MODEL.md#4-apoptosis-neuron-death) for cascading death analysis.
 
 ---
 

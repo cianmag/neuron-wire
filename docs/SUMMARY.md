@@ -25,6 +25,7 @@
 - [Debugging Patterns](DEVELOPER_GUIDE.md#8-debugging-patterns)
 
 # Research
+- [Formal Mathematical Model](FORMAL_MODEL.md)
 - [Research Paper](PAPER.md)
 - [Foundational Q&A](FOUNDATIONAL_QNA.md)
 - [Benchmark Results](ARCHITECTURE.md#9-benchmark-results)
