@@ -48,6 +48,13 @@ pub mod zerocopy;
 
 pub mod ml;
 
+// ── Security / Identity ───────────────────────────────────────
+pub mod audit;
+pub mod identity;
+pub mod secure_channel;
+pub mod security;
+pub mod trust;
+
 // Re-exports
 pub use flat::*;
 pub use header::*;

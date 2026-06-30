@@ -9,8 +9,28 @@
 //! [8-11]  body_len: u32     = body length in bytes
 //! [12-15] header_crc: u32   = CRC32 of bytes [0..12)
 //! ```
+//!
+//! # Security Flags
+//!
+//! The `flags` field in MessageHeader indicates additional processing:
+//! - `ENCRYPTED` (0x01): payload is AEAD-encrypted with XChaCha20-Poly1305
+//! - `AUTHENTICATED` (0x02): payload prepended with auth prefix (pubkey + signature)
+//! - `HANDSHAKE` (0x04): this message is part of a secure channel handshake
+//! - `AUDIT_REQUEST` (0x08): sender requests audit proof
+//! - `BOOTSTRAP` (0x10): payload is a bootstrap proof
 
 use crate::{HEADER_SIZE, MAGIC, MAX_BODY_SIZE, VERSION};
+
+/// Payload is AEAD-encrypted with XChaCha20-Poly1305.
+pub const FLAG_ENCRYPTED: u16 = 0x0001;
+/// Payload includes identity auth prefix (32-byte public key + 64-byte signature).
+pub const FLAG_AUTHENTICATED: u16 = 0x0002;
+/// This message is part of a secure channel handshake.
+pub const FLAG_HANDSHAKE: u16 = 0x0004;
+/// Sender is requesting an audit proof in response.
+pub const FLAG_AUDIT_REQUEST: u16 = 0x0008;
+/// Message body is a bootstrap proof payload.
+pub const FLAG_BOOTSTRAP: u16 = 0x0010;
 
 /// 16-byte message header — zero-copy accessible via repr(C)
 #[repr(C)]
