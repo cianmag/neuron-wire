@@ -809,9 +809,465 @@ $$A = \frac{10^6}{10^6 + 0.013} \approx 0.999999987 \text{ (six nines)}$$
 
 ---
 
-## 16. Empirical Validation
+## 16. Formal Pseudocode
 
-Every equation above is testable by experiment. The simulation framework provides:
+This section presents eight major algorithms in formal notation. Every loop, branch, and data structure maps directly to the implementation. Preconditions, postconditions, and per-line complexity are annotated throughout.
+
+---
+
+### Algorithm 1: Sparse Gossip
+
+**Purpose.** Periodically exchange learned weights with random peers to propagate learning signals across the network.
+
+**Run condition.** Every $T_{\text{gossip}}$ engine ticks (default 1000 ticks = 1s).
+
+```
+Algorithm 1 SPARSE-GOSSIP
+Input:  peer_set P, local_synapses S, gossip_fanout g
+Output: updated local_synapses after weighted merge with peer weights
+
+ 1:  selected ← ∅                                           ▷ O(1)
+ 2:  while |selected| < g and |P| > 0 do                    ▷ O(g)
+ 3:      peer ← RANDOM-UNIFORM(P \ selected)                ▷ O(1)
+ 4:      selected ← selected ∪ {peer}                       ▷ O(1)
+ 5:      frame ← serialize(S[1..K_syn])                     ▷ O(K_syn)
+ 6:      SEND-TO(peer, GOSSIP, frame)                       ▷ O(1) send
+ 7:  end while
+ 8:                                                         ▷ async recv:
+ 9:  for each incoming GOSSIP frame from peer p do          ▷ O(g') inbound
+10:      ΔS ← deserialize(frame)                            ▷ O(K_syn)
+11:      for each (i, j, w_p, t_p) ∈ ΔS do                  ▷ O(K_syn)
+12:          w_local ← S[i][j].weight
+13:          t_local ← S[i][j].timestamp
+14:          α ← TIME-DECAY(t_local, t_p, τ)                ▷ O(1)
+15:          S[i][j].weight ← α·w_local + (1-α)·w_p         ▷ O(1) weighted avg
+16:          S[i][j].timestamp ← max(t_local, t_p)           ▷ O(1)
+17:      end for
+18:  end for
+19:  return S
+
+Complexity: Time O(g + g'·K_syn), Memory O(K_syn), Comm O(g·n) total
+Theorem ref: §6, Eq. B_gossip = g·s_frame / T_gossip
+```
+
+**Precondition:** $|P| \geq 1$ (at least one peer known). If $|P| < g$, gossip sends to all known peers.
+
+**Postcondition:** Each selected peer receives $K_{\text{syn}}$ synapse entries. Each incoming frame is merged into the local synapse store via time-weighted average.
+
+---
+
+### Algorithm 2: Weight Adaptation (STDP)
+
+**Purpose.** Update every synapse according to the Hebbian rule with decay and micro-pruning. Runs every engine tick.
+
+```
+Algorithm 2 WEIGHT-ADAPTATION
+Input:  weight_matrix W ∈ ℝ^{m×m}, activation_vector a ∈ [-1,1]^m,
+        learning_rate η, weight_decay λ, pruning_threshold θ, noise σ_ε
+Output: updated W, pruning_count
+
+ 1:  prune_count ← 0                                        ▷ O(1)
+ 2:  for each (i, j) where W[i][j] ≠ 0 do                   ▷ O(d·m²) sparse
+ 3:      Δw ← η · a[i] · a[j]                               ▷ Hebbian term
+ 4:      decay ← -λ · W[i][j]                                ▷ forgetting
+ 5:      noise ∼ N(0, σ_ε²)                                  ▷ exploration
+ 6:      W[i][j] ← W[i][j] + Δw + decay + noise             ▷ O(1)
+ 7:                                                          
+ 8:      if |W[i][j]| < θ then                               ▷ micro-prune
+ 9:          W[i][j] ← 0                                    ▷ O(1)
+10:          prune_count ← prune_count + 1                  ▷ O(1)
+11:      end if
+12:  end for
+13:  return (W, prune_count)
+
+Complexity: Time O(d·m²), Memory O(m²)dense or O(d·m²)sparse
+Theorem ref: §1 (Eq. 1.1, Thm 1), §1.4 (pruning)
+```
+
+**Precondition:** $\eta > 0$, $\lambda \in (0,1)$, $\theta \ll \eta/\lambda$.
+
+**Postcondition:** $W^{(t+1)} = W^{(t)} + \eta \cdot \mathbf{a}\mathbf{a}^\top - \lambda W^{(t)} + \varepsilon$. All weights with $|w_{ij}| < \theta$ are removed (set to 0). At steady state, $\mathbb{E}[W^{(\infty)}] = (\eta/\lambda)\boldsymbol{\Sigma}$.
+
+---
+
+### Algorithm 3: Node Lifecycle
+
+**Purpose.** Manage the finite-state machine governing each node's operational status. Transitions are triggered by timer expiry, network events, or signal handlers.
+
+```
+Algorithm 3 NODE-LIFECYCLE
+Input:  state ∈ {OFFLINE, BOOTING, DISCOVERING, ACTIVE, DEGRADED, SHUTDOWN},
+        seed_list, peer_cache, timeout_config
+Output: state transitions (control flow — no return)
+
+ 1:  state ← OFFLINE                                          ▷ initial
+ 2:  loop                                                      ▷ main FSM
+ 3:      match state:
+ 4:          OFFLINE:
+ 5:              initialize UDP socket                         ▷ O(1)
+ 6:              state ← BOOTING
+ 7:
+ 8:          BOOTING:
+ 9:              cache ← read(peer_cache)                     ▷ O(|cache|)
+10:              for each seed ∈ seed_list do                 ▷ O(|seeds|)
+11:                  SEND-TO(seed, PING)                      ▷ O(1) send
+12:              end for
+13:              start_timer(T_timeout)                       ▷ O(1)
+14:              state ← DISCOVERING
+15:
+16:          DISCOVERING:
+17:              if timer_expired(T_timeout) then             ▷ O(1)
+18:                  if peer_count ≥ K_min then               ▷ threshold check
+19:                      state ← ACTIVE
+20:                  else
+21:                      retry with expanded seeds             ▷ exponential backoff
+22:                      state ← BOOTING
+23:                  end if
+24:              end if
+25:
+26:          ACTIVE:
+27:              if peer_count < n_liveness then              ▷ O(1) peer count check
+28:                  state ← DEGRADED
+29:                  start_timer(T_degraded)                  ▷ O(1)
+30:              end if
+31:              # fall through to engine tick (Algorithm 5)
+32:
+33:          DEGRADED:
+34:              if peer_count ≥ n_liveness then               ▷ recovery
+35:                  state ← ACTIVE
+36:                  cancel_timer(T_degraded)                  ▷ O(1)
+37:              elif timer_expired(T_degraded) then           ▷ terminal
+38:                  state ← SHUTDOWN
+39:              else
+40:                  RUN-BOOTSTRAP-PHASE()                     ▷ re-discover
+41:              end if
+42:
+43:          SHUTDOWN:
+44:              flush buffers, close socket                   ▷ O(1)
+45:              exit
+46:      end match
+47:  end loop
+
+Complexity: Time O(1) per tick (state machine dispatch), Memory O(|cache|)
+Theorem ref: §14.1 (Markov chain transition probabilities)
+```
+
+**Precondition:** Initial state is OFFLINE.
+
+**Postcondition:** The node progresses monotonically through BOOTING → DISCOVERING → ACTIVE. DEGRADED is a transient state; the node either recovers to ACTIVE or enters SHUTDOWN.
+
+---
+
+### Algorithm 4: Dynamic Graph Expansion (Neurogenesis)
+
+**Purpose.** Grow the neural network when prediction error exceeds threshold. Spawn new neurons to increase representational capacity.
+
+```
+Algorithm 4 DYNAMIC-GRAPH-EXPANSION
+Input:  neuron_count m, weight_matrix W, activation_buffer A[0..W_window-1],
+        observation o_t, readout_weights w_readout,
+        spawn_threshold σ, spawn_rate β, surprise_decay ρ, max_neurons M_max
+Output: updated m, W, A, possibly new neuron
+
+ 1:  # Compute prediction and surprise                            §2.1
+ 2:  o_hat ← w_readout · a_t                                      ▷ O(m)
+ 3:  γ_t ← |o_hat - o_t|                                          ▷ O(1)
+ 4:
+ 5:  # Update cumulative surprise (EWMA)                           §3.2
+ 6:  Γ_t ← (1-ρ)·Γ_{t-1} + ρ·γ_t                                 ▷ O(1)
+ 7:  A[t mod W_window] ← a_t                                      ▷ O(m) store
+ 8:
+ 9:  # Decide whether to spawn                                     §3.1
+10:  if Γ_t > σ and m < M_max then                                 ▷ O(1)
+11:      p_spawn ← 1 - exp(-β · (Γ_t - σ))                        ▷ O(1)
+12:      r ∼ UNIFORM(0, 1)                                         ▷ O(1)
+13:      if r < p_spawn then                                       ▷ Bernoulli trial
+14:          # Spawn one neuron
+15:          m ← m + 1                                             ▷ O(1)
+16:          W ← pad(W, m)                                         ▷ O(m) extend
+17:          for each existing neuron j ∈ [1, m-1] do              ▷ O(m)
+18:              w ∼ UNIFORM(-0.01, 0.01)                          ▷ O(1)
+19:              W[m][j] ← w                                       ▷ new → old
+20:              W[j][m] ← w                                       ▷ old → new
+21:          end for
+22:          # Curiosity bonus: noise for C_explore ticks
+23:          curiosity[m] ← C_explore                              ▷ O(1)
+24:      end if
+25:  end if
+26:
+27:  # Apply curiosity noise to recently-spawned neurons           §3.1 note
+28:  for each i where curiosity[i] > 0 do                          ▷ O(m)
+29:      a_t[i] ← a_t[i] + N(0, σ_curiosity)                      ▷ O(1)
+30:      curiosity[i] ← curiosity[i] - 1                           ▷ O(1)
+31:  end for
+32:
+33:  return (m, W, Γ_t)
+
+Complexity: Time O(m), Memory O(m²) for W, O(W_window·m) for activation buffer
+Theorem ref: §3 (Thm 3: steady-state neuron count)
+```
+
+**Precondition:** $m < M_{\max}$. The EWMA buffer $\Gamma$ is initialized to 0.
+
+**Postcondition:** If the Bernoulli trial succeeds, $m$ increases by 1 and $W$ gains one row and column with small random weights. Curiosity noise is applied for $C_{\text{explore}}$ subsequent ticks.
+
+---
+
+### Algorithm 5: Forward Pass (Neural Computation)
+
+**Purpose.** Execute one complete tick of the 6-phase neural computation pipeline.
+
+```
+Algorithm 5 FORWARD-PASS
+Input:  weight_matrix W ∈ ℝ^{m×m}, activation_vector a_{t-1} ∈ [-1,1]^m,
+        observation o_t, readout_weights w_readout ∈ ℝ^m
+Output: updated a_t, prediction o_hat_t, surprise γ_t
+
+ 1:  # Phase 1: Leak — exponential decay                         §2.1
+ 2:  a_t ← 0.999 · a_{t-1}                                       ▷ O(m)
+ 3:
+ 4:  # Phase 2: Propagate — weighted sum                          §2.1
+ 5:  for each neuron i ∈ [1, m] do                                ▷ O(d·m²) sparse
+ 6:      x_i ← sum_{j: W[i][j]≠0} W[i][j] · a_t[j]               ▷ O(d·m)
+ 7:  end for
+ 8:
+ 9:  # Phase 3: Squash — non-linear activation                    §2.1
+10:  for each neuron i ∈ [1, m] do                                ▷ O(m)
+11:      a_t[i] ← tanh(x_i)                                       ▷ O(1)
+12:  end for
+13:
+14:  # Phase 4: Predict — readout                                  §2.1
+15:  o_hat_t ← dot(w_readout, a_t)                                ▷ O(m)
+16:
+17:  # Phase 5: Observe — compute surprise                        §2.2
+18:  γ_t ← |o_hat_t - o_t|                                        ▷ O(1)
+19:
+20:  # Phase 6: Cleanup — zero scratch buffers                     §2.1
+21:  scratch ← zero(m)                                             ▷ O(m)
+22:
+23:  return (a_t, o_hat_t, γ_t)
+
+Complexity: Time O(d·m²) dominated by Propagate, Memory O(m²)
+Theorem ref: §2.1 (forward equations), §2.3 (prediction error convergence)
+```
+
+**Precondition:** $W \in \mathbb{R}^{m \times m}$ with connection density $d$, $a_{t-1} \in [-1,1]^m$.
+
+**Postcondition:** $a_t = \tanh(W \cdot (0.999 \cdot a_{t-1}))$, $\hat{o}_t = w_{\text{readout}} \cdot a_t$, $\gamma_t = |\hat{o}_t - o_t|$.
+
+---
+
+### Algorithm 6: Bootstrap (Full-Mesh Discovery)
+
+**Purpose.** Discover all peers in the network via PING/PONG flood. Every node ends up knowing every other node's address.
+
+```
+Algorithm 6 BOOTSTRAP
+Input:  node_id id, peer_cache C_0, seed_list seeds,
+        socket_drain_rate ν, fail_probability p_f, max_retries R
+Output: peer_set P ⊆ N \ {self} with |P| = n - 1 (full mesh)
+
+ 1:  P ← C_0 ∪ seeds                                             ▷ initial known
+ 2:  pending ← ∅                                                  ▷ O(1)
+ 3:  responded ← {id}                                             ▷ O(1) self
+ 4:
+ 5:  # Phase 1: PING flood — announce to all known peers          §5.4
+ 6:  for each peer ∈ P do                                         ▷ O(|P|)
+ 7:      frame ← encode(PING, id, addr, timestamp)                ▷ O(1)
+ 8:      SEND-TO(peer, frame)                                     ▷ O(1) drain time: 1/ν
+ 9:      pending ← pending ∪ {peer}                               ▷ O(1)
+10:  end for
+11:
+12:  # Phase 2: Receive PONGs — learn new peers                   §5.4
+13:  repeat for R retries or until |P| = n - 1:                   ▷ O(R·n²/v)
+14:      for each incoming PONG from peer p do                    ▷ O(n)
+15:          responded ← responded ∪ {p}                          ▷ O(1)
+16:          NEW-PEERS ← decode(PONG.payload)                     ▷ O(1)
+17:          for each new_peer ∈ NEW-PEERS do                     ▷ O(K)
+18:              if new_peer ∉ P then                              ▷ O(1)
+19:                  P ← P ∪ {new_peer}                           ▷ O(1)
+20:                  SEND-TO(new_peer, PING)                      ▷ O(1) drain
+21:              end if
+22:          end for
+23:      end for
+24:      if |P| < n - 1 then                                      ▷ missing some
+25:          sleep(T_retry)                                        ▷ backoff
+26:          for each p ∈ pending \ responded do                  ▷ O(n)
+27:              SEND-TO(p, PING)                                 ▷ retransmit
+28:          end for
+29:      end if
+30:  end repeat
+31:
+32:  # Phase 3: Verify convergence                                 §5.4
+33:  assert |P| = n - 1                                           ▷ O(1)
+34:  return P
+
+Expected time: max(RTT, 2n/ν) + (2n/ν)·(p_f/(1-p_f))
+Complexity: Time O(R·n²/ν), Memory O(n), Comm Θ(n²) per node
+Theorem ref: §5.4 (Thm 5a/b), §10.2 (Thm 6: Ω(n²) lower bound)
+```
+
+**Precondition:** Node has a valid NodeId, UDP socket bound to a port reachable by all peers, and at least one seed address.
+
+**Postcondition:** $|P| = n - 1$. Every other node's address is known. All remote nodes have this node's address in their peer sets (symmetric convergence).
+
+---
+
+### Algorithm 7: DHT Routing
+
+**Purpose.** Maintain Kademlia k-buckets over the 256-bit NodeId space. Support insertion, eviction, and nearest-neighbor queries.
+
+```
+Algorithm 7 DHT-ROUTING
+Input:  local_id x ∈ {0,1}²⁵⁶, k_bucket array B[0..b-1] each of capacity K,
+        incoming_frame frame from peer y with address addr
+Output: updated B, response_frame (if PING → PONG)
+
+ 1:  d_x ← XOR(x, y)                                             ▷ O(256) bits
+ 2:  k ← floor(log₂(d_x))                                        ▷ bucket index  §5.2
+ 3:
+ 4:  # Handle message type                                        §5.5
+ 5:  match frame.type:
+ 6:      PING:
+ 7:          INSERT-ENTRY(B[k], y, addr, now)                     ▷ Algorithm 7b
+ 8:          SEND-TO(y, PONG, my_id, my_addr)                     ▷ O(1)
+ 9:
+10:      PONG:
+11:          UPDATE-ENTRY(B[k], y, addr, now, rtt)               ▷ O(K)
+12:
+13:      FIND_NODE:
+14:          target ← frame.target_id                             ▷ O(1)
+15:          candidates ← FIND-NEAREST(target, K)                 ▷ Algorithm 7c
+16:          SEND-TO(y, NODES, candidates)                        ▷ O(K) encode
+17:
+18:      NODES:
+19:          for each entry e ∈ frame.node_list do                ▷ O(K)
+20:              INSERT-ENTRY(B[log₂(XOR(x, e.id))], e.id, e.addr, now)
+21:          end for
+22:  end match
+
+Algorithm 7b INSERT-ENTRY(B_k, id, addr, timestamp)
+ 1:  if ∃ entry e ∈ B_k with e.id = id then                      ▷ exists
+ 2:      e.timestamp ← timestamp                                  ▷ O(1) refresh
+ 3:      e.rtt ← MEASURE-RTT(id)                                  ▷ O(1)
+ 4:      return
+ 5:  end if
+ 6:  if |B_k| < K then                                             ▷ room
+ 7:      B_k ← B_k ∪ {NodeEntry(id, addr, timestamp)}             ▷ O(1)
+ 8:      return
+ 9:  end if
+10:  # Bucket full: find stalest entry                            §5.5
+11:  stale_idx ← argmin_e B_k[e].last_seen                        ▷ O(K)
+12:  if B_k[stale_idx].last_seen < timestamp - T_stale then       ▷ stale
+13:      REPLACE(B_k[stale_idx], NodeEntry(id, addr, timestamp))  ▷ O(1)
+14:  else                                                          ▷ all fresh → drop
+15:      DROP(frame)                                               ▷ O(1) silently
+16:  end if
+
+Algorithm 7c FIND-NEAREST(target_id, K)
+ 1:  candidates ← ∅                                               ▷ O(1)
+ 2:  k ← floor(log₂(XOR(x, target_id)))                           ▷ §5.2
+ 3:  # Search outward from the target's bucket                    §5.3
+ 4:  for δ ∈ [0, 1, 2, ..., b-1] do                               ▷ O(K) stops early
+ 5:      if k - δ ≥ 0 then
+ 6:          candidates ← candidates ∪ B[k - δ]
+ 7:      end if
+ 8:      if k + δ < b then
+ 9:          candidates ← candidates ∪ B[k + δ]
+10:      end if
+11:      if |candidates| ≥ K then break                           ▷ O(K)
+12:  end for
+13:  return top K by XOR distance to target_id                     ▷ O(K log K) sort
+
+Complexity: Time O(K + log n) per op, Memory O(K·b) worst / O(K·log n) expected
+Theorem ref: §5 (Thm 4: lookup hops O(log_K n)), §7.1 (memory bound)
+```
+
+**Precondition:** Bucket array $B$ is initialized with $b = 256$ empty capacity-$K$ lists.
+
+**Postcondition:** Every node is inserted into exactly one bucket determined by XOR prefix length. Stale entries are evicted when the bucket is full. FIND-NEAREST returns $K$ candidates with minimum XOR distance to the target.
+
+---
+
+### Algorithm 8: Failure Recovery
+
+**Purpose.** Detect node failures, evict dead entries from routing tables, repair connectivity via apoptosis and re-discovery.
+
+```
+Algorithm 8 FAILURE-RECOVERY
+Input:  peer_set P, routing_table B, inactivity_tracker T_inactive[1..Kb],
+        death_counter D, apoptosis_threshold π, gossip_interval T_gossip,
+        failure_rate λ_f
+Output: cleaned P, B, with dead peers removed; network partition repaired
+
+ 1:  # Phase 1: Inactivity detection                              §4.1
+ 2:  for each entry e ∈ B do                                      ▷ O(K·log n)
+ 3:      if now - e.last_seen > T_stale then                      ▷ stale
+ 4:          if e.ping_sent and not e.pong_received then          ▷ §5.5
+ 5:              e.fail_count ← e.fail_count + 1                  ▷ O(1)
+ 6:              if e.fail_count ≥ max_fails then                 ▷ threshold
+ 7:                  EVICT(e)                                      ▷ ○ route table
+ 8:                  B[e.bucket] ← B[e.bucket] \ {e}              ▷ O(K)
+ 9:                  P ← P \ {e.id}                               ▷ O(1)
+10:                  D ← D + 1                                     ▷ O(1) count
+11:              else
+12:                  SEND-TO(e.id, PING)                           ▷ retry probe
+13:              end if
+14:          else
+15:              SEND-TO(e.id, PING)                               ▷ freshen
+16:              e.ping_sent ← true                               ▷ O(1)
+17:          end if
+18:      end if
+19:  end for
+20:
+21:  # Phase 2: Apoptosis (neuron death)                           §4.2
+22:  for each neuron i ∈ [1, m] do                                 ▷ O(m)
+23:      if activation_under_threshold(i) for π ticks then         ▷ streak
+24:          for each synapse (i, j) ∈ S do                       ▷ O(deg(i))
+25:              S ← S \ {(i, j)}                                  ▷ evict
+26:          end for
+27:          m ← m - 1                                             ▷ O(1)
+28:          D ← D + 1                                             ▷ O(1)
+29:      end if
+30:  end for
+31:
+32:  # Phase 3: Cascade detection                                  §4.3
+33:  if D > m / (avg_degree + 1) then                              ▷ Lemma 6
+34:      LOG("⚠ cascade warning: {D} deaths > {m/(avg_deg+1)} threshold")
+35:      COLLECT-GARBAGE()                                         ▷ O(m²)
+36:  end if
+37:
+38:  # Phase 4: Re-discovery                                       §5.4
+39:  if |P| < n - 1 then                                           ▷ missing peers
+40:      for each seed ∈ seed_list do                              ▷ O(|seeds|)
+41:          SEND-TO(seed, PING)                                   ▷ O(1)
+42:      end for
+43:      for each survivor_peer ∈ P do                              ▷ gossip rediscovery
+44:          REQUEST-PEER-LIST(survivor_peer)                      ▷ O(1)
+45:      end for
+46:      # Incoming PONGs and NODES refill P via Algorithm 7
+47:  end if
+48:
+49:  # Phase 5: Gossip repair                                       §6
+50:  if |P| ≥ g then                                                ▷ enough peers
+51:      RUN-GOSSIP(Algorithm 1)                                    ▷ re-sync weights
+52:  end if
+53:
+54:  return (P, B, D)
+
+Complexity: Time O(K·log n + m + m·deg_avg + n), Memory O(K·log n + m²)
+Theorem ref: §4 (Apoptosis), §8 (Failure prob.), §12 (Partition, Eclipse)
+```
+
+**Precondition:** Failure rate $\lambda_f$ is bounded. At least one seed node remains reachable for recovery.
+
+**Postcondition:** Dead nodes are evicted from routing tables and peer sets within at most $T_{\text{stale}} + \text{max\_fails} \cdot \text{PING\_TIMEOUT} = 300 + 3 \cdot 10 = 330$ seconds. Neurons inactive for $\pi$ consecutive ticks are removed. If enough peers remain, gossip resumes. If the peer set is depleted, bootstrap re-runs to re-discover survivors.
+
+---
+
+## 17. Empirical Validation
+
+Every equation and algorithm above is testable by experiment. The simulation framework (`cargo run --example simulate -- --paper-mode ...`) provides:
 
 | Experiment | What to measure | Expected result | Reference |
 |-----------|----------------|----------------|-----------|
