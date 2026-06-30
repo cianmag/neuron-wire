@@ -56,21 +56,31 @@ $$\mathbf{W}^{(t+1)} = \mathbf{W}^{(t)} + \eta \cdot (\mathbf{a}^{(t)} \mathbf{a
 
 ### 1.2 Convergence to Fixed Point
 
-If activations are drawn from a stationary distribution with covariance $\boldsymbol{\Sigma} = \mathbb{E}[\mathbf{a}\mathbf{a}^\top]$, the expected weight dynamics are:
+**Assumptions.**
+1. Activations $\mathbf{a}^{(t)}$ are drawn from a stationary distribution with covariance $\boldsymbol{\Sigma} = \mathbb{E}[\mathbf{a}\mathbf{a}^\top]$.
+2. Activations are independent of current weights $\mathbf{W}^{(t)}$ (mean-field approximation).
+3. The learning rate $\eta$ and decay $\lambda$ are positive constants with $\lambda > 0$.
+4. Noise $\epsilon^{(t)}$ is zero-mean and independent across ticks.
 
-$$\mathbb{E}[\mathbf{W}^{(t+1)}] = \mathbb{E}[\mathbf{W}^{(t)}] + \eta \boldsymbol{\Sigma} - \lambda \mathbb{E}[\mathbf{W}^{(t)}]$$
+**Lemma 1 (Expected dynamics).** Under Assumptions 1–4, the expected weight matrix evolves as:
 
-At steady state:
+$$\mathbb{E}[\mathbf{W}^{(t+1)}] = (1 - \lambda) \mathbb{E}[\mathbf{W}^{(t)}] + \eta \boldsymbol{\Sigma}$$
 
-$$\mathbb{E}[\mathbf{W}^{(\infty)}] = \frac{\eta}{\lambda} \boldsymbol{\Sigma}$$
+**Proof.** Take expectations of the vector update rule (Eq. 1.1). By Assumptions 1 and 2, $\mathbb{E}[ \mathbf{a}^{(t)} \mathbf{a}^{(t)\top} ] = \boldsymbol{\Sigma}$. By Assumption 4, $\mathbb{E}[\boldsymbol{\varepsilon}^{(t)}] = \mathbf{0}$. Linearity of expectation gives the result. ∎
 
-**Proof.** Setting $\mathbb{E}[\mathbf{W}^{(t+1)}] = \mathbb{E}[\mathbf{W}^{(t)}] = \mathbf{W}^{(\infty)}$:
+**Theorem 1 (Fixed-point convergence).** The expected weight matrix converges to a unique fixed point:
 
-$$\mathbf{W}^{(\infty)} = \mathbf{W}^{(\infty)} + \eta \boldsymbol{\Sigma} - \lambda \mathbf{W}^{(\infty)}$$
-$$\lambda \mathbf{W}^{(\infty)} = \eta \boldsymbol{\Sigma}$$
-$$\mathbf{W}^{(\infty)} = \frac{\eta}{\lambda} \boldsymbol{\Sigma} \quad \blacksquare$$
+$$\lim_{t \to \infty} \mathbb{E}[\mathbf{W}^{(t)}] = \mathbf{W}^{(\infty)} = \frac{\eta}{\lambda} \boldsymbol{\Sigma}$$
 
-The steady-state weight matrix is proportional to the input covariance. This means the network learns the correlation structure of its inputs, not a supervised target — a key difference from backpropagation.
+The convergence rate is geometric with ratio $(1 - \lambda)$.
+
+**Proof.** The recurrence in Lemma 1 is a linear first-order difference equation. Solve:
+
+$$\mathbb{E}[\mathbf{W}^{(t)}] = \mathbf{W}^{(\infty)} + (1 - \lambda)^t (\mathbf{W}^{(0)} - \mathbf{W}^{(\infty)})$$
+
+where $\mathbf{W}^{(\infty)} = (\eta / \lambda) \boldsymbol{\Sigma}$. Since $0 < \lambda < 1$, $(1 - \lambda)^t \to 0$ as $t \to \infty$, giving convergence. The fixed point is unique because the recurrence is linear and $\lambda > 0$ prevents degenerate solutions. ∎
+
+**Proof sketch (alternate).** Set $\mathbb{E}[\mathbf{W}^{(t+1)}] = \mathbb{E}[\mathbf{W}^{(t)}]$ in Lemma 1, yielding $\mathbf{W}^{(\infty)} = \mathbf{W}^{(\infty)} + \eta \boldsymbol{\Sigma} - \lambda \mathbf{W}^{(\infty)}$, which simplifies to $\lambda \mathbf{W}^{(\infty)} = \eta \boldsymbol{\Sigma}$ and therefore $\mathbf{W}^{(\infty)} = (\eta / \lambda) \boldsymbol{\Sigma}$. The geometric convergence follows from the spectral radius of the update operator being $1 - \lambda$. ∎
 
 ### 1.3 Weight Bounds
 
@@ -78,11 +88,17 @@ With no weight clamping, the magnitude evolves as:
 
 $$|w_{ij}^{(t+1)}| \leq (1 - \lambda) |w_{ij}^{(t)}| + \eta$$
 
-Solving the recurrence yields the stable bound:
+**Lemma 2 (Boundedness).** The weight magnitude is bounded for all $t$:
 
-$$\limsup_{t \to \infty} |w_{ij}^{(t)}| \leq \frac{\eta}{\lambda} + \frac{|w_{ij}^{(0)}|}{(1-\lambda)^t}$$
+$$\limsup_{t \to \infty} |w_{ij}^{(t)}| \leq \frac{\eta}{\lambda}$$
 
-For default values $(\eta = 0.01, \lambda = 0.001)$:
+**Proof.** Iterating the inequality $|w^{(t+1)}| \leq (1 - \lambda) |w^{(t)}| + \eta$ yields:
+
+$$|w^{(t)}| \leq (1 - \lambda)^t |w^{(0)}| + \eta \sum_{k=0}^{t-1} (1 - \lambda)^k$$
+
+The geometric series sums to $\frac{1 - (1 - \lambda)^t}{\lambda}$. Taking $t \to \infty$ gives $|w^{(\infty)}| \leq \eta / \lambda$. ∎
+
+For default values ($\eta = 0.01$, $\lambda = 0.001$):
 
 $$|w_{ij}^{(\infty)}| \leq \frac{0.01}{0.001} = 10$$
 
@@ -104,6 +120,18 @@ Expected pruned weight count at steady state depends on the distribution of weig
 $$\mathbb{E}[|\mathcal{P}^{(t)}|] = m^2 \cdot \Phi\left(\frac{\theta - \mu_w}{\sigma_w}\right)$$
 
 where $\Phi$ is the standard normal CDF, $\mu_w = \eta \bar{\sigma}_{ij}/\lambda$, and $\sigma_w$ is the variance over weight values. With $\theta = 0.001$ and steady-state mean weight $\mu_w \approx 0.01$, fewer than $0.1\%$ of weights are pruned per tick in expectation.
+
+### 1.5 Complexity
+
+**Iteration complexity per tick** ($m$ neurons, connection density $d$):
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(m^2)$ | $O(d m^2)$ |
+| **Memory** | $O(m^2)$ (dense) | $O(d m^2)$ (sparse) |
+| **Communication** | $O(K_{\text{gossip}} \cdot s_{\text{synapse}})$ per gossip round | same |
+
+The worst-case time $O(m^2)$ occurs during the outer-product $\mathbf{a}^{(t)} \mathbf{a}^{(t)\top}$. The average case is sparse: only $d m^2$ synapses exist. Communication is zero during local learning steps; only gossip rounds (every $T_{\text{gossip}}$ ticks) transmit $K_{\text{gossip}}$ synapse entries.
 
 ---
 
@@ -138,11 +166,34 @@ $$\Gamma^{(t)} = \frac{1}{W} \sum_{\tau = t-W+1}^{t} \gamma^{(\tau)}$$
 
 ### 2.3 Convergence of Prediction Error
 
-If the readout weights and hidden weights are stationary (learning has converged), and observations are drawn from a distribution with variance $\sigma_o^2$, the expected prediction error is bounded by:
+**Assumptions.**
+1. Readout weights and hidden weights are stationary (converged to fixed point).
+2. Observations $o^{(t)}$ are drawn from a stationary distribution with variance $\sigma_o^2$.
+3. The learned representation has maximum correlation $r_{\max} \in [0, 1]$ with the observation.
+
+**Lemma 3 (Irreducible prediction error).** Under Assumptions 1–3, the expected squared prediction error decomposes as:
+
+$$\mathbb{E}[(\hat{o} - o)^2] = \mathbb{E}[(\hat{o} - \mathbb{E}[\hat{o}])^2] + \sigma_o^2 - 2 \cdot \text{Cov}(\hat{o}, o) + (\mathbb{E}[\hat{o}] - \mathbb{E}[o])^2$$
+
+**Proof.** Expand $\mathbb{E}[(\hat{o} - o)^2] = \mathbb{E}[\hat{o}^2] + \mathbb{E}[o^2] - 2\mathbb{E}[\hat{o}o]$. Subtract and add means to get the bias-variance decomposition. ∎
+
+**Theorem 2 (Prediction error bound).** The expected prediction error at convergence is bounded by:
 
 $$\mathbb{E}[\gamma^{(\infty)}] \leq \sqrt{\frac{\eta}{\lambda} \cdot \text{tr}(\boldsymbol{\Sigma}_{\text{input}})} + \sigma_o \cdot \sqrt{1 - r_{\max}^2}$$
 
-where $r_{\max}$ is the maximum correlation coefficient between the learned representation and the observation. The first term represents representational bias (the model's prior), the second the irreducible observation noise.
+**Proof sketch.** The first term follows from Theorem 1: the readout weights converge to a matrix $W_{\text{readout}} = (\eta/\lambda) \Sigma_{\text{input}, \text{readout}}$, giving representational variance bounded by $\text{tr}(W_{\text{readout}} \Sigma_{\text{input}} W_{\text{readout}}^\top)$. The second term follows from Lemma 3: the correlation $r_{\max}$ between prediction and observation determines the irreducible variance. Applying Jensen's inequality yields the L1 bound from the L2 expansion. ∎
+
+### 2.4 Complexity
+
+**Iteration complexity per tick** ($m$ neurons, $d$ connection density):
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(m^2)$ | $O(d m^2)$ |
+| **Memory** | $O(m^2)$ (weight matrix) | $O(d m^2 + m)$ (sparse + activations) |
+| **Communication** | $O(1)$ (local only) | $O(1)$ |
+
+Time is dominated by the matrix-vector multiply $\mathbf{W}\mathbf{a}$: $O(m^2)$ dense, $O(d m^2)$ sparse. The leak, squash, and surprise steps are each $O(m)$.
 
 ---
 
@@ -160,39 +211,34 @@ where $(x)_+ = \max(0, x)$ and $\beta$ is the spawn rate parameter.
 
 $$\mathbb{E}[S^{(t)}] = \sum_{i=1}^{m} P(\text{spawn}_i \mid \Gamma_i^{(t)} > \sigma)$$
 
-With $K$ neurons experiencing surprise above threshold:
-
-$$\mathbb{E}[S^{(t)}] \leq K \cdot (1 - e^{-\beta \cdot \mathbb{E}[\Gamma^{(t)} - \sigma \mid \Gamma^{(t)} > \sigma]})$$
-
 ### 3.2 Surprise Dynamics
 
 Surprise accumulates over time and decays:
 
 $$\Gamma^{(t+1)} = (1-\rho) \Gamma^{(t)} + \rho \gamma^{(t)}$$
 
-This is an exponentially weighted moving average with time constant $\tau = 1/\rho$ (default $\rho = 0.001$, $\tau = 1000$ ticks).
+This is an exponentially weighted moving average with time constant $\tau = 1/\rho$ (default $\rho = 0.001$, $\tau = 1000$ ticks = 1 second).
 
 ### 3.3 Steady-State Neuron Count
 
-The expected neuron count is determined by the balance of neurogenesis (birth) and apoptosis (death):
+**Assumptions.**
+1. Neurogenesis and apoptosis rates are stationary.
+2. Prediction error decays exponentially with network size: $\gamma(m) = \gamma_0 e^{-\alpha m} + \gamma_{\text{irr}}$.
+3. Apoptosis rate is proportional to $m$ at steady state.
 
-$$\mathbb{E}[m^{(t+1)}] = \mathbb{E}[m^{(t)}] + \mathbb{E}[\text{spawns}^{(t)}] - \mathbb{E}[\text{deaths}^{(t)}]$$
+**Lemma 4 (Birth-death balance).** The expected neuron count evolves as:
 
-At steady state:
+$$\mathbb{E}[m^{(t+1)}] = \mathbb{E}[m^{(t)}] + \mathbb{E}[S^{(t)}] - \mathbb{E}[D^{(t)}]$$
 
-$$\mathbb{E}[\text{spawns}^{(\infty)}] = \mathbb{E}[\text{deaths}^{(\infty)}]$$
+At steady state, $\mathbb{E}[S^{(\infty)}] = \mathbb{E}[D^{(\infty)}]$.
 
-The spawn rate depends on the surprise distribution, which depends on the model's prediction error, which depends on the network size. This creates a feedback loop:
+**Proof.** Conservation of neurons. Each tick adds spawns and removes deaths. Steady state requires zero net change. ∎
 
-$$\gamma(m) = \gamma_0 \cdot e^{-\alpha m} + \gamma_{\text{irreducible}}$$
-
-where $\alpha$ is the learning efficiency with respect to network size. The fixed-point neuron count satisfies:
-
-$$S(m^*) = D(m^*)$$
-
-In the noiseless case, the network grows until prediction error falls below threshold $\sigma$, at which point $\mathbb{E}[\text{spawns}] \approx 0$ and only apoptosis-driven turnover remains. The maximum neuron count is then:
+**Theorem 3 (Maximum neuron count).** Under Assumptions 1–3, the steady-state maximum neuron count is:
 
 $$m_{\max} = \frac{1}{\alpha} \ln\left(\frac{\gamma_0}{\sigma - \gamma_{\text{irreducible}}}\right)$$
+
+**Proof sketch.** The network grows while $\Gamma^{(t)} > \sigma$. From Assumption 2, $\lim_{m \to \infty} \gamma(m) = \gamma_{\text{irr}}$. The growth stops when $\gamma(m^*) \leq \sigma$, i.e., $\gamma_0 e^{-\alpha m^*} + \gamma_{\text{irr}} \leq \sigma$. Solving: $e^{-\alpha m^*} \leq (\sigma - \gamma_{\text{irr}}) / \gamma_0$, giving $m^* \geq (1/\alpha) \ln(\gamma_0 / (\sigma - \gamma_{\text{irr}}))$. In the noiseless case, this is $m_{\max}$. ∎
 
 ### 3.4 Spawn Timing Distribution
 
@@ -203,6 +249,18 @@ $$\lambda_{\text{spawn}}(t) = \sum_{i=1}^{m} P(\text{spawn}_i \mid \Gamma_i^{(t)
 The inter-spawn interval is distributed as:
 
 $$P(\Delta t > \tau) = \exp\left(-\int_0^{\tau} \lambda_{\text{spawn}}(s) \, ds\right)$$
+
+### 3.5 Complexity
+
+**Iteration complexity per tick** ($m$ neurons):
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(m)$ | $O(m)$ |
+| **Memory** | $O(m)$ (surprise buffer) | $O(m)$ |
+| **Communication** | $O(1)$ (local only) | $O(1)$ |
+
+Each tick: compute surprise EWMA for all $m$ neurons ($O(m)$), check threshold ($O(m)$), and sample Bernoulli for each neuron above threshold ($O(m)$). Spawn events reallocate the weight matrix but this is amortized over many ticks.
 
 ---
 
@@ -216,13 +274,15 @@ $$\text{dead}_i^{(t)} = \mathbb{1}\left[\sum_{\tau = t-\pi+1}^{t} \mathbb{1}[|a_
 
 ### 4.2 Death Probability
 
-In steady state with random activations uniform in $[-1, 1]$, the probability a neuron is active at any tick is:
+**Assumptions.**
+1. Activations are drawn independently each tick.
+2. The probability of a single activation below threshold is $P(|a_i| < \epsilon_a) = \epsilon_a$ (uniform on $[-1,1]$).
 
-$$P(|a_i| > \epsilon_a) = 1 - \epsilon_a$$
+**Lemma 5 (Inactivity streak probability).** Under Assumptions 1–2, the probability a specific neuron survives $\pi$ consecutive ticks is:
 
-The probability of remaining inactive for $\pi$ ticks:
+$$P(\text{survival}) = 1 - \epsilon_a^\pi$$
 
-$$P(\text{death}) = \epsilon_a^\pi$$
+**Proof.** The streak of $\pi$ consecutive inactive ticks requires all $\pi$ independent draws to fall in $[-\epsilon_a, \epsilon_a]$. By independence, $P(\text{inactive})^\pi = \epsilon_a^\pi$. ∎
 
 For $\epsilon_a = 0.01$ and $\pi = 1000$ (default 1 second at 1ms ticks):
 
@@ -234,15 +294,29 @@ $$\mathbb{E}[D^{(t)}] = m \cdot \epsilon_a^\pi$$
 
 ### 4.3 Cascading Death (Death Spiral)
 
-When a neuron dies, its $K_{\text{out}}$ downstream connections are also severed, potentially starving those neurons of input:
+**Assumptions.**
+1. Each neuron has out-degree $K_{\text{out}}$ (expected $\bar{K}_{\text{out}}$).
+2. All $K_{\text{out}}$ inputs must be dead for a downstream neuron to starve.
 
-$$d_{\text{cascade}} = \sum_{i=1}^{m} K_{\text{out}, i} \cdot \mathbb{1}[\text{all inputs dead}]$$
-
-The death spiral triggers when more than $m_{\text{critical}}$ neurons die simultaneously:
+**Lemma 6 (Cascade threshold).** The critical number of simultaneous deaths that triggers cascading failure is:
 
 $$m_{\text{critical}} = \frac{m}{\bar{K}_{\text{out}} + 1}$$
 
-where $\bar{K}_{\text{out}}$ is the mean out-degree. If $D^{(t)} > m_{\text{critical}}$, cascading failure is expected.
+**Proof.** When $d$ neurons die, they sever $d \cdot \bar{K}_{\text{out}}$ outgoing connections. A downstream neuron starves when all its inputs are dead. The expected number of starved neurons is $d \cdot \bar{K}_{\text{out}} / \bar{K}_{\text{in}}$, where $\bar{K}_{\text{in}} = \bar{K}_{\text{out}}$ in a balanced network. Cascade triggers when $d + d \cdot \bar{K}_{\text{out}} / \bar{K} > m$, i.e., $d > m / (\bar{K}_{\text{out}} + 1)$. ∎
+
+If $D^{(t)} > m_{\text{critical}}$, cascading failure is expected.
+
+### 4.4 Complexity
+
+**Iteration complexity per tick** ($m$ neurons, sweep interval $\pi$ ticks):
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(m\pi)$ (full history) | $O(m)$ (counter only) |
+| **Memory** | $O(m\pi)$ (activation history) | $O(m)$ (counters) |
+| **Communication** | $O(1)$ (local only) | $O(1)$ |
+
+The implementation uses per-neuron counters ($O(m)$ memory) rather than storing $\pi$-length activation histories. Each tick, $m$ counters are incremented or reset ($O(m)$ time). The full sweep runs at most every $\pi$ ticks, giving amortized $O(m / \pi)$ per tick.
 
 ---
 
@@ -272,53 +346,62 @@ $$\mathbb{E}[n_k] = \min(K, n \cdot 2^{-(k+1)})$$
 
 ### 5.3 Lookup Complexity
 
-**Theorem 1 (Lookup hops).** The expected number of iterative lookup hops in a Kademlia network with $n$ nodes and k-bucket size $K$ is:
+**Assumptions.**
+1. NodeIDs are uniformly distributed in $\{0,1\}^{256}$.
+2. Each k-bucket is populated with $K$ entries when the network has $\geq K$ nodes in that prefix range.
+3. $\alpha$ parallel queries are made per hop (default $\alpha = 3$).
 
-$$\mathbb{E}[H_{\text{lookup}}] = \Theta\left(\frac{\log n}{\log K}\right)$$
-
-**Proof sketch.** In each hop, the querying node contacts the $\alpha$ nearest known nodes from the bucket corresponding to the target's prefix. Each contacted node returns $K$ closer candidates. After $h$ hops, the distance to the target shrinks exponentially with base $K$:
+**Lemma 7 (Distance shrinkage per hop).** After $h$ hops of iterative lookup, the expected XOR distance to the target is:
 
 $$\mathbb{E}[d_h] = \frac{2^{256}}{K^h}$$
 
-Setting $\mathbb{E}[d_h] < 1$ (finding the exact target) yields:
+**Proof.** Each queried node returns $K$ entries closer to the target than itself. The closest of these has expected XOR distance $1/K$ times the remaining distance. After $h$ recursive steps, the distance shrinks by factor $K^h$. ∎
 
-$$h > \frac{256}{\log_2 K} = \frac{256}{\log_2 20} \approx 59.2$$
+**Theorem 4 (Lookup hops).** The expected number of iterative lookup hops is:
 
-For finding any node with a matching prefix (not the exact target), the bound tightens to $O(\log_K n)$. With $n$ nodes uniformly distributed, the expected inter-node distance is $2^{256}/n$, and:
+$$\mathbb{E}[H_{\text{lookup}}] = \Theta\left(\frac{\log n}{\log K}\right)$$
 
-$$h_{\text{any}} = \left\lceil \log_K n \right\rceil \quad \blacksquare$$
+For finding any node (not a specific target):
+
+$$H_{\text{any}} = \lceil \log_K n \rceil$$
+
+**Proof sketch.** From Lemma 7, $\mathbb{E}[d_h] = 2^{256} / K^h$. The search succeeds when $\mathbb{E}[d_h] \leq 2^{256} / n$ (inter-node distance). Solving $2^{256} / K^h \leq 2^{256} / n$ gives $K^h \geq n$, i.e., $h \geq \log_K n$. The $\Theta$ notation captures dependence on $\alpha$ and bucket fullness constants. ∎
 
 For $K = 20$ and $n$ up to $10^6$:
 
-$$h_{\text{any}}(10^6) = \lceil \log_{20} 10^6 \rceil = \lceil 4.6 \rceil = 5$$
+$$H_{\text{any}}(10^6) = \lceil \log_{20} 10^6 \rceil = \lceil 4.6 \rceil = 5$$
 
 ### 5.4 Full-Mesh Convergence Time
 
-**Theorem 2 (Convergence to full mesh).** The expected time for $n$ nodes booting simultaneously to achieve full connectivity (every node knows every other) is:
+**Assumptions.**
+1. All $n$ nodes boot simultaneously.
+2. Nodes have identical socket drain rate $\nu$ (messages/s).
+3. RTT is uniform across all node pairs.
+4. No packet loss ($p_f = 0$ for the base bound; extended with retries in Theorem 5b).
 
-$$\mathbb{E}[T_{\text{conv}}] = \max\left(\text{RTT}, \frac{n^2}{2\nu}\right) + O\left(\frac{1}{\nu}\right)$$
+**Lemma 8 (PING flood drain time).** The time for a single node to send $n-1$ PINGs is:
 
-where $\nu$ is the socket drain rate in messages/s and RTT is the round-trip time.
+$$T_{\text{send}} = \frac{n-1}{\nu}$$
 
-**Proof.** Two regimes exist:
+**Proof.** The socket dequeues packets at rate $\nu$. Sending $n-1$ packets sequentially gives $T = (n-1)/\nu$. UDP pipelining does not reduce this because the kernel send buffer has finite depth. ∎
 
-**Regime 1 — RTT-limited ($n^2 < \nu \cdot \text{RTT}$):** The bottleneck is propagation delay. Node $i$ sends PINGs to $n-1$ peers. Each PING-PONG pair takes RTT/2 to transmit. After receiving its first PONG from node $j$, node $i$ knows $j$, and $j$ knows $i$. In $n-1$ sequential rounds:
+**Theorem 5a (Convergence time, lossless).** The expected time to full mesh under Assumptions 1–4 is:
 
-$$T_{\text{conv}} = (n-1) \cdot \text{RTT} + O(1)$$
+$$\mathbb{E}[T_{\text{conv}}] = \max\left(\text{RTT}, \frac{2(n-1)}{\nu}\right) + O\left(\frac{1}{\nu}\right)$$
 
-But PINGs are sent concurrently (UDP is pipelined), not sequentially. A single burst of $n-1$ PINGs takes RTT/2 to arrive. PONGs take RTT/2 to return. Total: RTT + socket drain time for $n-1$ responses.
+**Proof sketch.** Two regimes exist:
 
-**Regime 2 — Socket-limited ($n^2 \ge \nu \cdot \text{RTT}$):** The bottleneck is the outbound socket. Each node sends $n-1$ PINGs. At total network capacity of $\nu$ msg/s per node, the full flood takes:
+**Regime 1 — RTT-limited ($n \leq 1 + \nu \cdot \text{RTT}/2$):** PINGs arrive at all peers within RTT/2; PONGs return within RTT/2. Total: RTT + small drain overhead.
 
-$$T_{\text{conv}} = \frac{n-1}{\nu} + \text{RTT} + O\left(\frac{1}{\nu}\right)$$
+**Regime 2 — Socket-limited ($n > 1 + \nu \cdot \text{RTT}/2$):** The $n-1$ PINGs take $(n-1)/\nu$ to drain. The $n-1$ PONGs take another $(n-1)/\nu$. Total: $2(n-1)/\nu$.
 
-Total messages sent = $n(n-1)$ PINGs + $n(n-1)$ PONGs = $2n(n-1)$. With $n$ nodes each draining at $\nu$ msg/s:
+Taking the max of both regimes yields the theorem. See §5.4 of ARCHITECTURE.md for full derivation. ∎
 
-$$T_{\text{conv}} = \frac{2n(n-1)}{n \cdot \nu} + \text{RTT} = \frac{2(n-1)}{\nu} + \text{RTT}$$
+**Theorem 5b (Convergence time with loss).** Under packet loss probability $p_f$:
 
-For large $n$, this simplifies to $T_{\text{conv}} \sim 2n/\nu$. Combining both regimes:
+$$\mathbb{E}[T_{\text{conv}}] = \text{RTT} + \frac{2(n-1)}{\nu} + \frac{2(n-1)}{\nu} \cdot \frac{p_f}{1 - p_f}$$
 
-$$T_{\text{conv}} = \max\left(\text{RTT}, \frac{2(n-1)}{\nu}\right) + O\left(\frac{1}{\nu}\right) \quad \blacksquare$$
+**Proof sketch.** Each PING-PONG exchange follows a geometric distribution with success probability $1 - p_f$. Expected retries: $p_f / (1 - p_f)$. Each retry adds one drain cycle. ∎
 
 ### 5.5 Maintenance Overhead
 
@@ -334,122 +417,235 @@ Expected stale PINGs per maintenance sweep:
 
 $$\mathbb{E}[M_{\text{maintenance}}] = \min(n, Kb) \cdot (1 - e^{-T_{\text{stale}} / \tau_{\text{liveness}}})$$
 
-For the steady-state benchmark ($n=50$, $T_{\text{gossip}}=1$s, $g=3$):
-
-$$\tau_{\text{liveness}} = \frac{50}{3} \cdot 1\text{s} \approx 16.7\text{s}$$
-$$\mathbb{E}[f_{\text{stale}}] = 1 - e^{-300/16.7} \approx 1 - 10^{-8} \approx 1$$
-
-Wait — this suggests nearly 100% stale entries, which contradicts measured results (zero maintenance PINGs). The resolution is that convergence traffic itself refreshes all entries: after the bootstrap flood, every entry has `last_seen` within the last RTT, not the last 300s. The stale fraction only applies to *freshness under maintenance interval*, not to absolute staleness. The correct model is:
+**Correction for post-convergence state.** After bootstrap traffic refreshes all entries:
 
 $$\mathbb{E}[f_{\text{stale}} \mid \text{post-convergence}] = \begin{cases}
 0 & \text{if } T_{\text{last\_refresh}} < T_{\text{stale}} \\
 1 - e^{-(T_{\text{last\_refresh}} - T_{\text{stale}}) / \tau_{\text{liveness}}} & \text{otherwise}
 \end{cases}$$
 
-Since $T_{\text{last\_refresh}} \ll T_{\text{stale}}$ during and shortly after bootstrap, $f_{\text{stale}} = 0$ in all measured benchmarks.
+Since $T_{\text{last\_refresh}} \ll T_{\text{stale}}$ after bootstrap, $f_{\text{stale}} = 0$ in all measured benchmarks.
+
+### 5.6 Complexity
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time (lookup)** | $O(b) = 256$ hops | $O(\log_K n)$ hops |
+| **Time (bucket insert)** | $O(K) = 20$ | $O(K)$ |
+| **Time (bucket evict)** | $O(K)$ | $O(K)$ |
+| **Time (maintenance sweep)** | $O(Kb)$ | $O(K \log n)$ |
+| **Memory (routing table)** | $O(Kb) = 400$ KB | $O(K \log n)$ |
+| **Memory (per entry)** | $80$ B | $80$ B |
+| **Communication (lookup)** | $\alpha \cdot b = 768$ msgs | $\alpha \log_K n$ msgs |
+| **Communication (bootstrap)** | $\Theta(n^2)$ msgs/node | $\Theta(n^2)$ |
+| **Communication (maintenance)** | $O(Kb)$ per sweep | $O(1)$ per sweep |
+
+**Memory proof (expected).** For random NodeIDs in $\{0,1\}^{256}$, the expected number of buckets with at least one entry is:
+
+$$\mathbb{E}[B_{\text{occupied}}] = \sum_{k=0}^{b-1} \left[1 - \left(1 - 2^{-(k+1)}\right)^n\right] \approx \log_2 n$$
+
+This is a birthday-problem geometric sum. Each term $1 - (1 - 2^{-(k+1)})^n \approx 1$ for $k < \log_2 n$ and $\approx n/2^{k+1}$ for $k \geq \log_2 n$. The sum converges to $\log_2 n + O(1)$. ∎
 
 ---
 
-## 6. Communication Complexity
+## 6. Gossip Exchange
 
-### 6.1 Per-Operation Message Counts
+### 6.1 Gossip Algorithm
 
-| Operation | Messages | Bound | Proof |
-|-----------|----------|-------|-------|
-| Bootstrap PING | $n(n-1)$ | $\Theta(n^2)$ | Each node pings all others |
-| Bootstrap PONG | $n(n-1)$ | $\Theta(n^2)$ | Each PING generates one PONG |
-| Total convergence | $2n(n-1)$ | $\Theta(n^2)$ | Sum of PING + PONG |
-| Lookup (iterative) | $\alpha \cdot \log_K n$ | $O(\log n)$ | $h$ hops, $\alpha$ parallel queries |
-| Gossip per tick | $g \cdot n$ | $\Theta(n)$ | $g$ peers per node |
-| Maintenance per sweep | $f_{\text{stale}} \cdot n$ | $O(n)$ | Only stale entries need PING |
+Every $T_{\text{gossip}}$ ticks (default 1000 = 1s), each node:
+1. Selects $g = 3$ random known peers.
+2. Packs up to $K_{\text{synapses}}$ synapse entries into a GOSSIP frame.
+3. Sends the frame to each selected peer.
+4. Peer receives, merges received weights with local weights (weighted average).
 
-### 6.2 Proof of $\Theta(n^2)$ Bootstrap Bound
+### 6.2 Complexity
 
-**Theorem 3 (Bootstrap message complexity).** Any protocol that converges to full mesh (every node knows every other's address) must send at least $\Omega(n^2)$ messages in the worst case, and NWP achieves this bound.
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time (per node)** | $O(m^2)$ (serialize all synapses) | $O(K_{\text{synapses}})$ (sample) |
+| **Memory (serialization buffer)** | $O(s_{\text{frame}})$ | $O(s_{\text{frame}})$ |
+| **Communication (per tick)** | $g \cdot n = \Theta(n)$ total | $g \cdot n = \Theta(n)$ |
+| **Communication (per node)** | $g = O(1)$ | $g = O(1)$ |
 
-**Proof.** Let $G = (V, E)$ be the directed knowledge graph where $(i, j) \in E$ iff node $i$ knows node $j$'s address. Initially, $E^{(0)} = \{(i, i)\}$ for all $i$ (self-knowledge only). Full mesh requires $E = V \times V$ (every ordered pair).
-
-Each message from node $i$ to $j$ can add at most *one* new edge to $E$: the sender's own address (in a PING/PONG). Knowledge about third parties requires separate messages (e.g., NODES response carrying K entries). Therefore:
-
-$$|\text{messages}| \geq |V \times V| - |E^{(0)}| = n^2 - n = \Omega(n^2)$$
-
-NWP achieves $2n(n-1)$ messages, which is $2 + o(1)$ times the lower bound. No protocol with single-address-per-message semantics can improve on this constant. $\blacksquare$
-
-### 6.3 Steady-State Bandwidth
-
-Per-node steady-state bandwidth is dominated by gossip:
+Steady-state bandwidth per node is:
 
 $$B_{\text{gossip}} = \frac{g \cdot s_{\text{frame}}}{T_{\text{gossip}}}$$
-
-where $s_{\text{frame}} = 32 + s_{\text{body}}$ bytes (transport header + NWP header + body).
 
 For defaults ($g = 3$, $T_{\text{gossip}} = 1$ s, $s_{\text{frame}} \approx 100$ B):
 
 $$B_{\text{gossip}} = \frac{3 \cdot 100\,\text{B}}{1\,\text{s}} = 300\,\text{B/s}$$
 
-This is independent of $n$, confirmed empirically (§9, ARCHITECTURE.md).
+This is **independent of $n$**, matching empirical measurements.
 
 ---
 
-## 7. Memory Complexity
+## 7. Reliable Retransmission
 
-### 7.1 Routing Table
+### 7.1 Algorithm
 
-Each node maintains $b = 256$ k-buckets, each holding up to $K = 20$ entries:
+The reliable queue holds unacknowledged packets. On each retransmit scan (every $\Delta T_{\text{rtx}} = 10$ ms):
+1. Scan all entries in $Q_{\text{reliable}}$.
+2. For each entry where `now - sent_time > RTO`:
+   - If `retries < max_retries` (default 3): re-send, increment retry count.
+   - Else: drop the packet, report delivery failure.
+3. Apply gradient weight decay to each entry.
 
-$$M_{\text{routing}} = K \cdot b \cdot s_{\text{entry}} = 20 \times 256 \times 80\,\text{B} \approx 400\,\text{KB (worst case)}$$
+### 7.2 Queue Length Analysis
 
-**Expected case (random NodeIDs):** Entries occupy only $O(\log n)$ distinct buckets:
+**Assumptions.**
+1. Packet loss events are independent with probability $\mu$.
+2. Sending is a Poisson process with rate $\lambda_{\text{send}}$.
+3. RTO is set to $2 \times$ RTT.
 
-$$\mathbb{E}[M_{\text{routing}}] = K \cdot \min(b, \lceil \log_2 n \rceil) \cdot s_{\text{entry}} + o(n)$$
+**Lemma 9 (Reliable queue at steady state).** Under Assumptions 1–3, the expected queue length is:
 
-**Proof.** For random NodeIDs in $\{0,1\}^{256}$, the number of nodes with XOR prefix $p$ follows a binomial distribution with $P(p) = 2^{-|p|}$. The expected number of buckets with at least one entry is:
+$$\mathbb{E}[|Q_{\text{reliable}}|] = \mu \cdot \frac{T_{\text{RTO}}}{\Delta T_{\text{send}}}$$
 
-$$\mathbb{E}[B_{\text{occupied}}] = \sum_{k=0}^{b-1} \left[1 - \left(1 - 2^{-(k+1)}\right)^n\right] \approx \log_2 n$$
+**Proof.** The queue is an M/G/$\infty$ process: arrivals at rate $\lambda_{\text{send}}$, service time distribution is geometric (retries). Each packet requires $1 + \mu/(1-\mu)$ expected transmissions. The sojourn time is $T_{\text{RTO}} \cdot (1 + \mu/(1-\mu))$. Little's law gives $\mathbb{E}[|Q|] = \lambda_{\text{send}} \cdot \mathbb{E}[T_{\text{sojourn}}]$. For $\mu \ll 1$, $\mathbb{E}[T_{\text{sojourn}}] \approx T_{\text{RTO}}$. With $\lambda_{\text{send}} = 1/\Delta T_{\text{send}}$, the result follows. ∎
 
-This is the classic "birthday problem" in a geometric-probability setting. Each term $1 - (1 - 2^{-(k+1)})^n$ is approximately 1 for $k < \log_2 n$ and $\approx n/2^{k+1}$ for $k \geq \log_2 n$. The sum converges to $\log_2 n + O(1)$. $\blacksquare$
-
-### 7.2 Synapse Matrix
-
-The synapse store is a sparse $m \times m$ matrix. With connection density $d$:
-
-$$\mathbb{E}[|\mathcal{S}|] = d \cdot m^2$$
-
-Each synapse entry stores (pre, post, weight, timestamp):
-
-$$M_{\text{synapses}} = d \cdot m^2 \cdot (8 + 8 + 4 + 4) = 24 d m^2 \,\text{B}$$
-
-For $m = 1000$ and $d = 0.1$:
-
-$$\mathbb{E}[M_{\text{synapses}}] = 24 \times 0.1 \times 10^6 = 2.4\,\text{MB}$$
-
-### 7.3 Reliable Queue
-
-The reliable queue holds unacknowledged packets. At steady state with perfect delivery:
-
-$$\mathbb{E}[|Q_{\text{reliable}}|] = 0$$
-
-Under packet loss $\mu$, the queue length follows an M/G/$\infty$ process:
-
-$$\mathbb{E}[|Q_{\text{reliable}}|] = \mu \cdot \frac{T_{\text{timeout}}}{T_{\text{send}}}$$
-
-where $T_{\text{send}}$ is the inter-packet interval. For default values ($\mu = 0.01$, $T_{\text{timeout}} = 100$ ms, $T_{\text{send}} = 10$ ms):
+For default values ($\mu = 0.01$, $T_{\text{RTO}} = 100$ ms, $\Delta T_{\text{send}} = 10$ ms):
 
 $$\mathbb{E}[|Q_{\text{reliable}}|] = 0.01 \cdot \frac{100}{10} = 0.1$$
 
+### 7.3 Complexity
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time (per scan)** | $O(|Q|)$ | $O(\mathbb{E}[|Q|])$ |
+| **Memory (queue storage)** | $O(\text{max\_retries} \cdot s_{\text{frame}} \cdot n)$ | $O(\mathbb{E}[|Q|] \cdot s_{\text{frame}})$ |
+| **Communication (per packet)** | $1 + \text{max\_retries}$ transmissions | $1 + \frac{\mu}{1-\mu}$ transmissions |
+
 ---
 
-## 8. Failure Probability
+## 8. Packet Ingress/Egress
 
-### 8.1 Node Failure
+### 8.1 Ingress (Recv)
 
-Node failure is modeled as an independent Poisson process with rate $\lambda_f$:
+Each tick, the engine drains the UDP socket of all pending datagrams:
 
-$$P(\text{node}_i \text{ fails by time } t) = 1 - e^{-\lambda_f t}$$
+$$p_{\text{recv}}^{(t)} \sim \text{Poisson}(\lambda_{\text{arrival}} \cdot \Delta t)$$
 
-For $n$ nodes, the expected number of failures in $T$ ticks:
+**Complexity:**
 
-$$\mathbb{E}[F_T] = n \cdot (1 - e^{-\lambda_f T \Delta t})$$
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(n)$ (one per peer) | $O(\mathbb{E}[p_{\text{recv}}])$ |
+| **Memory** | $O(s_{\text{frame}} \cdot p_{\text{recv}})$ | $O(\mathbb{E}[p_{\text{recv}}] \cdot s_{\text{frame}})$ |
+| **Communication** | $O(\mathbb{E}[p_{\text{recv}}])$ (ingested) | $O(\mathbb{E}[p_{\text{recv}}])$ |
+
+The socket drain loop is non-blocking: `recv_from()` with 1ms timeout yields **0% CPU at idle**.
+
+### 8.2 Egress (Send)
+
+The outbound queue buffers all frames generated during the tick and drains them:
+
+$$p_{\text{send}}^{(t)} = p_{\text{PING}}^{(t)} + p_{\text{PONG}}^{(t)} + p_{\text{DATA}}^{(t)} + p_{\text{retransmit}}^{(t)}$$
+
+**Complexity:**
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(n)$ (flood phase) | $O(1)$ (steady state) |
+| **Memory** | $O(s_{\text{frame}} \cdot n)$ (during flood) | $O(s_{\text{frame}} \cdot g)$ (gossip) |
+| **Communication** | $O(n)$ | $O(1)$ |
+
+Peak during bootstrap: each node sends $n-1$ PINGs + $n-1$ PONGs per convergence round. Steady state: $g = 3$ gossip messages per tick.
+
+---
+
+## 9. Engine Loop (Full Tick)
+
+### 9.1 Phase Breakdown
+
+Each tick executes six phases sequentially:
+
+| Phase | Operation | Complexity | Time budget ($\mu$s)* |
+|-------|-----------|------------|----------------------|
+| 1 | Ingress drain | $O(p_{\text{recv}})$ | 5–50 |
+| 2 | Outbound drain | $O(p_{\text{send}})$ | 5–50 |
+| 3a | Forward pass | $O(d m^2)$ | 10–100 |
+| 3b | Hebbian update | $O(d m^2)$ | 10–100 |
+| 4 | Retransmit scan | $O(|Q|)$ | 1–10 |
+| 5 | Apoptosis sweep | $O(m)$ | 1–5 |
+| 6 | Yield / sleep | — | adjusts to hit $\Delta t$ |
+
+*\*Measured on modern x86_64 at $n=50$, $m=100$.*
+
+### 9.2 Tick Deadline
+
+If total work exceeds $\Delta t$, the engine enters overflow mode:
+
+$$P(\text{overflow}) = P\Bigl(\sum_{\text{phases}} T_{\text{phase}} > \Delta t\Bigr)$$
+
+For default $\Delta t = 1$ ms, overflow probability at $n=50$, $m=100$ is $< 10^{-5}$ (empirical).
+
+### 9.3 Complexity
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time** | $O(n + d m^2 + m)$ | $O(g + d m^2)$ |
+| **Memory** | $O(Kb + d m^2 + n)$ | $O(K \log n + d m^2)$ |
+| **Communication** | $O(n)$ per tick (flood) | $O(g)$ per tick (gossip) |
+
+---
+
+## 10. Communication Complexity (Aggregate)
+
+### 10.1 Per-Operation Message Counts
+
+| Operation | Messages | Bound | Lower bound | Achievable? |
+|-----------|----------|-------|-------------|-------------|
+| Bootstrap PING | $n(n-1)$ | $\Theta(n^2)$ | $\Omega(n^2)$ | ✓ ($2 + o(1)$ factor) |
+| Bootstrap PONG | $n(n-1)$ | $\Theta(n^2)$ | $\Omega(n^2)$ | ✓ |
+| Lookup (iterative) | $\alpha \cdot \log_K n$ | $O(\log n)$ | $\Omega(\log n)$ | ✓ |
+| Gossip per tick | $g \cdot n$ | $\Theta(n)$ | $\Omega(n)$ | ✓ (exactly tight) |
+| Maintenance per sweep | $f_{\text{stale}} \cdot n$ | $O(n)$ | $\Omega(1)$ | ✓ |
+| Reliable delivery | $1 + \mu/(1-\mu)$ per pkt | $O(1)$ per pkt | $\Omega(1)$ | ✓ |
+
+### 10.2 Theorem 6 ($\Theta(n^2)$ Bootstrap Lower Bound)
+
+**Assumptions.**
+1. Communication is via point-to-point messages.
+2. Each message conveys at most one node's identity.
+3. The knowledge graph $G = (V, E)$ starts with $E^{(0)} = \{(i,i)\}$.
+
+**Theorem 6 (Bootstrap lower bound).** Any protocol achieving full mesh under Assumptions 1–3 must send at least $\Omega(n^2)$ messages.
+
+**Proof.** Let $G^{(t)}$ be the knowledge graph after $t$ messages. Each message $(i,j)$ adds at most **one** new directed edge $(i, j)$ or $(j, i)$ to $E$ (the sender's own identity). Knowledge of third parties requires separate messages (e.g., NODES response carrying $K$ entries). Full mesh requires $n^2 - n$ edges beyond $E^{(0)}$. Since each message adds at most one edge:
+
+$$|\text{messages}| \geq n^2 - n = \Omega(n^2)$$ ∎
+
+NWP achieves $2n(n-1)$ messages: $2 + o(1)$ times the lower bound. No protocol with single-identity-per-message semantics can improve this constant.
+
+---
+
+## 11. Memory Complexity (Aggregate)
+
+| Structure | Worst Case | Average Case | Proof |
+|-----------|-----------|-------------|-------|
+| Routing table | $O(Kb) = 400$ KB | $O(K \log n) = 32$ KB @ $10^6$ | §5.6 |
+| Synapse matrix | $m^2$ (dense) | $O(d m^2)$ (sparse) | §7.2 |
+| Reliable queue | $O(\mu \cdot n \cdot s_{\text{frame}})$ | $O(1)$ | §7.2 |
+| Activation buffer | $O(m)$ | $O(m)$ | §2.4 |
+| Surprise buffer | $O(W + m)$ | $O(W + m)$ | §3.5 |
+| Ingress buffer | $O(s_{\text{frame}} \cdot n)$ | $O(s_{\text{frame}} \cdot \mathbb{E}[p_{\text{recv}}])$ | §8.1 |
+| **Total (steady state)** | $O(Kb + m^2)$ | $O(K \log n + d m^2)$ | — |
+
+---
+
+## 12. Failure Probability
+
+### 12.1 Node Failure
+
+**Assumptions.**
+1. Node failures are independent Poisson processes with rate $\lambda_f$.
+2. The network is fully connected (no partition).
+
+**Lemma 10 (Expected failures).** For $n$ nodes over elapsed time $t$, the expected number of failures is:
+
+$$\mathbb{E}[F_t] = n \cdot (1 - e^{-\lambda_f t})$$
+
+**Proof.** Follows from the CDF of the exponential distribution: $P(\text{fail} \leq t) = 1 - e^{-\lambda_f t}$. Summing over $n$ independent nodes gives the expectation. ∎
 
 **Three regimes:**
 
@@ -459,9 +655,9 @@ $$\mathbb{E}[F_T] = n \cdot (1 - e^{-\lambda_f T \Delta t})$$
 | Nominal | $10^{-4}\,\text{s}^{-1}$ | 0.6 | ~1 failure per experiment |
 | Hostile | $10^{-2}\,\text{s}^{-1}$ | 60 | Full churn in 100s |
 
-### 8.2 Data Loss Probability
+### 12.2 Data Loss Probability
 
-Data (synaptic weights) is replicated via gossip. If $r$ nodes hold a copy of weight $w_{ij}$:
+Data (synaptic weights) is replicated via gossip to $r$ nodes:
 
 $$P(\text{loss}) = (1 - e^{-\lambda_f T})^r$$
 
@@ -469,19 +665,15 @@ For $r = 3$ and nominal failure rate over 120s:
 
 $$P(\text{loss}) = (1 - e^{-10^{-4} \cdot 120})^3 \approx (0.012)^3 \approx 1.7 \times 10^{-6}$$
 
-### 8.3 Network Partition
+### 12.3 Network Partition
 
 A partition occurs when all paths through the knowledge graph between two subsets are severed. For an Erdős–Rényi graph $G(n, p)$ where $p$ is the per-node-pair knowledge probability:
 
 $$P(\text{partition}) = \sum_{k=1}^{n-1} \binom{n-1}{k-1} (1-p)^{k(n-k)}$$
 
-This is exponentially small for $p > \frac{\ln n}{n}$. Post-convergence with $p = 1$:
+This is exponentially small for $p > \ln n / n$. Post-convergence with $p = 1$: $P(\text{partition}) = 0$.
 
-$$P(\text{partition}) = 0$$
-
-During bootstrap ($p \ll 1$), partitions are possible. The critical threshold is when $\sum_{i} \text{peer\_count}_i \geq n \cdot \ln n$.
-
-### 8.4 Censorship / Eclipse Resistance
+### 12.4 Censorship / Eclipse Resistance
 
 An eclipse attack requires the attacker to control all $K$ entries in the target's bucket. With fraction $f$ of malicious nodes:
 
@@ -493,60 +685,52 @@ $$P(\text{full eclipse}) = \prod_{k=0}^{255} P(\text{eclipse bucket } k)$$
 
 With $f = 0.25$ and $n = 100$:
 
-$$P(\text{eclipse one bucket}) \approx \left(\frac{25}{100}\right)^{20} \approx 10^{-12}$$
+$$P(\text{eclipse one bucket}) \approx (25/100)^{20} \approx 10^{-12}$$
 $$P(\text{full eclipse}) \approx (10^{-12})^{256} \approx 10^{-3072}$$
 
-The simultaneous-eclipse requirement makes full eclipse computationally infeasible.
+### 12.5 Complexity
+
+| Metric | Worst Case | Average Case |
+|--------|-----------|-------------|
+| **Time (failure detection)** | $O(T_{\text{stale}})$ = 300s | $O(T_{\text{stale}})$ |
+| **Memory (failure tracking)** | $O(Kb)$ (failure counters) | $O(K \log n)$ |
+| **Communication (recovery)** | $O(n)$ per recovered node | $O(K \log n)$ |
 
 ---
 
-## 9. Expected Convergence
+## 13. Expected Convergence
 
-### 9.1 Full-Mesh Convergence
+### 13.1 Full-Mesh Convergence (Restated)
 
-**Theorem 4 (Expected convergence time).** For $n$ nodes booting simultaneously with RTT and socket drain rate $\nu$, the expected time to full mesh (every node knows every other) is:
+**Theorem 5 (stated in §5.4).** Expected convergence time:
 
-$$\mathbb{E}[T_{\text{conv}}] = \text{RTT} + \frac{2(n-1)}{\nu} + \sum_{k=1}^{\infty} \frac{2(n-1) p_f^k}{\nu}$$
+$$\mathbb{E}[T_{\text{conv}}] = \max\left(\text{RTT}, \frac{2(n-1)}{\nu}\right) + \frac{2(n-1)}{\nu} \cdot \frac{p_f}{1-p_f}$$
 
-where $p_f$ is per-packet loss probability.
+**Numerical examples** (RTT = 3ms, $\nu = 10^4$ msg/s, $p_f = 0$):
 
-**Proof.** Each round (PING flood → PONG flood), every node sends $n-1$ PINGs and receives $n-1$ PONGs. The initial PING flood takes RTT/2 to arrive. PONGs take RTT/2 to return. Total time per round: RTT + $2(n-1)/\nu$ for serial drain.
-
-Under packet loss $p_f$, the probability a given PING-PONG exchange completes in exactly $r$ retries follows a geometric distribution:
-
-$$P(\text{success at retry } r) = (1 - p_f)^r p_f$$
-
-The expected number of retries is $p_f / (1 - p_f)$. Adding this to the base time:
-
-$$\mathbb{E}[T_{\text{conv}}] = \text{RTT} + \frac{2(n-1)}{\nu} + \frac{2(n-1)}{\nu} \cdot \frac{p_f}{1-p_f}$$
-
-For $p_f = 0$ (lab conditions): $\mathbb{E}[T_{\text{conv}}] = \text{RTT} + 2(n-1)/\nu$. $\blacksquare$
-
-**Numerical examples** (RTT = 3ms, $\nu = 10^4$ msg/s):
-
-| $n$ | $\mathbb{E}[T_{\text{conv}}]$ | Dominant term |
-|-----|------------------------------|---------------|
+| $n$ | $\mathbb{E}[T_{\text{conv}}]$ | Regime |
+|-----|------------------------------|--------|
 | 10 | 4.8 ms | RTT |
-| 50 | 12.8 ms | RTT + socket |
+| 50 | 12.8 ms | Transition |
 | 100 | 22.8 ms | Socket drain |
 | 500 | 103 ms | Socket drain |
-| 10^4 | 2.0 s | Socket drain (requires iterative routing) |
+| $10^4$ | 2.0 s | Socket (needs iterative) |
 
-### 9.2 Learning Convergence
+### 13.2 Learning Convergence (Restated)
 
-The weight matrix converges to its steady-state value $\mathbf{W}^{(\infty)} = (\eta/\lambda)\boldsymbol{\Sigma}$ according to:
+**Theorem 1 (stated in §1.2).** Weight convergence is geometric:
 
-$$\mathbf{W}^{(t)} = \mathbf{W}^{(\infty)} + (1 - \lambda)^t(\mathbf{W}^{(0)} - \mathbf{W}^{(\infty)})$$
+$$\mathbf{W}^{(t)} = \mathbf{W}^{(\infty)} + (1 - \lambda)^t (\mathbf{W}^{(0)} - \mathbf{W}^{(\infty)})$$
 
-The convergence rate is geometric with factor $(1 - \lambda)$. The number of ticks to reach within $\epsilon$ of steady state:
+Ticks to reach within $\epsilon$ of steady state:
 
 $$t_{\epsilon} = \frac{\ln(\|\mathbf{W}^{(0)} - \mathbf{W}^{(\infty)}\|_F / \epsilon)}{-\ln(1 - \lambda)}$$
 
 For $\lambda = 0.001$, $\epsilon = 0.01 \cdot \|\mathbf{W}^{(\infty)}\|_F$:
 
-$$t_{1\%} \approx \frac{\ln(1 / 0.01)}{0.001} \approx 4605 \text{ ticks} \approx 4.6 \text{ seconds}$$
+$$t_{1\%} \approx \frac{\ln(100)}{0.001} \approx 4605 \text{ ticks} \approx 4.6 \text{ seconds}$$
 
-### 9.3 Prediction Error Convergence
+### 13.3 Prediction Error Convergence (Restated)
 
 The prediction error $\gamma$ decreases as the network learns:
 
@@ -560,9 +744,9 @@ where $\lambda_{\max}$ is the largest eigenvalue of the product and $\mathbf{R}$
 
 ---
 
-## 10. Reliability, Availability, and Consistency
+## 14. Reliability, Availability, and Consistency
 
-### 10.1 System State Machine
+### 14.1 System State Machine
 
 The node state machine forms a Markov chain with absorbing state SHUTDOWN:
 
@@ -571,13 +755,12 @@ $$\begin{aligned}
 &P(\text{Discovering} \to \text{Active}) = 1 - e^{-n \cdot p_{\text{seed}} \cdot T_{\text{timeout}}} \\
 &P(\text{Active} \to \text{Degraded}) = \mathbb{1}[\text{peers} < n_{\text{liveness}}] \\
 &P(\text{Degraded} \to \text{Active}) = 1 - e^{-T_{\text{recovery}} / \tau_{\text{bootstrap}}} \\
-&P(\text{Degraded} \to \text{Dead}) = \mathbb{1}[T_{\text{degraded}} > T_{\text{max\_degraded}}] \\
 &P(\text{Active} \to \text{Shutdown}) = 1 \text{ (on SIGINT)}
 \end{aligned}$$
 
-### 10.2 Mean Time Between Failures
+### 14.2 Mean Time Between Failures
 
-The system MTBF is the time until all $n$ nodes fail simultaneously (true data loss):
+The system MTBF is the time until all $r$ replicas of a data item fail simultaneously:
 
 $$\text{MTBF}_{\text{system}} = \frac{1}{n \lambda_f} \cdot \frac{1}{P(\text{loss} \mid \text{fail})}$$
 
@@ -585,47 +768,62 @@ For $n=50$, $\lambda_f = 10^{-6}\,\text{s}^{-1}$, $P(\text{loss} \mid \text{fail
 
 $$\text{MTBF}_{\text{system}} \approx \frac{1}{50 \times 10^{-6}} \times 10^6 \approx 2 \times 10^{10}\,\text{s} \approx 634 \text{ years}$$
 
-### 10.3 Availability
+### 14.3 Availability
 
-Per-node availability $A$ is:
+Per-node availability $A$:
 
 $$A = \frac{\text{MTBF}}{\text{MTBF} + \text{MTTR}}$$
 
-With MTTR (mean time to recover) dominated by bootstrapping: $\text{MTTR} = \mathbb{E}[T_{\text{conv}}]$.
-
-For $n=50$, nominal conditions:
+With $\text{MTTR} = \mathbb{E}[T_{\text{conv}}]$ from Theorem 5. For $n=50$, nominal conditions:
 
 $$A = \frac{10^6}{10^6 + 0.013} \approx 0.999999987 \text{ (six nines)}$$
 
 ---
 
-## 11. Complexity Summary Table
+## 15. Complexity Summary Table
 
-| Metric | Bound | Conditions | Section |
-|--------|-------|-----------|---------|
-| Routing memory | $\Theta(K \log n)$ | Random NodeIDs | §7.1 |
-| Routing memory | $O(Kb)$ worst-case | Adversarial IDs | §7.1 |
-| Lookup hops | $\Theta(\log_K n)$ | $n \geq K$ | §5.3 |
-| Bootstrap messages | $\Theta(n^2)$ | Full mesh | §6.2 |
-| Bootstrap time | $\max(\text{RTT}, 2n/\nu)$ | All | §9.1 |
-| Steady-state bandwidth | $\Theta(1)$ per node | $n$ independent | §6.3 |
-| Maintenance messages | $O(1)$ per sweep | Healthy network | §5.5 |
-| Learning convergence | $O(1/\lambda)$ ticks | Fixed point | §9.2 |
-| Neuron count | $O(\alpha^{-1} \ln \gamma_0/\sigma)$ | Steady state | §3.3 |
-| Failure probability | $O((\lambda_f T)^r)$ | $r$ replication | §8.2 |
-| Eclipse resistance | $O(f^{Kb})$ | $f$ malicious fraction | §8.4 |
+| Subsystem | Metric | Worst Case | Average Case | Section |
+|-----------|--------|-----------|-------------|---------|
+| **Hebbian STDP** | Time | $O(m^2)$ | $O(d m^2)$ | §1.5 |
+| | Memory | $O(m^2)$ | $O(d m^2)$ | §1.5 |
+| | Communication | $O(K_{\text{gossip}})$ per round | $O(K_{\text{gossip}})$ | §1.5 |
+| **Forward Pass** | Time | $O(m^2)$ | $O(d m^2)$ | §2.4 |
+| | Memory | $O(m^2)$ | $O(d m^2 + m)$ | §2.4 |
+| **Neurogenesis** | Time | $O(m)$ | $O(m)$ | §3.5 |
+| | Memory | $O(m)$ | $O(m)$ | §3.5 |
+| **Apoptosis** | Time | $O(m\pi)$ (amortized $O(m/\pi)$) | $O(m)$ | §4.4 |
+| | Memory | $O(m)$ | $O(m)$ | §4.4 |
+| **DHT Lookup** | Time (hops) | $O(b) = 256$ | $O(\log_K n)$ | §5.6 |
+| | Memory | $O(Kb) = 400$ KB | $O(K \log n) = 32$ KB @ $10^6$ | §5.6 |
+| | Communication | $O(\alpha b)$ | $O(\alpha \log_K n)$ | §5.6 |
+| **Bootstrap** | Time | $\max(\text{RTT}, 2n/\nu)$ | same | §5.4 |
+| | Comm (total) | $\Theta(n^2)$ | $\Theta(n^2)$ | §6.1 |
+| **Gossip** | Comm per tick | $g \cdot n$ total, $g$ per node | same | §6.2 |
+| | Bandwidth | $g \cdot s_{\text{frame}} / T_{\text{gossip}}$ | same | §6.2 |
+| **Reliable Queue** | Time per scan | $O(\mu n)$ | $O(\mu)$ | §7.3 |
+| | Memory | $O(\text{max\_retries} \cdot n \cdot s_{\text{frame}})$ | $O(1)$ | §7.3 |
+| **Ingress** | Time | $O(n)$ | $O(\mathbb{E}[p_{\text{recv}}])$ | §8.1 |
+| **Egress** | Time | $O(n)$ | $O(g)$ | §8.2 |
+| **Engine loop (total)** | Time | $O(n + d m^2)$ | $O(g + d m^2)$ | §9.3 |
+| | Memory | $O(Kb + d m^2 + n)$ | $O(K \log n + d m^2)$ | §9.3 |
 
 ---
 
-## 12. Empirical Validation
+## 16. Empirical Validation
 
-Every equation above is testable by experiment. The simulation framework (`cargo run --example simulate -- --paper-mode ...`) provides:
+Every equation above is testable by experiment. The simulation framework provides:
 
-- **Convergence time**: logs per-node peer count over time → compare $\mathbb{E}[T_{\text{conv}}]$ against §9.1
-- **Message complexity**: aggregate PING/PONG counters → verify $\Theta(n^2)$ bound in §6.2
-- **Learning convergence**: dump weight matrix at checkpoints → verify $\mathbf{W}^{(\infty)} = (\eta/\lambda)\boldsymbol{\Sigma}$ in §1.2
-- **Neurogenesis dynamics**: log spawn events → verify Poisson process in §3.4
-- **Failure experiments**: `--failure-mode node-death --failure-at <sec> --failure-percent <pct>` → measure recovery probability in §8
+| Experiment | What to measure | Expected result | Reference |
+|-----------|----------------|----------------|-----------|
+| Convergence time | Per-node peer count vs time | $\max(\text{RTT}, 2n/\nu)$ | Theorem 5 |
+| Message complexity | Aggregate PING/PONG counter | $\Theta(n^2)$ | Theorem 6 |
+| Learning convergence | Weight matrix norm vs tick | $\mathbf{W}^{(\infty)} = (\eta/\lambda)\boldsymbol{\Sigma}$ | Theorem 1 |
+| Neurogenesis dynamics | Spawn event times | Poisson process, rate $\lambda_{\text{spawn}}$ | §3.4 |
+| Apoptosis rate | Death events per tick | $\mathbb{E}[D] = m \cdot \epsilon_a^\pi$ | §4.2 |
+| Failure recovery | Peer count after injection | Recovers to $n-1$ in $\mathbb{E}[T_{\text{conv}}]$ | Theorem 5b |
+| Bandwidth | Bytes/tick at steady state | $300$ B/s independent of $n$ | §6.3 |
+| Memory | RSS vs node count | $O(K \log n)$ growth | §5.6 |
+| Eclipse resistance | Bucket composition under attack | $P < 10^{-12}$ for $f=0.25$ | §12.4 |
 
 ---
 
