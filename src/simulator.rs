@@ -414,6 +414,7 @@ impl Simulator {
                 } else {
                     None
                 },
+                identity_seed: None,
             };
 
             // Create shared packet filter for partition injection

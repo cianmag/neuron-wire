@@ -69,6 +69,24 @@ use crate::ml::MLSystem;
 use crate::neurogenesis::NeurogenesisSystem;
 use crate::transport::{TransportHeader, UdpTransport};
 
+// ── Security imports (optional, gate via cfg) ──────────────────
+use crate::audit::{AuditEventType, AuditLog};
+use crate::identity::NodeIdentity;
+use crate::secure_channel::SecureChannel;
+use crate::trust::TrustSystem;
+use std::hash::{Hash, Hasher};
+
+/// Derive a deterministic EntityId from a SocketAddr for trust tracking.
+/// This is a fallback when the actual public key isn't available.
+fn entity_id_from_addr(addr: &SocketAddr) -> EntityId {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    addr.hash(&mut hasher);
+    let h = hasher.finish();
+    let mut id = [0u8; 32];
+    id[..8].copy_from_slice(&h.to_le_bytes());
+    EntityId(id)
+}
+
 // ─── Configuration ─────────────────────────────────────────────
 
 /// Engine loop configuration
@@ -94,6 +112,8 @@ pub struct EngineConfig {
     pub shared_stats: Option<Arc<Mutex<EngineStats>>>,
     /// Sparse Gradient Aging configuration (None = standard maintenance).
     pub freshness_config: Option<FreshnessConfig>,
+    /// Optional identity seed for deterministic key generation (None = random).
+    pub identity_seed: Option<[u8; 32]>,
 }
 
 impl Default for EngineConfig {
@@ -109,6 +129,7 @@ impl Default for EngineConfig {
             local_peers: Vec::new(),
             shared_stats: None,
             freshness_config: None,
+            identity_seed: None, // random identity by default
         }
     }
 }
@@ -225,7 +246,16 @@ pub struct EngineLoop {
     pub apoptosis_system: ApoptosisSystem,
     /// Shutdown signal: when true, the run() loop exits cleanly
     pub shutdown: Arc<AtomicBool>,
-    /// Timers (tick counters)
+    /// ── Security Subsystem ──────────────────────────────────────
+    /// This node's cryptographic identity (Ed25519 keypair)
+    pub node_identity: NodeIdentity,
+    /// Encrypted channel manager (XChaCha20-Poly1305 sessions)
+    pub secure_channel: SecureChannel,
+    /// Trust & reputation system (Sybil resistance, rate limiting)
+    pub trust_system: TrustSystem,
+    /// Audit log with hash-chain tamper detection
+    pub audit_log: AuditLog,
+    /// ── Timers ─────────────────────────────────────────────────
     tick: u64,
     last_retransmit_tick: u64,
     last_cleanup_tick: u64,
@@ -271,6 +301,13 @@ impl EngineLoop {
         let (outbound_tx, outbound_rx) = mpsc::channel();
         let (events_tx, events_rx) = mpsc::channel();
 
+        // Create cryptographic identity (deterministic from seed, or random)
+        let node_identity = match config.identity_seed {
+            Some(seed) => NodeIdentity::from_seed(&seed),
+            None => NodeIdentity::new(),
+        };
+        let audit_log = AuditLog::new();
+
         let engine = EngineLoop {
             config,
             transport,
@@ -279,6 +316,11 @@ impl EngineLoop {
             dht_handler: None,
             apoptosis_system: ApoptosisSystem::new(),
             shutdown: Arc::new(AtomicBool::new(false)),
+            // Security subsystem
+            node_identity,
+            secure_channel: SecureChannel::new(),
+            trust_system: TrustSystem::new(),
+            audit_log,
             tick: 0,
             last_retransmit_tick: 0,
             last_cleanup_tick: 0,
@@ -348,6 +390,19 @@ impl EngineLoop {
         // Pre-allocate a local receive buffer (stack-friendly, reused)
         let mut recv_buf = vec![0u8; self.config.recv_buffer_size];
         let mut ingress_count_this_tick: u32;
+
+        // Log startup to audit trail
+        self.audit_log.append(
+            AuditEventType::NodeStartup,
+            &format!(
+                "Engine started, entity={:02x}{:02x}{:02x}.., bind={}",
+                self.node_identity.entity_id().0[0],
+                self.node_identity.entity_id().0[1],
+                self.node_identity.entity_id().0[2],
+                self.config.bind_addr,
+            ),
+            None,
+        );
 
         loop {
             self.tick += 1;
@@ -587,6 +642,17 @@ impl EngineLoop {
             return Err(format!("too short: {} bytes", data.len()));
         }
 
+        // ── Security: trust-based rate limiting ────────────────
+        let peer_id = entity_id_from_addr(&src);
+        if self.trust_system.check_rate_limit(&peer_id) {
+            self.audit_log.append(
+                AuditEventType::RateLimitTriggered,
+                &format!("rate-limited packet from {}", src),
+                Some(peer_id),
+            );
+            return Ok(()); // silently drop, but log
+        }
+
         // Zero-copy parse the transport header from the raw datagram
         let transport_header = unsafe { TransportHeader::from_bytes(data) };
 
@@ -731,6 +797,11 @@ pub fn spawn_engine(
                 dht_handler,
                 apoptosis_system: ApoptosisSystem::new(),
                 shutdown: shutdown.clone(),
+                // Security subsystem
+                node_identity: NodeIdentity::new(),
+                secure_channel: SecureChannel::new(),
+                trust_system: TrustSystem::new(),
+                audit_log: AuditLog::new(),
                 tick: 0,
                 last_retransmit_tick: 0,
                 last_cleanup_tick: 0,
