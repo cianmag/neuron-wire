@@ -363,7 +363,7 @@ mod tests {
     fn test_prediction_in_report() {
         let mut ml = MLSystem::new();
         let mut activations = ActivationMap::new();
-        let synapses = SynapseMap::new();
+        let mut synapses = SynapseMap::new();
 
         let e1 = make_entity(1);
         activations.insert(

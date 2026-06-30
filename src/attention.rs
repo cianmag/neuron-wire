@@ -405,7 +405,7 @@ mod tests {
         );
 
         // Gate ~ 0.5 (since w_g are zero, only bias 0.0 -> sigmoid(0) = 0.5)
-        let hebbian_val = 0.8 * 1.0 + 0.2 * 0.5; // = 0.9
+        let _hebbian_val = 0.8 * 1.0 + 0.2 * 0.5; // = 0.9
         let expected = 0.9 * 0.5;
         assert!((result.get(&eid(3)).copied().unwrap_or(0.0) - expected).abs() < 1e-6);
     }

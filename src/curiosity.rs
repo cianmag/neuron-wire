@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_constant_schedule() {
-        let mut cm = CuriosityModule::new(1.0, 0.5, CuriositySchedule::Constant(0.1));
+        let cm = CuriosityModule::new(1.0, 0.5, CuriositySchedule::Constant(0.1));
         assert!((cm.curiosity_beta(0) - 0.1).abs() < 0.001);
         assert!((cm.curiosity_beta(1000) - 0.1).abs() < 0.001);
     }
@@ -260,6 +260,6 @@ mod tests {
     fn test_default() {
         let cm = CuriosityModule::default();
         assert!((cm.count_beta - 1.0).abs() < 0.001);
-        assert!((cm.tick_count() - 0.0).abs() < 0.001);
+        assert!((cm.tick_count() as f32 - 0.0).abs() < 0.001);
     }
 }

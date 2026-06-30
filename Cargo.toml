@@ -32,6 +32,11 @@ name = "benchmarks"
 harness = false
 required-features = ["bench"]
 
+[[bench]]
+name = "bench_ml"
+harness = false
+required-features = ["bench"]
+
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1"
