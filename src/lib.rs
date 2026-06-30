@@ -14,26 +14,45 @@
 
 #![deny(missing_docs)]
 
+// ─── Core Protocol Modules ──────────────────────────────────────
+pub mod adaptive_lr;
 pub mod adversary;
 pub mod apoptosis;
+pub mod attention;
 pub mod components;
+pub mod continual_learning;
 pub mod crc;
+pub mod curiosity;
 pub mod dht;
+pub mod distillation;
+pub mod distributed_replay;
+pub mod dynamic_activation;
 pub mod engine_loop;
 pub mod flat;
+pub mod forgetting_bench;
 pub mod forward_pass;
+pub mod gradient_compression;
 pub mod header;
 pub mod hebbian;
 pub mod io;
+pub mod memory_module;
+pub mod meta_learning;
 pub mod neurogenesis;
+pub mod routing;
 pub mod simulator;
+pub mod sparse_tensor;
 pub mod transport;
 pub mod types;
+pub mod uncertainty;
 pub mod zerocopy;
 
+pub mod ml;
+
+// Re-exports
 pub use flat::*;
 pub use header::*;
 pub use io::*;
+pub use ml::*;
 pub use types::*;
 
 /// Magic: "NWP\0"
