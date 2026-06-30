@@ -65,6 +65,7 @@ use crate::components::{ActivationMap, EntityId, SynapseMap};
 use crate::dht::{DhtHandler, FreshnessConfig, NodeId, NodeType};
 use crate::forward_pass::ForwardPassSystem;
 use crate::hebbian::HebbianLearningSystem;
+use crate::ml::MLSystem;
 use crate::neurogenesis::NeurogenesisSystem;
 use crate::transport::{TransportHeader, UdpTransport};
 
@@ -245,6 +246,8 @@ pub struct EngineLoop {
     neurogenesis: NeurogenesisSystem,
     /// Hebbian learning: STDP weight updates + gossip
     hebbian: HebbianLearningSystem,
+    /// ML orchestration: adaptive LR, meta-learning, curiosity, memory, etc.
+    ml_system: MLSystem,
     /// Local node's 256-bit cryptographic identity
     local_id: EntityId,
     /// Clone of the outbound sender (for Hebbian gossip)
@@ -288,6 +291,7 @@ impl EngineLoop {
             forward_pass: ForwardPassSystem::default(),
             neurogenesis: NeurogenesisSystem::default(),
             hebbian: HebbianLearningSystem::new(0.01, 0.999, 0.001, 500),
+            ml_system: MLSystem::new(),
             local_id: EntityId([0u8; 32]),
             outbound_tx: outbound_tx.clone(),
             brain_attached: false,
@@ -314,6 +318,7 @@ impl EngineLoop {
         forward_pass: ForwardPassSystem,
         neurogenesis: NeurogenesisSystem,
         hebbian: HebbianLearningSystem,
+        ml_system: MLSystem,
         local_id: EntityId,
     ) {
         self.activation_map = activation_map;
@@ -321,6 +326,7 @@ impl EngineLoop {
         self.forward_pass = forward_pass;
         self.neurogenesis = neurogenesis;
         self.hebbian = hebbian;
+        self.ml_system = ml_system;
         self.local_id = local_id;
         self.brain_attached = true;
     }
@@ -475,6 +481,23 @@ impl EngineLoop {
                         fp_report.orphans_cleaned,
                     );
                 }
+
+                // Step 3: ML system — adaptive LR, meta-learning, curiosity,
+                // memory, replay, distillation, continual learning.
+                let ml_observations: Vec<crate::ml::Observation> = observations
+                    .iter()
+                    .map(|(entity, value)| crate::ml::Observation {
+                        entity: *entity,
+                        value: *value,
+                        tick: self.tick,
+                    })
+                    .collect();
+                let _ml_report = self.ml_system.tick(
+                    self.tick,
+                    &mut self.activation_map,
+                    &mut self.synapse_map,
+                    &ml_observations,
+                );
             }
 
             // ── PHASE 4: RETRANSMIT (every N ticks) ──────────
@@ -719,6 +742,7 @@ pub fn spawn_engine(
                 forward_pass: ForwardPassSystem::default(),
                 neurogenesis: NeurogenesisSystem::default(),
                 hebbian: HebbianLearningSystem::new(0.01, 0.999, 0.001, 500),
+                ml_system: MLSystem::new(),
                 local_id: EntityId([0u8; 32]),
                 outbound_tx: outbound_tx.clone(),
                 brain_attached: false,
