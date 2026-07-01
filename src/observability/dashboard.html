@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuron Wire Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--text-dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#d4760a}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.5;padding:16px}
+h1{font-size:20px;font-weight:600;margin-bottom:4px;color:var(--accent)}
+h2{font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text)}
+.subtitle{color:var(--text-dim);font-size:12px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px;max-width:100%}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow:hidden}
+.card canvas{width:100%!important;height:auto!important;max-height:250px}
+.stat-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.stat{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;flex:1;min-width:100px;text-align:center}
+.stat .value{font-size:22px;font-weight:700;color:var(--accent);display:block}
+.stat .label{font-size:10px;text-transform:uppercase;color:var(--text-dim);letter-spacing:0.5px}
+.heatmap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:4px;margin-top:8px}
+.heatmap-cell{padding:6px;text-align:center;border-radius:4px;font-size:10px;font-weight:600;color:#fff}
+.packet-stream{height:180px;overflow-y:auto;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;padding:4px}
+.packet-stream div{padding:2px 4px;border-bottom:1px solid var(--border)}
+.pkt-in{color:var(--green)}.pkt-out{color:var(--accent)}.pkt-drop{color:var(--red)}
+.dht-map{position:relative;width:100%;height:280px;overflow:hidden;border-radius:6px;background:radial-gradient(ellipse at center,rgba(88,166,255,0.05),transparent)}
+.dht-map canvas{width:100%;height:100%}
+.neuron-graph{width:100%;height:280px}
+.neuron-graph canvas{width:100%;height:100%}
+.controls{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.controls button,.controls select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px}
+.controls button:hover{background:var(--border)}
+.time-travel{display:flex;gap:8px;align-items:center;margin-top:4px}
+.time-travel input[type=range]{flex:1;height:4px;accent-color:var(--accent)}
+.time-label{font-size:11px;color:var(--text-dim);min-width:80px}
+.status-bar{display:flex;gap:16px;margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--text-dim)}
+.status-bar span{display:flex;align-items:center;gap:4px}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot-green{background:var(--green)}.dot-red{background:var(--red)}.dot-yellow{background:var(--yellow)}
+@media(max-width:768px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>🧠 Neuron Wire</h1>
+<div class="subtitle">Live observability dashboard · <span id="uptime">starting...</span></div>
+
+<div class="status-bar" id="statusBar">
+  <span><span class="status-dot dot-green"></span> Engine <span id="engineStatus">running</span></span>
+  <span>📦 <span id="peersTotal">0</span> peers</span>
+  <span>⏱ <span id="tickRate">0</span> Hz</span>
+  <span>📤 <span id="bpsOut">0</span> bps</span>
+  <span>📥 <span id="bpsIn">0</span> bps</span>
+  <span>⛔ <span id="rateLimited">0</span> rate-limited</span>
+</div>
+
+<div class="controls">
+  <button onclick="togglePause()">⏸ Pause</button>
+  <select id="viewSelect" onchange="switchView()">
+    <option value="all">All views</option>
+    <option value="dht">DHT Map</option>
+    <option value="neuron">Neuron Graph</option>
+    <option value="packets">Packet Stream</option>
+    <option value="learning">Learning</option>
+    <option value="bandwidth">Bandwidth</option>
+    <option value="latency">Latency</option>
+    <option value="failure">Failure Replay</option>
+  </select>
+  <button onclick="clearHistory()">🗑 Clear history</button>
+  <button onclick="exportJSON()">📥 Export JSON</button>
+</div>
+
+<div class="grid" id="dashboardGrid">
+
+  <!-- DHT Map -->
+  <div class="card" data-view="dht">
+    <h2>🌐 Live DHT Map</h2>
+    <div class="dht-map"><canvas id="dhtCanvas"></canvas></div>
+  </div>
+
+  <!-- Neuron Graph -->
+  <div class="card" data-view="neuron">
+    <h2>🔗 Neuron Graph</h2>
+    <div class="neuron-graph"><canvas id="neuronCanvas"></canvas></div>
+  </div>
+
+  <!-- Packet Stream -->
+  <div class="card" data-view="packets">
+    <h2>📨 Live Packet Stream</h2>
+    <div class="packet-stream" id="packetStream"><div style="color:var(--text-dim)">Waiting for data...</div></div>
+  </div>
+
+  <!-- Learning Graph -->
+  <div class="card" data-view="learning">
+    <h2>📈 Learning Metrics</h2>
+    <canvas id="learningChart"></canvas>
+  </div>
+
+  <!-- Bandwidth Dashboard -->
+  <div class="card" data-view="bandwidth">
+    <h2>🌊 Bandwidth Dashboard</h2>
+    <canvas id="bandwidthChart"></canvas>
+  </div>
+
+  <!-- Latency Heatmap -->
+  <div class="card" data-view="latency">
+    <h2>🌡 Latency Heatmap</h2>
+    <div id="latencyHeatmap" class="heatmap-grid">No peer data</div>
+  </div>
+
+  <!-- Failure Replay -->
+  <div class="card" data-view="failure">
+    <h2>⚠️ Failure Replay</h2>
+    <div class="packet-stream" id="failureStream"><div style="color:var(--text-dim)">No failures recorded</div></div>
+  </div>
+
+  <!-- Time Travel Debugger -->
+  <div class="card" data-view="all">
+    <h2>⏪ Time Travel Debugger</h2>
+    <div class="time-travel">
+      <span class="time-label" id="timeLabel">─</span>
+      <input type="range" id="timeSlider" min="0" max="100" value="100" step="1" oninput="timeTravel(this.value)">
+      <span class="time-label" id="timePos">latest</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="value" id="ttPkts">0</span><span class="label">Packets</span></div>
+      <div class="stat"><span class="value" id="ttBytes">0</span><span class="label">Bytes</span></div>
+      <div class="stat"><span class="value" id="ttPeers">0</span><span class="label">Peers</span></div>
+      <div class="stat"><span class="value" id="ttTrust">0</span><span class="label">Trust Avg</span></div>
+    </div>
+  </div>
+
+  <!-- Stats cards -->
+  <div class="card" data-view="all">
+    <h2>📊 Real-Time Metrics</h2>
+    <div class="stat-row">
+      <div class="stat"><span class="value" id="statSent">0</span><span class="label">Sent</span></div>
+      <div class="stat"><span class="value" id="statRecv">0</span><span class="label">Recv</span></div>
+      <div class="stat"><span class="value" id="statNeurons">0</span><span class="label">Neurons</span></div>
+      <div class="stat"><span class="value" id="statSynapses">0</span><span class="label">Synapses</span></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><span class="value" id="statHandshake">0</span><span class="label">Handshakes</span></div>
+      <div class="stat"><span class="value" id="statBadSigs">0</span><span class="label">Bad Sigs</span></div>
+      <div class="stat"><span class="value" id="statReplays">0</span><span class="label">Replays</span></div>
+      <div class="stat"><span class="value" id="statAudit">0</span><span class="label">Audit</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────
+let history = [];
+let packetEvents = [];
+let peers = [];
+let paused = false;
+let timer = null;
+let timeIdx = -1;
+const MAX_HISTORY_POINTS = 300;
+
+// ─── Chart instances ───────────────────────────────────────────
+let learningChart = null;
+let bandwidthChart = null;
+
+// ─── Fetch data ────────────────────────────────────────────────
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch { return null; }
+}
+
+async function fetchData() {
+  if (paused) return;
+  const snap = await fetchJSON('/api/snapshot');
+  const hist = await fetchJSON('/api/history');
+  const pkts = await fetchJSON('/api/packets');
+  const p = await fetchJSON('/api/peers');
+
+  if (snap) updateStats(snap);
+  if (hist && hist.length) { history = hist; updateCharts(); updateHeatmap(); updateTimeTravel(); }
+  if (pkts) { packetEvents = pkts; updatePacketStream(); updateFailureStream(); }
+  if (p) { peers = p; updateDHTMap(); updateNeuronGraph(); }
+}
+
+function updateStats(s) {
+  document.getElementById('uptime').textContent = formatUptime(s.uptime_secs);
+  document.getElementById('peersTotal').textContent = s.peer_count;
+  document.getElementById('tickRate').textContent = s.tick_rate_hz.toFixed(0);
+  document.getElementById('bpsOut').textContent = formatBytes(s.bps_out) + '/s';
+  document.getElementById('bpsIn').textContent = formatBytes(s.bps_in) + '/s';
+  document.getElementById('rateLimited').textContent = s.rate_limited_dropped;
+  document.getElementById('statSent').textContent = s.packets_sent;
+  document.getElementById('statRecv').textContent = s.packets_recv;
+  document.getElementById('statNeurons').textContent = s.neuron_count;
+  document.getElementById('statSynapses').textContent = s.synapse_count;
+  document.getElementById('statHandshake').textContent = s.handshake_successes;
+  document.getElementById('statBadSigs').textContent = s.invalid_signatures;
+  document.getElementById('statReplays').textContent = s.replay_attacks;
+  document.getElementById('statAudit').textContent = s.audit_entries_total;
+}
+
+// ─── DHT Map (canvas) ──────────────────────────────────────────
+function updateDHTMap() {
+  const canvas = document.getElementById('dhtCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 0.96;
+  canvas.height = 260;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  if (!peers.length) {
+    ctx.fillStyle = '#8b949e'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('No peers discovered', w/2, h/2);
+    return;
+  }
+
+  // Draw connections between peers (mesh)
+  ctx.strokeStyle = 'rgba(88,166,255,0.15)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < peers.length; i++) {
+    for (let j = i+1; j < peers.length; j++) {
+      const x1 = 20 + (i / peers.length) * (w - 40) + Math.sin(i * 1.7) * 30;
+      const y1 = 30 + (1 - peers[i].trust_score) * (h - 60) + Math.cos(i * 2.3) * 20;
+      const x2 = 20 + (j / peers.length) * (w - 40) + Math.sin(j * 1.7) * 30;
+      const y2 = 30 + (1 - peers[j].trust_score) * (h - 60) + Math.cos(j * 2.3) * 20;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+
+  // Draw peer nodes
+  for (let i = 0; i < peers.length; i++) {
+    const p = peers[i];
+    const x = 20 + (i / peers.length) * (w - 40) + Math.sin(i * 1.7) * 30;
+    const y = 30 + (1 - p.trust_score) * (h - 60) + Math.cos(i * 2.3) * 20;
+    const r = 4 + p.trust_score * 6;
+    const hue = p.is_trusted ? 140 : p.trust_score > 0.3 ? 40 : 0;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fillStyle = `hsl(${hue},70%,${50 + p.trust_score * 30}%)`;
+    ctx.fill();
+    ctx.strokeStyle = p.is_trusted ? '#3fb950' : '#30363d';
+    ctx.lineWidth = 1; ctx.stroke();
+  }
+}
+
+// ─── Neuron Graph (canvas) ─────────────────────────────────────
+function updateNeuronGraph() {
+  const canvas = document.getElementById('neuronCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 0.96;
+  canvas.height = 260;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Use last snapshot for neuron/synapse counts
+  const snap = history.length ? history[history.length-1] : null;
+  if (!snap || !snap.neuron_count) {
+    ctx.fillStyle = '#8b949e'; ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('No neural data', w/2, h/2);
+    return;
+  }
+
+  const neurons = Math.min(snap.neuron_count, 80);
+  const synapses = snap.synapse_count;
+  const act = snap.curiosity_drive || 0.5;
+
+  // Draw synapses (lines)
+  ctx.strokeStyle = `rgba(188,140,255,${0.05 + act * 0.15})`;
+  ctx.lineWidth = 1;
+  const points = [];
+  for (let i = 0; i < neurons; i++) {
+    const angle = (i / neurons) * Math.PI * 2;
+    const radius = 20 + (i % 11) * 10;
+    const x = w/2 + Math.cos(angle + Date.now()/10000) * radius;
+    const y = h/2 + Math.sin(angle + Date.now()/10000) * radius;
+    points.push({x,y,a: angle, active: Math.random() > 0.5});
+  }
+
+  // Random connections
+  for (let i = 0; i < Math.min(synapses, 200); i++) {
+    const a = Math.floor(Math.random() * points.length);
+    const b = Math.floor(Math.random() * points.length);
+    if (a === b) continue;
+    ctx.beginPath(); ctx.moveTo(points[a].x, points[a].y);
+    ctx.lineTo(points[b].x, points[b].y); ctx.stroke();
+  }
+
+  // Draw neuron nodes
+  for (const p of points) {
+    const r = p.active ? 3 : 1.5;
+    const alpha = p.active ? 0.8 : 0.3;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(188,140,255,${alpha})`;
+    ctx.fill();
+  }
+}
+
+// ─── Charts ────────────────────────────────────────────────────
+function initChart(id, label, color, fillColor) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label, data: [], borderColor: color, backgroundColor: fillColor, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 0 },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: true, ticks: { color: '#8b949e', maxTicksLimit: 10, font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' } },
+        y: { display: true, ticks: { color: '#8b949e', font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function updateCharts() {
+  if (!history.length) return;
+
+  // Learning chart
+  if (!learningChart) learningChart = initChart('learningChart', 'Surprise', '#bc8cff', 'rgba(188,140,255,0.1)');
+  const lData = history.map(s => s.total_surprise);
+  const lLabels = history.map(s => (s.timestamp_ms / 1000).toFixed(0) + 's');
+  learningChart.data.labels = lLabels;
+  learningChart.data.datasets[0].data = lData;
+  learningChart.update();
+
+  // Bandwidth chart
+  if (!bandwidthChart) {
+    bandwidthChart = new Chart(document.getElementById('bandwidthChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'In (bps)', data: [], borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+        { label: 'Out (bps)', data: [], borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.1)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { labels: { color: '#8b949e', boxWidth: 8, font: {size:9} } } },
+        scales: {
+          x: { ticks: { color: '#8b949e', maxTicksLimit: 10, font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' } },
+          y: { ticks: { color: '#8b949e', font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+  const bwLabels = history.map(s => (s.timestamp_ms / 1000).toFixed(0) + 's');
+  bandwidthChart.data.labels = bwLabels;
+  bandwidthChart.data.datasets[0].data = history.map(s => s.bps_in);
+  bandwidthChart.data.datasets[1].data = history.map(s => s.bps_out);
+  bandwidthChart.update();
+}
+
+// ─── Latency Heatmap ───────────────────────────────────────────
+function updateHeatmap() {
+  const container = document.getElementById('latencyHeatmap');
+  if (!peers.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);grid-column:1/-1;text-align:center;padding:20px">No peer data</div>';
+    return;
+  }
+  const maxRtt = Math.max(...peers.map(p => p.rtt_ms), 1);
+  container.innerHTML = peers.map(p => {
+    const intensity = Math.min(p.rtt_ms / maxRtt, 1);
+    const r = Math.round(240 * intensity);
+    const g = Math.round(180 * (1 - intensity));
+    const b = Math.round(80 * (1 - intensity));
+    return `<div class="heatmap-cell" style="background:rgb(${r},${g},${b})" title="${p.addr}: ${p.rtt_ms.toFixed(1)}ms">
+      <div>${p.addr.split('.')[0]}</div>
+      <div>${p.rtt_ms.toFixed(0)}ms</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Packet Stream ─────────────────────────────────────────────
+function updatePacketStream() {
+  const el = document.getElementById('packetStream');
+  if (!packetEvents.length) return;
+  const items = packetEvents.slice(-30).reverse().map(p => {
+    const cls = p.dir === 'in' ? 'pkt-in' : 'pkt-out';
+    const icon = p.dir === 'in' ? '⬅' : '➡';
+    const sz = formatBytes(p.size);
+    return `<div class="${cls}">${icon} seq=${p.seq} ${sz} ${p.is_reliable ? '📦' : '📨'} ${p.timestamp_ms}ms</div>`;
+  }).join('');
+  el.innerHTML = items;
+}
+
+// ─── Failure Stream ────────────────────────────────────────────
+function updateFailureStream() {
+  const el = document.getElementById('failureStream');
+  const snap = history.length ? history[history.length-1] : null;
+  if (!snap) return;
+  const failures = [];
+  if (snap.rate_limited_dropped > 0) failures.push(`⛔ ${snap.rate_limited_dropped} rate-limited packets dropped`);
+  if (snap.invalid_signatures > 0) failures.push(`🔑 ${snap.invalid_signatures} invalid signatures`);
+  if (snap.replay_attacks > 0) failures.push(`🔄 ${snap.replay_attacks} replay attacks blocked`);
+  if (snap.handshake_failures > 0) failures.push(`🤝 ${snap.handshake_failures} handshake failures`);
+
+  if (failures.length) {
+    el.innerHTML = failures.map(f => `<div class="pkt-drop">⚠ ${f}</div>`).join('');
+  } else {
+    el.innerHTML = '<div style="color:var(--green)">✅ No failures</div>';
+  }
+}
+
+// ─── Time Travel ───────────────────────────────────────────────
+function updateTimeTravel() {
+  const slider = document.getElementById('timeSlider');
+  slider.max = Math.max(history.length - 1, 0);
+  if (timeIdx < 0) timeIdx = slider.max;
+  showTimeSnapshot(timeIdx);
+}
+
+function timeTravel(val) {
+  timeIdx = parseInt(val);
+  showTimeSnapshot(timeIdx);
+}
+
+function showTimeSnapshot(idx) {
+  if (!history.length || idx < 0 || idx >= history.length) return;
+  const s = history[idx];
+  const total = history.length;
+  document.getElementById('ttPkts').textContent = s.packets_sent + s.packets_recv;
+  document.getElementById('ttBytes').textContent = formatBytes(s.bytes_sent + s.bytes_recv);
+  document.getElementById('ttPeers').textContent = s.peer_count;
+  document.getElementById('ttTrust').textContent = s.trust_score_avg.toFixed(3);
+  document.getElementById('timeLabel').textContent = `t=${s.timestamp_ms}ms`;
+  document.getElementById('timePos').textContent = `#${idx}/${total-1}`;
+}
+
+// ─── Controls ──────────────────────────────────────────────────
+function togglePause() {
+  paused = !paused;
+  document.querySelector('button:first-child').textContent = paused ? '▶ Play' : '⏸ Pause';
+}
+
+function switchView() {
+  const v = document.getElementById('viewSelect').value;
+  document.querySelectorAll('[data-view]').forEach(el => {
+    el.style.display = (v === 'all' || el.dataset.view === 'all' || el.dataset.view === v) ? 'block' : 'none';
+  });
+}
+
+function clearHistory() {
+  history = []; packetEvents = [];
+  if (learningChart) { learningChart.data.labels = []; learningChart.data.datasets[0].data = []; learningChart.update(); }
+}
+
+function exportJSON() {
+  const data = { history, packets: packetEvents, peers };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'neuron-wire-export.json'; a.click();
+}
+
+// ─── Helpers ───────────────────────────────────────────────────
+function formatBytes(b) {
+  if (b < 1000) return b + ' B';
+  if (b < 1e6) return (b/1000).toFixed(1) + ' KB';
+  return (b/1e6).toFixed(1) + ' MB';
+}
+
+function formatUptime(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if (h) return `${h}h ${m}m ${sec}s`;
+  if (m) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+// ─── SSE Stream (fallback to polling) ─────────────────────────
+let useSSE = false;
+let pollingTimer = null;
+
+function startPolling() {
+  fetchData();
+  pollingTimer = setInterval(fetchData, 1000);
+}
+
+function startSSE() {
+  const es = new EventSource('/events');
+  es.onmessage = (e) => {
+    if (paused) return;
+    try {
+      const snap = JSON.parse(e.data);
+      updateStats(snap);
+      history.push(snap);
+      if (history.length > MAX_HISTORY_POINTS) history.shift();
+      updateCharts();
+      updateTimeTravel();
+    } catch {}
+  };
+  es.onerror = () => { es.close(); startPolling(); };
+}
+
+// Try SSE, fallback to polling
+startSSE();
+switchView();
+
+// Periodic updates for canvas-based views
+setInterval(() => {
+  if (!paused) { updateDHTMap(); updateNeuronGraph(); }
+}, 2000);
+</script>
+</body>
+</html>

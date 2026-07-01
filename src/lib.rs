@@ -51,6 +51,7 @@ pub mod ml;
 // ── Security / Identity ───────────────────────────────────────
 pub mod audit;
 pub mod identity;
+pub mod observability;
 pub mod secure_channel;
 pub mod security;
 pub mod trust;
