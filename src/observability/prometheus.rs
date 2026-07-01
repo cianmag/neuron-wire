@@ -35,7 +35,7 @@ pub fn format_metrics(registry: &MetricsRegistry) -> String {
     out.push_str("# HELP neuron_wire_peer_rtt Per-peer RTT in ms\n");
     out.push_str("# TYPE neuron_wire_peer_rtt gauge\n");
     for peer in &peers {
-        let addr_safe = peer.addr.replace('.', "_").replace(':', "_");
+        let addr_safe = peer.addr.replace(['.', ':'], "_");
         out.push_str(&format!(
             "neuron_wire_peer_rtt{{addr=\"{}\",trust=\"{:.2}\"}} {}\n",
             addr_safe, peer.trust_score, peer.rtt_ms

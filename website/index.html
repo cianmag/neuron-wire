@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Neuron Wire Protocol — Decentralised Adaptive Runtime for Large-Scale Distributed Learning">
+<meta name="theme-color" content="#0a0a1a">
+<title>Neuron Wire Protocol</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a1a;
+    --bg-card: #111128;
+    --bg-card-hover: #161638;
+    --fg: #e0e0f0;
+    --fg-muted: #8888aa;
+    --accent: #00c8ff;
+    --accent-glow: rgba(0, 200, 255, 0.15);
+    --purple: #7c3aed;
+    --purple-glow: rgba(124, 58, 237, 0.15);
+    --border: #1e1e3a;
+    --radius: 12px;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+  a:hover { color: #66ddff; }
+
+  /* ── Utilities ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 100px 0 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 50%, var(--accent-glow) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 50%, var(--purple-glow) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .hero-content { position: relative; z-index: 1; }
+  .hero h1 {
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--fg) 0%, var(--accent) 50%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    color: var(--fg-muted);
+    max-width: 680px;
+    margin: 0 auto 32px;
+  }
+  .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 28px; border-radius: 8px;
+    font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; transition: all 0.25s; border: none;
+  }
+  .btn-primary {
+    background: var(--accent); color: #0a0a1a;
+  }
+  .btn-primary:hover { background: #66ddff; transform: translateY(-2px); box-shadow: 0 8px 24px var(--accent-glow); }
+  .btn-secondary {
+    background: transparent; color: var(--fg); border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+
+  /* ── Stats Bar ── */
+  .stats-bar {
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 0;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    text-align: center;
+  }
+  .stat-item { }
+  .stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }
+
+  /* ── Sections ── */
+  section { padding: 80px 0; }
+  .section-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .section-subtitle {
+    color: var(--fg-muted);
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 48px;
+    font-size: 1.05rem;
+  }
+
+  /* ── Feature Cards ── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+  }
+  .feature-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    transition: all 0.3s;
+  }
+  .feature-card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 200, 255, 0.08);
+  }
+  .feature-icon {
+    width: 48px; height: 48px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 16px;
+  }
+  .feature-icon.cyan { background: var(--accent-glow); color: var(--accent); }
+  .feature-icon.purple { background: var(--purple-glow); color: var(--purple); }
+  .feature-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+  .feature-card p { font-size: 0.9rem; color: var(--fg-muted); line-height: 1.55; }
+
+  /* ── Quick Start ── */
+  .quick-start-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .code-block {
+    background: #050512;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    color: #c0c0d0;
+  }
+  .code-block .prompt { color: var(--accent); }
+  .code-block .comment { color: #5a5a7a; }
+
+  /* ── Links ── */
+  .links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .link-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    transition: all 0.3s;
+  }
+  .link-card:hover {
+    border-color: var(--purple);
+    background: var(--bg-card-hover);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px var(--purple-glow);
+  }
+  .link-card .link-icon { font-size: 1.6rem; margin-bottom: 8px; }
+  .link-card h4 { font-size: 1rem; font-weight: 600; }
+  .link-card p { font-size: 0.8rem; color: var(--fg-muted); margin-top: 4px; }
+
+  /* ── Architecture ── */
+  .arch-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+  }
+  .arch-section h3 { font-size: 1.2rem; margin-bottom: 16px; color: var(--accent); }
+  .arch-section p { color: var(--fg-muted); margin-bottom: 16px; }
+  .arch-phases {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .phase-badge {
+    background: #050512;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+  .phase-badge .num { color: var(--accent); font-weight: 700; }
+  .phase-badge .label { color: var(--fg-muted); }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: auto;
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    text-align: center;
+    color: var(--fg-muted);
+    font-size: 0.85rem;
+  }
+  footer a { color: var(--fg-muted); }
+  footer a:hover { color: var(--accent); }
+  footer .license { margin-top: 8px; font-family: var(--font-mono); font-size: 0.78rem; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero { padding: 60px 0 40px; }
+    section { padding: 48px 0; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .stat-value { font-size: 1.3rem; }
+    .features-grid { grid-template-columns: 1fr; }
+    .arch-phases { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="container hero-content">
+    <h1>Neuron Wire Protocol</h1>
+    <p>Decentralised Adaptive Runtime for Large-Scale Distributed Learning &mdash; a P2P neural computation fabric where nodes discover peers, exchange activation gradients, and learn through Hebbian STDP without any central coordinator.</p>
+    <div class="hero-actions">
+      <a href="https://github.com/cianmag/neuron-wire" class="btn btn-primary">View on GitHub</a>
+      <a href="https://github.com/cianmag/neuron-wire/blob/master/ARCHITECTURE.md" class="btn btn-secondary">Architecture &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats-bar">
+  <div class="container stats-grid">
+    <div class="stat-item">
+      <div class="stat-value">&sim;8K</div>
+      <div class="stat-label">Lines of Rust</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">110+</div>
+      <div class="stat-label">Tests</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">8</div>
+      <div class="stat-label">CI Jobs</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">20</div>
+      <div class="stat-label">Roadmap Directions</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Features ── -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Key Features</h2>
+    <p class="section-subtitle">Neuron Wire is a purpose-built substrate for adaptive distributed neural computation &mdash; not a general-purpose ML framework retrofitted for distribution.</p>
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon cyan">&#9670;</div>
+        <h3>DHT Discovery</h3>
+        <p>Latency-weighted Kademlia routing with 256 k-buckets, peer caching, DNS seed bootstrapping, and failure-aware eviction. Every node finds its peers without a central registry.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon purple">&#8734;</div>
+        <h3>Hebbian Learning</h3>
+        <p>Spike-Timing-Dependent Plasticity (STDP) with local weight updates, micro-pruning of stale synapses, and cluster-biased gradient gossip to up to 3 peers per tick.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon cyan">&#9881;</div>
+        <h3>Deterministic Simulation</h3>
+        <p><code>--paper-mode</code> locks all RNG seeds, freezes parameters, and verifies output against known-good CSVs. Every benchmark is reproducible with one command.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon purple">&#9672;</div>
+        <h3>Observability</h3>
+        <p>Prometheus metrics, structured audit logging, continuous benchmark regression detection, and a live dashboard at <a href="https://neuron-wire-dashboard.vercel.app">neuron-wire-dashboard.vercel.app</a>.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Quick Start ── -->
+<section style="background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container">
+    <h2 class="section-title">Quick Start</h2>
+    <p class="section-subtitle">Zero external runtime dependencies. Build, test, and run in seconds.</p>
+    <div class="quick-start-grid">
+      <div class="code-block">
+        <span class="comment"># Clone and build</span><br>
+        <span class="prompt">$</span> git clone https://github.com/cianmag/neuron-wire<br>
+        <span class="prompt">$</span> cd neuron-wire<br>
+        <span class="prompt">$</span> cargo build --release
+      </div>
+      <div class="code-block">
+        <span class="comment"># Run 110+ tests</span><br>
+        <span class="prompt">$</span> cargo test<br>
+        <span class="comment"># Zero-warnings check</span><br>
+        <span class="prompt">$</span> cargo clippy -D warnings
+      </div>
+      <div class="code-block">
+        <span class="comment"># Deterministic simulation</span><br>
+        <span class="prompt">$</span> cargo run --example simulate -- --paper-mode<br>
+        <span class="prompt">  </span>   --nodes 10 --duration 120
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Links ── -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Explore</h2>
+    <div class="links-grid">
+      <a href="https://github.com/cianmag/neuron-wire" class="link-card">
+        <div class="link-icon">&#128187;</div>
+        <h4>GitHub</h4>
+        <p>Source code, issues, discussions</p>
+      </a>
+      <a href="https://github.com/cianmag/neuron-wire/blob/master/ARCHITECTURE.md" class="link-card">
+        <div class="link-icon">&#128214;</div>
+        <h4>Documentation</h4>
+        <p>Architecture, protocol spec, developer guide</p>
+      </a>
+      <a href="https://github.com/cianmag/neuron-wire/blob/master/ROADMAP.md" class="link-card">
+        <div class="link-icon">&#128640;</div>
+        <h4>Roadmap</h4>
+        <p>20 research directions from L1 to L5</p>
+      </a>
+      <a href="https://neuron-wire-dashboard.vercel.app" class="link-card">
+        <div class="link-icon">&#128300;</div>
+        <h4>Live Dashboard</h4>
+        <p>Real-time metrics and visualisation</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Architecture ── -->
+<section style="background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container">
+    <h2 class="section-title">Architecture</h2>
+    <p class="section-subtitle">A single-threaded, non-blocking engine loop owns the UDP socket and executes six phases every tick at ~400 KHz&ndash;1 MHz.</p>
+    <div class="arch-section">
+      <h3>6-Phase Engine Loop</h3>
+      <p>The engine is a lock-free <code>recv_from()</code> loop with a 1 ms read timeout &mdash; no Tokio, no async runtime, no scheduler jitter. Every tick it:</p>
+      <div class="arch-phases">
+        <div class="phase-badge"><span class="num">1</span> <span class="label">Drain UDP</span></div>
+        <div class="phase-badge"><span class="num">2</span> <span class="label">Drain Outbound</span></div>
+        <div class="phase-badge"><span class="num">3</span> <span class="label">Neural Compute</span></div>
+        <div class="phase-badge"><span class="num">4</span> <span class="label">Retransmit</span></div>
+        <div class="phase-badge"><span class="num">5</span> <span class="label">Apoptosis</span></div>
+        <div class="phase-badge"><span class="num">6</span> <span class="label">Yield</span></div>
+      </div>
+      <p style="margin-top: 20px; color: var(--fg-muted); font-size: 0.9rem;">
+        <strong style="color: var(--accent);">DHT:</strong> Latency-weighted Kademlia &bull;
+        <strong style="color: var(--purple);">Transport:</strong> Custom reliable UDP with 3 tiers &bull;
+        <strong style="color: var(--accent);">Neural:</strong> ForwardPass + Hebbian STDP + Neurogenesis + Apoptosis
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="container">
+    <p>
+      <a href="https://github.com/cianmag/neuron-wire">GitHub</a> &middot;
+      <a href="https://github.com/cianmag/neuron-wire/blob/master/ARCHITECTURE.md">Docs</a> &middot;
+      <a href="https://github.com/cianmag/neuron-wire/blob/master/ROADMAP.md">Roadmap</a> &middot;
+      <a href="https://neuron-wire-dashboard.vercel.app">Dashboard</a>
+    </p>
+    <p class="license">
+      MIT &amp; Apache-2.0 &copy; 2025&ndash;2026 Neuron Wire Contributors &mdash;
+      Built with Rust 2021 edition
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

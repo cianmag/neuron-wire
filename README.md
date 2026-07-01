@@ -3,15 +3,20 @@
 **A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![Tests](https://img.shields.io/badge/tests-77%2F77-brightgreen)](#)
-[![Lines of Rust](https://img.shields.io/badge/rust-7%2C975%20LOC-blue)](#)
-[![Crates.io](https://img.shields.io/badge/crate-v0.2.0-blue)](#)
+[![Tests](https://img.shields.io/badge/tests-110%2B-brightgreen)](#)
+[![Lines of Rust](https://img.shields.io/badge/rust-8%2C154%20LOC-blue)](#)
+[![Crates.io](https://img.shields.io/badge/crate-v0.3.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
+[![Discord](https://img.shields.io/badge/discord-join-5865F2)](https://discord.gg/neuron-wire)
+[![Documentation](https://img.shields.io/badge/docs-mdBook-00c853)](https://cianmag.github.io/neuron-wire)
+[![Website](https://img.shields.io/badge/website-project-7c3aed)](website/)
 [![Reproducible](https://img.shields.io/badge/reproducible-yes-brightgreen)](REPRODUCIBILITY.md)
 [![Architecture](https://img.shields.io/badge/architecture-formal-7c3aed)](ARCHITECTURE.md)
 [![Q&A](https://img.shields.io/badge/q%26a-foundational-ff6b6b)](FOUNDATIONAL_QNA.md)
 [![Roadmap](https://img.shields.io/badge/roadmap-20%20directions-ffc107)](ROADMAP.md)
 [![Lessons](https://img.shields.io/badge/lessons-learned-00c853)](LESSONS_LEARNED.md)
+[![Tutorials](https://img.shields.io/badge/tutorials-6%20series-00c8ff)](docs/src/tutorials/README.md)
+[![Good First Issue](https://img.shields.io/badge/good%20first%20issue-welcome-7057ff)](https://github.com/cianmag/neuron-wire/issues?q=is:issue+is:open+label:"good+first+issue")
 
 ---
 
