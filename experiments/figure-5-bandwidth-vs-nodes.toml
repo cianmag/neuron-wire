@@ -1,0 +1,17 @@
+[experiment]
+name = "figure-5-bandwidth-vs-nodes"
+description = "Bandwidth scaling with network size (Figure 5)"
+paper_mode = true
+seed = 42
+trials = 3
+
+[simulation]
+node_count = 25
+duration_secs = 30
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[output]
+directory = "results/figure-5"
+include_raw_logs = false
+snapshot_interval_ticks = 100

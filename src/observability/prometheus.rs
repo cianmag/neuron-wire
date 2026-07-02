@@ -46,11 +46,26 @@ pub fn format_metrics(registry: &MetricsRegistry) -> String {
     if let Some(snap) = registry.get_history().last() {
         out.push_str("# HELP neuron_wire_throughput_bytes_per_sec Instantaneous throughput\n");
         out.push_str("# TYPE neuron_wire_throughput_bytes_per_sec gauge\n");
-        out.push_str(&format!("neuron_wire_bps_in {} {}\n", snap.bps_in, snap.timestamp_ms));
-        out.push_str(&format!("neuron_wire_bps_out {} {}\n", snap.bps_out, snap.timestamp_ms));
-        out.push_str(&format!("neuron_wire_pps_in {} {}\n", snap.pps_in, snap.timestamp_ms));
-        out.push_str(&format!("neuron_wire_pps_out {} {}\n", snap.pps_out, snap.timestamp_ms));
-        out.push_str(&format!("neuron_wire_tick_rate_hz {} {}\n", snap.tick_rate_hz, snap.timestamp_ms));
+        out.push_str(&format!(
+            "neuron_wire_bps_in {} {}\n",
+            snap.bps_in, snap.timestamp_ms
+        ));
+        out.push_str(&format!(
+            "neuron_wire_bps_out {} {}\n",
+            snap.bps_out, snap.timestamp_ms
+        ));
+        out.push_str(&format!(
+            "neuron_wire_pps_in {} {}\n",
+            snap.pps_in, snap.timestamp_ms
+        ));
+        out.push_str(&format!(
+            "neuron_wire_pps_out {} {}\n",
+            snap.pps_out, snap.timestamp_ms
+        ));
+        out.push_str(&format!(
+            "neuron_wire_tick_rate_hz {} {}\n",
+            snap.tick_rate_hz, snap.timestamp_ms
+        ));
     }
 
     out

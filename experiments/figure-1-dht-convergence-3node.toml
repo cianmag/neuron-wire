@@ -1,0 +1,17 @@
+[experiment]
+name = "figure-1-dht-convergence-3node"
+description = "Three-node DHT convergence baseline (Figure 1)"
+paper_mode = true
+seed = 42
+trials = 1
+
+[simulation]
+node_count = 3
+duration_secs = 10
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[output]
+directory = "results/figure-1"
+include_raw_logs = true
+snapshot_interval_ticks = 100

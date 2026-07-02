@@ -1,0 +1,17 @@
+[experiment]
+name = "figure-2-dht-convergence-10node"
+description = "Ten-node DHT convergence scaling (Figure 2)"
+paper_mode = true
+seed = 42
+trials = 3
+
+[simulation]
+node_count = 10
+duration_secs = 30
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[output]
+directory = "results/figure-2"
+include_raw_logs = false
+snapshot_interval_ticks = 100

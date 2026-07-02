@@ -301,8 +301,16 @@ impl TrustSystem {
     /// Get statistics about the trust system.
     pub fn stats(&self) -> TrustStats {
         let total = self.peers.len();
-        let trusted = self.peers.values().filter(|p| p.score >= TRUSTED_THRESHOLD).count();
-        let sybil = self.peers.values().filter(|p| p.score < SYBIL_THRESHOLD).count();
+        let trusted = self
+            .peers
+            .values()
+            .filter(|p| p.score >= TRUSTED_THRESHOLD)
+            .count();
+        let sybil = self
+            .peers
+            .values()
+            .filter(|p| p.score < SYBIL_THRESHOLD)
+            .count();
         let rate_limited = self.peers.values().filter(|p| p.rate_limited).count();
 
         TrustStats {
@@ -381,7 +389,10 @@ mod tests {
 
         let score = ts.trust_score(&peer);
         assert!(score > INITIAL_TRUST, "positive events must increase trust");
-        assert!(score >= 0.70, "5 sig verifications should bring trust above 0.7");
+        assert!(
+            score >= 0.70,
+            "5 sig verifications should bring trust above 0.7"
+        );
     }
 
     #[test]
@@ -392,7 +403,10 @@ mod tests {
         ts.record_event(peer, TrustEvent::InvalidSignature);
         let score = ts.trust_score(&peer);
         assert!(score < INITIAL_TRUST, "invalid sig must decrease trust");
-        assert!(score < SYBIL_THRESHOLD, "invalid sig should drop below sybil threshold");
+        assert!(
+            score < SYBIL_THRESHOLD,
+            "invalid sig should drop below sybil threshold"
+        );
     }
 
     #[test]
@@ -471,7 +485,10 @@ mod tests {
 
         // First 100 packets should be fine
         for _ in 0..100 {
-            assert!(!ts.check_rate_limit(&peer), "should not hit global limit yet");
+            assert!(
+                !ts.check_rate_limit(&peer),
+                "should not hit global limit yet"
+            );
         }
 
         // 101st should be limited (trusted peer)

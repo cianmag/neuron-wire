@@ -21,7 +21,9 @@
 //! [32-95]  signature:  [u8; 64]    = Ed25519 over (seq || timestamp || body_hash)
 //! ```
 
-use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, VerifyingKey, SECRET_KEY_LENGTH};
+use ed25519_dalek::{
+    Signature, SignatureError, Signer, SigningKey, VerifyingKey, SECRET_KEY_LENGTH,
+};
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -282,8 +284,7 @@ mod tests {
         let sig_bytes: [u8; SIGNATURE_LENGTH] = sig.to_bytes();
         let pk_bytes = id.public_key_bytes();
 
-        let result =
-            verify_packet_signature(&pk_bytes, 42, 1_234_567_890, &body_hash, &sig_bytes);
+        let result = verify_packet_signature(&pk_bytes, 42, 1_234_567_890, &body_hash, &sig_bytes);
         assert!(result.is_ok(), "packet signature must verify");
 
         // Wrong seq should fail
@@ -292,8 +293,7 @@ mod tests {
 
         // Wrong body hash should fail
         let wrong_hash = Sha256::digest(b"tampered").into();
-        let wrong =
-            verify_packet_signature(&pk_bytes, 42, 1_234_567_890, &wrong_hash, &sig_bytes);
+        let wrong = verify_packet_signature(&pk_bytes, 42, 1_234_567_890, &wrong_hash, &sig_bytes);
         assert!(wrong.is_err(), "tampered hash must fail verification");
     }
 

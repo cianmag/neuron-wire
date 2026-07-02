@@ -315,11 +315,7 @@ impl AuditLog {
 
     /// Get entries in a range.
     pub fn get_entries(&self, offset: usize, limit: usize) -> Vec<&AuditEntry> {
-        self.entries
-            .iter()
-            .skip(offset)
-            .take(limit)
-            .collect()
+        self.entries.iter().skip(offset).take(limit).collect()
     }
 
     /// Get all entries.
@@ -526,15 +522,13 @@ mod tests {
     fn test_checkpointing() {
         let mut log = AuditLog::new();
         for i in 0..CHECKPOINT_INTERVAL + 5 {
-            log.append(
-                AuditEventType::PeerDiscovered,
-                &format!("peer_{}", i),
-                None,
-            );
+            log.append(AuditEventType::PeerDiscovered, &format!("peer_{}", i), None);
         }
 
-        assert!(log.last_checkpoint_hash() != [0u8; 32],
-                "checkpoint hash should be set after CHECKPOINT_INTERVAL entries");
+        assert!(
+            log.last_checkpoint_hash() != [0u8; 32],
+            "checkpoint hash should be set after CHECKPOINT_INTERVAL entries"
+        );
         assert!(log.verify_integrity());
     }
 }

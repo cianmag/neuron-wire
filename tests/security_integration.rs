@@ -5,8 +5,8 @@
 
 #[cfg(test)]
 mod tests {
-    use neuron_wire::security::*;
     use neuron_wire::components::EntityId;
+    use neuron_wire::security::*;
 
     /// Generate an IPv4-mapped EntityId for testing.
     fn test_eid(id: u8) -> EntityId {
@@ -34,23 +34,13 @@ mod tests {
         let sig = alice.sign_packet(seq, ts, &body_hash);
         let sig_bytes: [u8; SIGNATURE_LENGTH] = sig.to_bytes();
 
-        let verify_result = verify_packet_signature(
-            &alice.public_key_bytes(),
-            seq,
-            ts,
-            &body_hash,
-            &sig_bytes,
-        );
+        let verify_result =
+            verify_packet_signature(&alice.public_key_bytes(), seq, ts, &body_hash, &sig_bytes);
         assert!(verify_result.is_ok(), "signature must verify");
 
         // Wrong public key should fail
-        let wrong_verify = verify_packet_signature(
-            &bob.public_key_bytes(),
-            seq,
-            ts,
-            &body_hash,
-            &sig_bytes,
-        );
+        let wrong_verify =
+            verify_packet_signature(&bob.public_key_bytes(), seq, ts, &body_hash, &sig_bytes);
         assert!(wrong_verify.is_err(), "wrong key must fail verification");
 
         // ── 3. Secure channel handshake + encryption ──────────────
@@ -150,7 +140,10 @@ mod tests {
 
         // Generate bootstrap proof
         let proof = audit.bootstrap_proof();
-        assert!(audit.verify_bootstrap(&proof), "bootstrap proof must verify");
+        assert!(
+            audit.verify_bootstrap(&proof),
+            "bootstrap proof must verify"
+        );
 
         // ── 6. EntityId derivation ──────────────────────────────
         let derived_eid = entity_id_from_public_key(&alice.public_key_bytes());

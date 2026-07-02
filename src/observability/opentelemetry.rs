@@ -124,7 +124,9 @@ impl TraceCollector {
     /// Begin a span, pushing it onto the stack.
     /// Returns the span ID.
     pub fn begin_span(&mut self, name: &str) -> String {
-        let parent_id = self.trace_stack.last()
+        let parent_id = self
+            .trace_stack
+            .last()
             .map(|s| s.span_id.clone())
             .unwrap_or_default();
 

@@ -123,7 +123,9 @@ impl SecureChannel {
 
         // Evict oldest if at capacity
         if self.sessions.len() >= MAX_PEERS {
-            if let Some(oldest_key) = self.sessions.iter()
+            if let Some(oldest_key) = self
+                .sessions
+                .iter()
                 .min_by_key(|(_, s)| s.last_activity_ms)
                 .map(|(k, _)| *k)
             {
@@ -159,8 +161,7 @@ impl SecureChannel {
         nonce[12..].copy_from_slice(&counter.to_be_bytes());
 
         // Use XChaCha20Poly1305 with a 24-byte nonce (expand our 16-byte one)
-        let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key)
-            .expect("valid key");
+        let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key).expect("valid key");
         let xnonce = XNonce::from_slice(&nonce[..24.min(NONCE_SIZE)]);
 
         let payload = Payload {
@@ -186,10 +187,7 @@ impl SecureChannel {
         let session = self.sessions.get_mut(session_id)?;
 
         // Replay protection: extract counter from nonce
-        let counter = u64::from_be_bytes([
-            nonce[12], nonce[13], nonce[14], nonce[15],
-            0, 0, 0, 0,
-        ]);
+        let counter = u64::from_be_bytes([nonce[12], nonce[13], nonce[14], nonce[15], 0, 0, 0, 0]);
 
         // Reject if counter is less than max seen (or within drift window)
         if counter <= session.max_received_nonce {
@@ -220,8 +218,7 @@ impl SecureChannel {
         session.last_activity_ms = now_ms;
 
         // Decrypt
-        let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key)
-            .expect("valid key");
+        let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key).expect("valid key");
         let xnonce = XNonce::from_slice(&nonce[..24.min(NONCE_SIZE)]);
 
         let payload = Payload {
@@ -363,13 +360,11 @@ mod tests {
         let (nonce, ciphertext) = alice_channel
             .encrypt(&alice_session, b"msg1", b"nwp")
             .expect("encrypt");
-        let decrypted = bob_channel
-            .decrypt(&bob_session, &nonce, &ciphertext, b"nwp");
+        let decrypted = bob_channel.decrypt(&bob_session, &nonce, &ciphertext, b"nwp");
         assert!(decrypted.is_some(), "first decrypt must succeed");
 
         // Replay the same packet
-        let replayed = bob_channel
-            .decrypt(&bob_session, &nonce, &ciphertext, b"nwp");
+        let replayed = bob_channel.decrypt(&bob_session, &nonce, &ciphertext, b"nwp");
         assert!(replayed.is_none(), "replay must be rejected");
     }
 
@@ -389,8 +384,7 @@ mod tests {
             .expect("encrypt");
 
         // Bob decrypts with wrong AAD
-        let tampered = bob_channel
-            .decrypt(&bob_session, &nonce, &ciphertext, b"wrong");
+        let tampered = bob_channel.decrypt(&bob_session, &nonce, &ciphertext, b"wrong");
         assert!(tampered.is_none(), "wrong AAD must fail decryption");
     }
 
@@ -421,11 +415,9 @@ mod tests {
         let key = SecureChannel::generate_key();
         let msg = b"standalone test message";
 
-        let (nonce, ct) = SecureChannel::encrypt_raw(&key, msg, b"nwp")
-            .expect("raw encrypt");
+        let (nonce, ct) = SecureChannel::encrypt_raw(&key, msg, b"nwp").expect("raw encrypt");
 
-        let pt = SecureChannel::decrypt_raw(&key, &nonce, &ct, b"nwp")
-            .expect("raw decrypt");
+        let pt = SecureChannel::decrypt_raw(&key, &nonce, &ct, b"nwp").expect("raw decrypt");
         assert_eq!(&pt, msg, "raw encrypt/decrypt roundtrip");
     }
 }

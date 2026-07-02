@@ -34,10 +34,7 @@ fn parse_args() -> (String, u16, Option<String>) {
             }
             "--port" => {
                 i += 1;
-                port = args
-                    .get(i)
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(port);
+                port = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(port);
             }
             "--connect" => {
                 i += 1;

@@ -1,0 +1,23 @@
+[experiment]
+name = "figure-10-sga-comparison"
+description = "Sparse Gossip Aging vs Fixed Gossip comparison (Figure 10)"
+paper_mode = true
+seed = 42
+trials = 5
+
+[simulation]
+node_count = 25
+duration_secs = 30
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[sga]
+enabled = true
+aging_factor = 0.7
+min_fanout = 2
+max_fanout = 5
+
+[output]
+directory = "results/figure-10"
+include_raw_logs = false
+snapshot_interval_ticks = 100

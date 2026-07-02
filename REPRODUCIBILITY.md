@@ -1,88 +1,106 @@
 # Reproducibility Guide
 
-**Can another developer run `cargo run --example simulate ...` and get the same results?**
-**Yes — and they don't need to know you.**
+**Can another developer clone this repo and get the same results?**
+**Yes — one command, guaranteed.**
+
+```bash
+bash scripts/reproduce.sh
+```
+
+That single command:
+1. Captures full environment (compiler, OS, CPU, deps, source hashes)
+2. Builds the release binary
+3. Runs every experiment in `experiments/`
+4. Validates output against `known-good/` reference data
+5. Generates publication-ready figures
 
 ---
 
-## Quick Start (5 minutes)
+## One-Command Reproduction
 
 ```bash
-# 1. Clone
-git clone https://github.com/cianmag/neuron-wire
-cd neuron-wire
+# Full reproduction (all figures)
+bash scripts/reproduce.sh
 
-# 2. Build & run paper-mode benchmark
-cargo run --example simulate -- --paper-mode --nodes 3 --duration 10
+# Individual figure
+bash scripts/reproduce.sh --figures 1
 
-# 3. Verify against known-good
-pip install -r scripts/requirements.txt  # optional (just needs python3)
-python scripts/validate_repro.py results/experiment_*/ --known-good known-good/
+# Range of figures
+bash scripts/reproduce.sh --figures 1-5
+
+# Validate against known-good only (fast)
+bash scripts/reproduce.sh --validate
+
+# Regenerate plots from existing data (no re-run)
+bash scripts/reproduce.sh --plots-only
 ```
 
-Expected output:
+### Output Structure
+
 ```
-✅ REPRODUCTION VERIFIED — results match known-good
+results/
+├── env/                          # Full environment capture
+│   └── 20260701-120000/
+│       ├── metadata.json         # Consolidated JSON
+│       ├── commit.txt            # Git commit hash (SHA)
+│       ├── branch.txt
+│       ├── rustc.txt             # rustc --version
+│       ├── cargo.txt             # cargo --version
+│       ├── rustup.txt            # Active toolchain
+│       ├── os.txt                # OS name/version
+│       ├── kernel.txt            # uname -a
+│       ├── cpu.txt               # CPU model name
+│       ├── cpu_cores.txt         # Core count
+│       ├── memory.txt            # Total RAM
+│       ├── hostname.txt
+│       ├── dependencies.txt      # Full cargo tree
+│       ├── dependencies-compact.txt
+│       └── source-hashes.txt     # SHA256 of every .rs file
+├── figure-1-dht-convergence-3node/
+│   ├── experiment.toml           # Frozen config snapshot
+│   ├── metadata.json             # Per-run metadata
+│   ├── summary.csv               # Per-trial aggregation
+│   ├── convergence.csv           # Per-tick peer convergence
+│   ├── bandwidth.csv             # Bandwidth over time
+│   ├── routing.csv               # DHT peer counts
+│   ├── apoptosis.csv             # Death counts
+│   ├── output-hashes.txt         # SHA256 of all outputs
+│   └── raw/                      # Per-node JSONL logs
+├── figure-2-.../
+│   └── ...                       # Same structure
+├── figures/                      # Publication-ready plots (PNG/PDF/SVG)
+│   ├── figure-1-*.png
+│   ├── figure-2-*.png
+│   └── ...
+└── reproduction-summary-*.csv    # One-row-per-figure status table
 ```
 
 ---
 
 ## What "Reproducible" Means
 
-The DHT convergence benchmark is **deterministic** given the same seed.
+Every experiment output directory captures **everything** needed to prove nothing was fabricated:
 
-| Property | Guarantee |
-|----------|-----------|
-| **Seed-driven RNG** | Same `--seed` → identical node IDs, identical timing |
-| **Paper mode** (`--paper-mode`) | Forces `seed=42`, disables non-deterministic logging |
-| **Synchronized start** | All nodes launched before simulation begins |
-| **No external dependencies** | Pure Rust + stdlib + UDP loopback (no Tokio, no DB) |
-| **Cross-platform** | Tested on Windows 10, should work on Linux/macOS |
+| Artifact | What It Contains |
+|----------|-----------------|
+| `experiment.toml` | Every configuration parameter frozen at experiment time |
+| `metadata.json` | Git commit, rustc version, OS, CPU, RAM, hostname, timestamp |
+| `summary.csv` | Per-trial aggregation (converged, conv_time, bandwidth, peers, packets) |
+| `convergence.csv` | Per-tick peer progression for every node |
+| `bandwidth.csv` | Aggregate bytes in/out per second |
+| `routing.csv` | DHT peer count per node over time |
+| `apoptosis.csv` | Death counts per apoptosis sweep |
+| `raw/node_NNN.jsonl` | Per-node event log (if `include_raw_logs=true`) |
+| `output-hashes.txt` | SHA256 of every output file — verifiable independence |
+| `source-hashes.txt` | SHA256 of every `.rs` file in `src/` |
 
----
-
-## Full Benchmark Suite
-
-Reproduce every result in the paper:
-
-```bash
-# Fast smoke test (30s)
-cargo run --example simulate -- --paper-mode --nodes 3 --duration 10
-
-# 5-node benchmark (25s)
-cargo run --example simulate -- --paper-mode --nodes 5 --duration 25 --output-dir results/5node-repro
-
-# 10-node benchmark (30s)
-cargo run --example simulate -- --paper-mode --nodes 10 --duration 30 --output-dir results/10node-repro
-
-# 25-node benchmark (30s)
-cargo run --example simulate -- --paper-mode --nodes 25 --duration 30 --output-dir results/25node-repro
-
-# 50-node benchmark (40s — requires ~8 CPU cores)
-cargo run --example simulate -- --paper-mode --nodes 50 --duration 40 --output-dir results/50node-repro
-```
-
-### Multi-trial statistics
-
-```bash
-# 10 trials of 5 nodes (4 min)
-cargo run --example simulate -- --paper-mode --nodes 5 --duration 25 --trials 10
-```
-
----
-
-## Expected Results
-
-| Nodes | Duration | Conv Rate | Conv Time | Max Peers | Avg Peers |
-|-------|----------|-----------|-----------|-----------|-----------|
-| 3     | 10s      | 100%      | 3.0s      | 2/2       | 1.40      |
-| 5     | 25s      | 100%      | 3.0s      | 4/4       | 3.52      |
-| 10    | 30s      | 100%      | 3.0s      | 9/9       | 8.10      |
-| 25    | 30s      | 100%      | 3.0s      | 24/24     | 21.60     |
-| 50    | 40s      | 100%      | 4.0s      | 49/49     | 45.35     |
-
-**Convergence is defined as** the first sample where every node knows every other node
-in its routing table. Reported values are mean across trials.
+**If someone questions the results, they get:**
+- The exact commit (`git checkout <hash>`)
+- The exact compiler (`rustc <version>`)
+- The exact config (`experiment.toml`)
+- The exact OS and hardware (`os.txt`, `cpu.txt`, `memory.txt`)
+- The exact output hashes to verify integrity
+- A one-command script to regenerate everything from scratch
 
 ---
 
@@ -91,7 +109,7 @@ in its routing table. Reported values are mean across trials.
 The validation script compares simulation output against known-good CSVs:
 
 ```bash
-python scripts/validate_repro.py <output-dir> --known-good known-good/
+python3 scripts/validate_repro.py <results-dir> --known-good known-good/
 ```
 
 Exits with code 0 on match, 1 on mismatch with a diff report.
@@ -101,34 +119,115 @@ Checked fields: `{nodes, converged, conv_time_s, max_peers, avg_peers, bw_kbps, 
 
 Known-good values are stored in `known-good/`:
 
-- `known-good/benchmark-3node-paper.csv`
-- `known-good/benchmark-5node-paper.csv`
-- `known-good/benchmark-5node-paper-convergence.csv` (full per-tick peer progression)
-- `known-good/benchmark-10node-paper.csv`
+```
+known-good/
+├── figure-1-dht-convergence-3node/
+│   ├── summary.csv
+│   └── convergence.csv
+├── figure-2-dht-convergence-10node/
+│   └── ...
+└── ...
+```
 
-These are the same files the CI runner checks against.
+These are the same files the CI runner checks against. To update known-good after a verified change:
 
----
-
-## CI (GitHub Actions)
-
-Every push runs:
-
-1. `cargo build` — must compile without errors
-2. `cargo test` — all 60+ unit tests
-3. `cargo run --example simulate -- --paper-mode --nodes 3 --duration 10` — quick benchmark
-4. `python scripts/validate_repro.py` — verifies against known-good
-
-Badge: [![build](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions)
+```bash
+bash scripts/reproduce.sh
+cp -r results/figure-* known-good/
+git add known-good/
+```
 
 ---
 
-## Live Dashboard
+## Experiments
 
-The benchmark results power a live public dashboard:
+Pre-configured experiment files live in `experiments/`:
 
-**https://neuron-wire-dashboard.vercel.app**
+| File | Description | Runtime |
+|------|-------------|---------|
+| `figure-1-dht-convergence-3node.toml` | 3-node DHT convergence baseline | ~10s |
+| `figure-2-dht-convergence-10node.toml` | 10-node DHT convergence scaling | ~30s |
+| `figure-3-dht-convergence-25node.toml` | 25-node DHT convergence scaling | ~30s |
+| `figure-4-convergence-time-scaling.toml` | Convergence time vs node count | ~60s |
+| `figure-5-bandwidth-vs-nodes.toml` | Bandwidth scaling with network size | ~30s |
+| `figure-6-node-churn-recovery.toml` | Node churn and recovery behavior | ~60s |
+| `figure-7-failure-injection.toml` | Adversarial failure injection | ~45s |
+| `figure-8-multi-trial-stats.toml` | Multi-trial statistical analysis | ~5min |
+| `figure-9-dashboard-visualization.toml` | Dashboard visualization benchmark | ~25s |
+| `figure-10-sga-comparison.toml` | SGA vs Fixed gossip comparison | ~30s |
 
-Shows: animated network topology, convergence time scaling, bandwidth scaling,
-peer discovery timeline, full results table, churn statistics.
-All data sourced from the same benchmark CSVs in `results/`.
+---
+
+## CI
+
+Every push runs the reproducibility pipeline:
+
+```yaml
+# .github/workflows/repro.yml
+- cargo build --release
+- bash scripts/reproduce.sh --figures 1   # Fast smoke test
+- python3 scripts/validate_repro.py results/ --known-good known-good/
+```
+
+Badges:
+[![repro](https://github.com/cianmag/neuron-wire/actions/workflows/repro.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions)
+
+---
+
+## Environment Captured
+
+| Field | Source | Format |
+|-------|--------|--------|
+| Git commit | `git rev-parse HEAD` | SHA (40 hex chars) |
+| Git branch | `git rev-parse --abbrev-ref HEAD` | String |
+| Git tag | `git describe --tags --exact-match` | String |
+| Uncommitted changes | `git status --porcelain \| wc -l` | Integer |
+| Repository URL | `git remote get-url origin` | URL |
+| Rust compiler version | `rustc --version` | String |
+| Cargo version | `cargo --version` | String |
+| Active toolchain | `rustup show active-toolchain` | String |
+| OS name/version | `/etc/os-release` or `sw_vers` | String |
+| Kernel | `uname -a` | String |
+| CPU model | `/proc/cpuinfo` or `sysctl` | String |
+| CPU cores | `/proc/cpuinfo \| grep processor \| wc -l` | Integer |
+| Total RAM | `/proc/meminfo` or `sysctl` | String |
+| Hostname | `hostname` | String |
+| Full dependency tree | `cargo tree --prefix depth` | Text |
+| Source file hashes | `sha256sum src/**/*.rs` | SHA256 |
+| Output file hashes | `sha256sum results/**/*.csv` | SHA256 |
+
+---
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/reproduce.sh` | One-command full reproduction |
+| `scripts/capture_env.sh` | Full environment metadata capture |
+| `scripts/generate_figures.py` | Publication-ready figure generation |
+| `scripts/validate_repro.py` | Output comparison against known-good |
+| `scripts/check_bench_regressions.py` | Benchmark regression detection |
+
+---
+
+## Quick Reference
+
+```bash
+# 1. Clone
+git clone https://github.com/cianmag/neuron-wire
+cd neuron-wire
+
+# 2. Full reproduction (30-60 min, all figures)
+bash scripts/reproduce.sh
+
+# 3. Smoke test (10s)
+bash scripts/reproduce.sh --figures 1
+
+# 4. Check results
+ls results/
+ls results/figures/
+
+# 5. Verify integrity
+cat results/env/*/source-hashes.txt
+cat results/figure-1-*/output-hashes.txt
+```

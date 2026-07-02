@@ -1,0 +1,17 @@
+[experiment]
+name = "figure-4-convergence-time-scaling"
+description = "Convergence time vs node count scaling law (Figure 4)"
+paper_mode = true
+seed = 42
+trials = 5
+
+[simulation]
+node_count = 50
+duration_secs = 60
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[output]
+directory = "results/figure-4"
+include_raw_logs = false
+snapshot_interval_ticks = 100

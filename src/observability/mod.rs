@@ -16,5 +16,8 @@ pub mod opentelemetry;
 pub mod prometheus;
 
 pub use dashboard::{spawn_dashboard, DashboardConfig, DashboardState};
-pub use metrics::{MetricsRegistry, MetricsSnapshot, PacketEvent, PeerLatencyStats, MAX_HISTORY, SAMPLE_INTERVAL_TICKS};
+pub use metrics::{
+    MetricsRegistry, MetricsSnapshot, PacketEvent, PeerLatencyStats, MAX_HISTORY,
+    SAMPLE_INTERVAL_TICKS,
+};
 pub use opentelemetry::{Span, TraceCollector};

@@ -9,8 +9,10 @@ fn bench_ml_tick_n1000(c: &mut Criterion) {
     //   name = "bench_ml"
     //   harness = false
 
+    use neuron_wire::components::{
+        ActivationComponent, ActivationMap, EntityId, SynapseComponent, SynapseMap,
+    };
     use neuron_wire::ml::MLSystem;
-    use neuron_wire::components::{ActivationMap, ActivationComponent, SynapseMap, SynapseComponent, EntityId};
 
     let mut ml = MLSystem::new();
     let mut activations = ActivationMap::new();
@@ -50,8 +52,14 @@ fn bench_ml_tick_n1000(c: &mut Criterion) {
             .take(syn_per_neuron)
             .copied()
             .collect();
-        let weights = targets.iter().map(|_| rand::random::<f32>() * 2.0 - 1.0).collect();
-        let grads = targets.iter().map(|_| rand::random::<f32>() * 0.1).collect();
+        let weights = targets
+            .iter()
+            .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+            .collect();
+        let grads = targets
+            .iter()
+            .map(|_| rand::random::<f32>() * 0.1)
+            .collect();
 
         synapses.insert(
             *e,
@@ -67,7 +75,12 @@ fn bench_ml_tick_n1000(c: &mut Criterion) {
 
     c.bench_function("ml_tick_1000x100", |b| {
         b.iter(|| {
-            let _report = ml.tick(black_box(tick), &mut activations, &mut synapses, &observations);
+            let _report = ml.tick(
+                black_box(tick),
+                &mut activations,
+                &mut synapses,
+                &observations,
+            );
         })
     });
 

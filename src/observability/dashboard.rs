@@ -155,7 +155,9 @@ fn handle_connection(mut stream: TcpStream, state: Arc<DashboardState>) {
             ok_response("application/json", &json)
         }
         ("GET", "/api/spans") => {
-            let spans = state.trace_collector.lock()
+            let spans = state
+                .trace_collector
+                .lock()
                 .map(|tc| tc.get_spans().to_vec())
                 .unwrap_or_default();
             let json = serde_json::to_string_pretty(&spans).unwrap_or_default();
@@ -171,14 +173,17 @@ fn handle_connection(mut stream: TcpStream, state: Arc<DashboardState>) {
         }
         ("GET", "/api/volumes") => {
             let peers = state.metrics.get_peer_latencies();
-            let volumes: Vec<serde_json::Value> = peers.iter().map(|p| {
-                serde_json::json!({
-                    "addr": p.addr,
-                    "packets_exchanged": p.packets_exchanged,
-                    "rtt_ms": p.rtt_ms,
-                    "trust_score": p.trust_score,
+            let volumes: Vec<serde_json::Value> = peers
+                .iter()
+                .map(|p| {
+                    serde_json::json!({
+                        "addr": p.addr,
+                        "packets_exchanged": p.packets_exchanged,
+                        "rtt_ms": p.rtt_ms,
+                        "trust_score": p.trust_score,
+                    })
                 })
-            }).collect();
+                .collect();
             let json = serde_json::to_string_pretty(&volumes).unwrap_or_default();
             ok_response("application/json", &json)
         }

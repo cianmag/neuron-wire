@@ -1,0 +1,17 @@
+[experiment]
+name = "figure-9-dashboard-screenshot"
+description = "Benchmark for live dashboard visualization (Figure 9)"
+paper_mode = false
+seed = 42
+trials = 1
+
+[simulation]
+node_count = 5
+duration_secs = 25
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[output]
+directory = "results/figure-9"
+include_raw_logs = false
+snapshot_interval_ticks = 50

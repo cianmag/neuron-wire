@@ -254,62 +254,138 @@ impl MetricsRegistry {
 
     // ── Counter increment helpers ──────────────────────────────
 
-    pub fn inc_packets_sent(&self)  { self.inner.packets_sent.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_packets_recv(&self)  { self.inner.packets_recv.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_bytes_sent(&self, n: u64) { self.inner.bytes_sent.fetch_add(n, Ordering::Relaxed); }
-    pub fn inc_bytes_recv(&self, n: u64) { self.inner.bytes_recv.fetch_add(n, Ordering::Relaxed); }
-    pub fn inc_ticks(&self)         { self.inner.ticks_total.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_idle(&self)          { self.inner.idle_ticks.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_busy(&self)          { self.inner.busy_ticks.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_rate_limited(&self)  { self.inner.rate_limited_dropped.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_handshake_ok(&self)  { self.inner.handshake_successes.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_handshake_fail(&self){ self.inner.handshake_failures.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_bad_sig(&self)       { self.inner.invalid_signatures.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_replay(&self)        { self.inner.replay_attacks.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_audit_entry(&self)   { self.inner.audit_entries_total.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_neurons_born(&self)  { self.inner.neurons_born.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_neurons_died(&self)  { self.inner.neurons_died.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_synapses_created(&self) { self.inner.synapses_created.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_synapses_pruned(&self)  { self.inner.synapses_pruned.fetch_add(1, Ordering::Relaxed); }
-    pub fn inc_gossip(&self)        { self.inner.gossip_messages_sent.fetch_add(1, Ordering::Relaxed); }
+    pub fn inc_packets_sent(&self) {
+        self.inner.packets_sent.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_packets_recv(&self) {
+        self.inner.packets_recv.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_bytes_sent(&self, n: u64) {
+        self.inner.bytes_sent.fetch_add(n, Ordering::Relaxed);
+    }
+    pub fn inc_bytes_recv(&self, n: u64) {
+        self.inner.bytes_recv.fetch_add(n, Ordering::Relaxed);
+    }
+    pub fn inc_ticks(&self) {
+        self.inner.ticks_total.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_idle(&self) {
+        self.inner.idle_ticks.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_busy(&self) {
+        self.inner.busy_ticks.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_rate_limited(&self) {
+        self.inner
+            .rate_limited_dropped
+            .fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_handshake_ok(&self) {
+        self.inner
+            .handshake_successes
+            .fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_handshake_fail(&self) {
+        self.inner
+            .handshake_failures
+            .fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_bad_sig(&self) {
+        self.inner
+            .invalid_signatures
+            .fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_replay(&self) {
+        self.inner.replay_attacks.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_audit_entry(&self) {
+        self.inner
+            .audit_entries_total
+            .fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_neurons_born(&self) {
+        self.inner.neurons_born.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_neurons_died(&self) {
+        self.inner.neurons_died.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_synapses_created(&self) {
+        self.inner.synapses_created.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_synapses_pruned(&self) {
+        self.inner.synapses_pruned.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn inc_gossip(&self) {
+        self.inner
+            .gossip_messages_sent
+            .fetch_add(1, Ordering::Relaxed);
+    }
 
     // ── Gauge setters ──────────────────────────────────────────
 
     pub fn set_peer_count(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.peer_count = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.peer_count = v;
+        }
     }
     pub fn set_dht_peers(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.dht_peers = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.dht_peers = v;
+        }
     }
     pub fn set_synapse_count(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.synapse_count = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.synapse_count = v;
+        }
     }
     pub fn set_neuron_count(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.neuron_count = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.neuron_count = v;
+        }
     }
     pub fn set_reliable_queue_depth(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.reliable_queue_depth = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.reliable_queue_depth = v;
+        }
     }
     pub fn set_session_count(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.session_count = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.session_count = v;
+        }
     }
     pub fn set_audit_buffered(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.audit_buffered = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.audit_buffered = v;
+        }
     }
     pub fn set_trust_avg(&self, v: f64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.trust_score_avg = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.trust_score_avg = v;
+        }
     }
     pub fn set_sybil_peers(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.sybil_peers = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.sybil_peers = v;
+        }
     }
     pub fn set_rate_limited_peers(&self, v: u64) {
-        if let Ok(mut g) = self.inner.gauges.write() { g.rate_limited_peers = v; }
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.rate_limited_peers = v;
+        }
     }
 
     // ── ML metrics ─────────────────────────────────────────────
 
-    pub fn set_ml_metrics(&self, surprise: f64, curiosity: f64, avg_act: f64,
-                          grad_norm: f64, lr: f64, forget: f64, distill: f64) {
+    pub fn set_ml_metrics(
+        &self,
+        surprise: f64,
+        curiosity: f64,
+        avg_act: f64,
+        grad_norm: f64,
+        lr: f64,
+        forget: f64,
+        distill: f64,
+    ) {
         if let Ok(mut m) = self.inner.ml_metrics.write() {
             m.total_surprise = surprise;
             m.curiosity_drive = curiosity;
@@ -325,16 +401,27 @@ impl MetricsRegistry {
 
     pub fn push_packet_event(&self, event: PacketEvent) {
         if let Ok(mut pe) = self.inner.packet_events.write() {
-            if pe.len() >= MAX_PACKET_EVENTS { pe.pop_front(); }
+            if pe.len() >= MAX_PACKET_EVENTS {
+                pe.pop_front();
+            }
             pe.push_back(event);
         }
     }
 
     // ── Peer latencies ─────────────────────────────────────────
 
-    pub fn update_peer_latency(&self, eid: EntityId, addr: &str, rtt: f32, trust: f32, trusted: bool) {
+    pub fn update_peer_latency(
+        &self,
+        eid: EntityId,
+        addr: &str,
+        rtt: f32,
+        trust: f32,
+        trusted: bool,
+    ) {
         if let Ok(mut pl) = self.inner.peer_latencies.write() {
-            if pl.len() >= MAX_PEER_LATENCIES { pl.clear(); }
+            if pl.len() >= MAX_PEER_LATENCIES {
+                pl.clear();
+            }
             let entry = pl.entry(eid).or_insert(PeerLatencyStats {
                 entity_id: eid.0,
                 addr: addr.to_string(),
@@ -349,7 +436,9 @@ impl MetricsRegistry {
             entry.last_seen_ms = elapsed_ms(&self.inner.started_at);
             entry.trust_score = trust;
             entry.is_trusted = trusted;
-            if entry.addr.is_empty() { entry.addr = addr.to_string(); }
+            if entry.addr.is_empty() {
+                entry.addr = addr.to_string();
+            }
         }
     }
 
@@ -358,8 +447,12 @@ impl MetricsRegistry {
     /// Take a snapshot of all current metrics and append to history.
     pub fn snapshot(&self) -> MetricsSnapshot {
         let now = elapsed_ms(&self.inner.started_at);
-        let gauges = self.inner.gauges.read().ok().map(|g| {
-            GaugeSet {
+        let gauges = self
+            .inner
+            .gauges
+            .read()
+            .ok()
+            .map(|g| GaugeSet {
                 peer_count: g.peer_count,
                 dht_peers: g.dht_peers,
                 synapse_count: g.synapse_count,
@@ -370,10 +463,14 @@ impl MetricsRegistry {
                 trust_score_avg: g.trust_score_avg,
                 sybil_peers: g.sybil_peers,
                 rate_limited_peers: g.rate_limited_peers,
-            }
-        }).unwrap_or_default();
-        let ml = self.inner.ml_metrics.read().ok().map(|m| {
-            MlMetricSet {
+            })
+            .unwrap_or_default();
+        let ml = self
+            .inner
+            .ml_metrics
+            .read()
+            .ok()
+            .map(|m| MlMetricSet {
                 total_surprise: m.total_surprise,
                 curiosity_drive: m.curiosity_drive,
                 avg_activation: m.avg_activation,
@@ -381,31 +478,40 @@ impl MetricsRegistry {
                 learning_rate: m.learning_rate,
                 forgetting_rate: m.forgetting_rate,
                 distillation_loss: m.distillation_loss,
-            }
-        }).unwrap_or_default();
+            })
+            .unwrap_or_default();
 
-        let prev = self.inner.history.read()
+        let prev = self
+            .inner
+            .history
+            .read()
             .ok()
             .and_then(|h| h.back().cloned())
             .unwrap_or_default();
 
-        let p_sent   = self.inner.packets_sent.load(Ordering::Relaxed);
-        let p_recv   = self.inner.packets_recv.load(Ordering::Relaxed);
-        let b_sent   = self.inner.bytes_sent.load(Ordering::Relaxed);
-        let b_recv   = self.inner.bytes_recv.load(Ordering::Relaxed);
-        let ticks    = self.inner.ticks_total.load(Ordering::Relaxed);
-        let idle     = self.inner.idle_ticks.load(Ordering::Relaxed);
-        let busy     = self.inner.busy_ticks.load(Ordering::Relaxed);
+        let p_sent = self.inner.packets_sent.load(Ordering::Relaxed);
+        let p_recv = self.inner.packets_recv.load(Ordering::Relaxed);
+        let b_sent = self.inner.bytes_sent.load(Ordering::Relaxed);
+        let b_recv = self.inner.bytes_recv.load(Ordering::Relaxed);
+        let ticks = self.inner.ticks_total.load(Ordering::Relaxed);
+        let idle = self.inner.idle_ticks.load(Ordering::Relaxed);
+        let busy = self.inner.busy_ticks.load(Ordering::Relaxed);
 
         let dt_secs = if prev.timestamp_ms > 0 {
             (now - prev.timestamp_ms) as f64 / 1000.0
-        } else { 1.0 };
+        } else {
+            1.0
+        };
 
         let snap = MetricsSnapshot {
             timestamp_ms: now,
-            packets_sent: p_sent, packets_recv: p_recv,
-            bytes_sent: b_sent, bytes_recv: b_recv,
-            ticks_total: ticks, idle_ticks: idle, busy_ticks: busy,
+            packets_sent: p_sent,
+            packets_recv: p_recv,
+            bytes_sent: b_sent,
+            bytes_recv: b_recv,
+            ticks_total: ticks,
+            idle_ticks: idle,
+            busy_ticks: busy,
             rate_limited_dropped: self.inner.rate_limited_dropped.load(Ordering::Relaxed),
             handshake_successes: self.inner.handshake_successes.load(Ordering::Relaxed),
             handshake_failures: self.inner.handshake_failures.load(Ordering::Relaxed),
@@ -438,13 +544,19 @@ impl MetricsRegistry {
             learning_rate: ml.learning_rate,
             forgetting_rate: ml.forgetting_rate,
             distillation_loss: ml.distillation_loss,
-            tick_rate_hz: if now > 0 { ticks as f64 / (now as f64 / 1000.0) } else { 0.0 },
+            tick_rate_hz: if now > 0 {
+                ticks as f64 / (now as f64 / 1000.0)
+            } else {
+                0.0
+            },
             uptime_secs: now / 1000,
         };
 
         // Append to history
         if let Ok(mut h) = self.inner.history.write() {
-            if h.len() >= MAX_HISTORY { h.pop_front(); }
+            if h.len() >= MAX_HISTORY {
+                h.pop_front();
+            }
             h.push_back(snap.clone());
         }
 
@@ -453,21 +565,27 @@ impl MetricsRegistry {
 
     /// Get the full history buffer.
     pub fn get_history(&self) -> Vec<MetricsSnapshot> {
-        self.inner.history.read()
+        self.inner
+            .history
+            .read()
             .map(|h| h.iter().cloned().collect())
             .unwrap_or_default()
     }
 
     /// Get recent packet events.
     pub fn get_packet_events(&self) -> Vec<PacketEvent> {
-        self.inner.packet_events.read()
+        self.inner
+            .packet_events
+            .read()
             .map(|pe| pe.iter().rev().cloned().collect())
             .unwrap_or_default()
     }
 
     /// Get peer latencies.
     pub fn get_peer_latencies(&self) -> Vec<PeerLatencyStats> {
-        self.inner.peer_latencies.read()
+        self.inner
+            .peer_latencies
+            .read()
             .map(|pl| pl.values().cloned().collect())
             .unwrap_or_default()
     }
@@ -475,24 +593,66 @@ impl MetricsRegistry {
     /// Get raw counter values for Prometheus export.
     pub fn counters_snapshot(&self) -> HashMap<&'static str, u64> {
         let mut m = HashMap::new();
-        m.insert("packets_sent", self.inner.packets_sent.load(Ordering::Relaxed));
-        m.insert("packets_recv", self.inner.packets_recv.load(Ordering::Relaxed));
+        m.insert(
+            "packets_sent",
+            self.inner.packets_sent.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "packets_recv",
+            self.inner.packets_recv.load(Ordering::Relaxed),
+        );
         m.insert("bytes_sent", self.inner.bytes_sent.load(Ordering::Relaxed));
         m.insert("bytes_recv", self.inner.bytes_recv.load(Ordering::Relaxed));
-        m.insert("ticks_total", self.inner.ticks_total.load(Ordering::Relaxed));
+        m.insert(
+            "ticks_total",
+            self.inner.ticks_total.load(Ordering::Relaxed),
+        );
         m.insert("idle_ticks", self.inner.idle_ticks.load(Ordering::Relaxed));
         m.insert("busy_ticks", self.inner.busy_ticks.load(Ordering::Relaxed));
-        m.insert("rate_limited_dropped", self.inner.rate_limited_dropped.load(Ordering::Relaxed));
-        m.insert("handshake_successes", self.inner.handshake_successes.load(Ordering::Relaxed));
-        m.insert("handshake_failures", self.inner.handshake_failures.load(Ordering::Relaxed));
-        m.insert("invalid_signatures", self.inner.invalid_signatures.load(Ordering::Relaxed));
-        m.insert("replay_attacks", self.inner.replay_attacks.load(Ordering::Relaxed));
-        m.insert("audit_entries_total", self.inner.audit_entries_total.load(Ordering::Relaxed));
-        m.insert("neurons_born", self.inner.neurons_born.load(Ordering::Relaxed));
-        m.insert("neurons_died", self.inner.neurons_died.load(Ordering::Relaxed));
-        m.insert("synapses_created", self.inner.synapses_created.load(Ordering::Relaxed));
-        m.insert("synapses_pruned", self.inner.synapses_pruned.load(Ordering::Relaxed));
-        m.insert("gossip_messages", self.inner.gossip_messages_sent.load(Ordering::Relaxed));
+        m.insert(
+            "rate_limited_dropped",
+            self.inner.rate_limited_dropped.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "handshake_successes",
+            self.inner.handshake_successes.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "handshake_failures",
+            self.inner.handshake_failures.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "invalid_signatures",
+            self.inner.invalid_signatures.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "replay_attacks",
+            self.inner.replay_attacks.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "audit_entries_total",
+            self.inner.audit_entries_total.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "neurons_born",
+            self.inner.neurons_born.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "neurons_died",
+            self.inner.neurons_died.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "synapses_created",
+            self.inner.synapses_created.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "synapses_pruned",
+            self.inner.synapses_pruned.load(Ordering::Relaxed),
+        );
+        m.insert(
+            "gossip_messages",
+            self.inner.gossip_messages_sent.load(Ordering::Relaxed),
+        );
         m
     }
 
@@ -524,26 +684,48 @@ impl Default for MetricsRegistry {
 impl Default for MetricsSnapshot {
     fn default() -> Self {
         MetricsSnapshot {
-            timestamp_ms: 0, packets_sent: 0, packets_recv: 0,
-            bytes_sent: 0, bytes_recv: 0, ticks_total: 0,
-            idle_ticks: 0, busy_ticks: 0,
-            rate_limited_dropped: 0, handshake_successes: 0,
-            handshake_failures: 0, invalid_signatures: 0,
-            replay_attacks: 0, audit_entries_total: 0,
-            neurons_born: 0, neurons_died: 0,
-            synapses_created: 0, synapses_pruned: 0,
+            timestamp_ms: 0,
+            packets_sent: 0,
+            packets_recv: 0,
+            bytes_sent: 0,
+            bytes_recv: 0,
+            ticks_total: 0,
+            idle_ticks: 0,
+            busy_ticks: 0,
+            rate_limited_dropped: 0,
+            handshake_successes: 0,
+            handshake_failures: 0,
+            invalid_signatures: 0,
+            replay_attacks: 0,
+            audit_entries_total: 0,
+            neurons_born: 0,
+            neurons_died: 0,
+            synapses_created: 0,
+            synapses_pruned: 0,
             gossip_messages: 0,
-            peer_count: 0, dht_peers: 0,
-            synapse_count: 0, neuron_count: 0,
-            reliable_queue_depth: 0, session_count: 0,
-            audit_buffered: 0, trust_score_avg: 0.0,
-            sybil_peers: 0, rate_limited_peers: 0,
-            pps_in: 0.0, pps_out: 0.0, bps_in: 0.0, bps_out: 0.0,
-            total_surprise: 0.0, curiosity_drive: 0.0,
-            avg_activation: 0.0, gradient_norm: 0.0,
-            learning_rate: 0.01, forgetting_rate: 0.0,
+            peer_count: 0,
+            dht_peers: 0,
+            synapse_count: 0,
+            neuron_count: 0,
+            reliable_queue_depth: 0,
+            session_count: 0,
+            audit_buffered: 0,
+            trust_score_avg: 0.0,
+            sybil_peers: 0,
+            rate_limited_peers: 0,
+            pps_in: 0.0,
+            pps_out: 0.0,
+            bps_in: 0.0,
+            bps_out: 0.0,
+            total_surprise: 0.0,
+            curiosity_drive: 0.0,
+            avg_activation: 0.0,
+            gradient_norm: 0.0,
+            learning_rate: 0.01,
+            forgetting_rate: 0.0,
             distillation_loss: 0.0,
-            tick_rate_hz: 0.0, uptime_secs: 0,
+            tick_rate_hz: 0.0,
+            uptime_secs: 0,
         }
     }
 }

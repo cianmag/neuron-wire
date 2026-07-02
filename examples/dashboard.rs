@@ -26,8 +26,7 @@ fn main() {
     let metrics = neuron_wire::observability::MetricsRegistry::new();
 
     // Create trace collector
-    let trace_collector =
-        Arc::new(Mutex::new(neuron_wire::observability::TraceCollector::new()));
+    let trace_collector = Arc::new(Mutex::new(neuron_wire::observability::TraceCollector::new()));
 
     // Shutdown flag
     let shutdown = Arc::new(AtomicBool::new(false));

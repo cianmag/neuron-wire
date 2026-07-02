@@ -1,0 +1,7 @@
+# Python dependencies for reproduction scripts
+# Install: pip install -r scripts/requirements.txt
+
+matplotlib>=3.5
+numpy>=1.21
+scipy>=1.7
+toml>=0.10

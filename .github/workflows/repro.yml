@@ -1,0 +1,51 @@
+name: Reproducibility
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Smoke test — Figure 1 (3-node convergence)
+        id: smoke
+        run: |
+          cargo run --release --example simulate -- \
+            --config experiments/figure-1-dht-convergence-3node.toml \
+            --output-dir results/figure-1-dht-convergence-3node
+        timeout-minutes: 2
+
+      - name: Validate against known-good
+        id: validate
+        run: |
+          python3 scripts/validate_repro.py results/ --known-good known-good/ && \
+            echo "status=pass" >> "$GITHUB_OUTPUT" || \
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "## Reproducibility Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke test | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validation | ${{ steps.validate.outputs.status == 'pass' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY

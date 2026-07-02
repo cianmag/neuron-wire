@@ -1,0 +1,22 @@
+[experiment]
+name = "figure-7-failure-injection"
+description = "Adversarial failure injection benchmarks (Figure 7)"
+paper_mode = true
+seed = 42
+trials = 5
+
+[simulation]
+node_count = 10
+duration_secs = 45
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[failure]
+mode = "packet-loss"
+at_secs = 10
+percent = 0.2
+
+[output]
+directory = "results/figure-7"
+include_raw_logs = true
+snapshot_interval_ticks = 100

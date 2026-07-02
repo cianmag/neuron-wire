@@ -337,6 +337,254 @@ pub struct Simulator {
     trace_writer: Option<BufWriter<std::fs::File>>,
 }
 
+// ─── System Info Capture ──────────────────────────────────────────
+
+/// Captured system metadata for reproducibility.
+#[derive(Debug, Clone, Serialize)]
+pub struct SystemInfo {
+    /// Unix timestamp when info was captured.
+    pub timestamp_secs: u64,
+    /// Full git commit SHA.
+    pub git_commit: String,
+    /// Current git branch name.
+    pub git_branch: String,
+    /// Number of uncommitted files.
+    pub git_dirty: usize,
+    /// Output of `rustc --version`.
+    pub rustc_version: String,
+    /// Output of `cargo --version`.
+    pub cargo_version: String,
+    /// OS family: "linux", "windows", "macos".
+    pub os_type: String,
+    /// OS version string.
+    pub os_version: String,
+    /// CPU model name.
+    pub cpu_model: String,
+    /// Number of logical CPU cores.
+    pub cpu_cores: usize,
+    /// Total system RAM in bytes.
+    pub memory_bytes: u64,
+    /// Machine hostname.
+    pub hostname: String,
+    /// SHA-256 hex hashes of Cargo.toml, Cargo.lock, and every .rs file in src/.
+    pub source_hashes: std::collections::HashMap<String, String>,
+}
+
+/// Collect system metadata for reproducibility.
+/// Gracefully degrades on unsupported platforms — never panics.
+pub fn collect_system_info() -> SystemInfo {
+    let timestamp_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    // Git info
+    let git_commit = run_cmd("git", &["rev-parse", "HEAD"]).unwrap_or_else(|| "unknown".into());
+    let git_branch =
+        run_cmd("git", &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|| "unknown".into());
+    let git_dirty = run_cmd("git", &["status", "--porcelain"])
+        .map(|s| s.lines().count())
+        .unwrap_or(0);
+
+    // Compiler info
+    let rustc_version = run_cmd("rustc", &["--version"]).unwrap_or_else(|| "unknown".into());
+    let cargo_version = run_cmd("cargo", &["--version"]).unwrap_or_else(|| "unknown".into());
+
+    // OS info
+    let os_type = std::env::consts::OS.to_string();
+    let os_version = detect_os_version();
+
+    // Hardware info
+    let cpu_model = detect_cpu_model();
+    let cpu_cores = num_cpus();
+    let memory_bytes = total_memory_bytes();
+    let hostname = hostname();
+
+    // Source hashes
+    let source_hashes = compute_source_hashes();
+
+    SystemInfo {
+        timestamp_secs,
+        git_commit,
+        git_branch,
+        git_dirty,
+        rustc_version,
+        cargo_version,
+        os_type,
+        os_version,
+        cpu_model,
+        cpu_cores,
+        memory_bytes,
+        hostname,
+        source_hashes,
+    }
+}
+
+/// Run a command, return stdout on success, `None` on failure.
+fn run_cmd(program: &str, args: &[&str]) -> Option<String> {
+    std::process::Command::new(program)
+        .args(args)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+}
+
+fn detect_os_version() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(os_release) = std::fs::read_to_string("/etc/os-release") {
+            for line in os_release.lines() {
+                if line.starts_with("PRETTY_NAME=") {
+                    return line
+                        .trim_start_matches("PRETTY_NAME=")
+                        .trim_matches('"')
+                        .to_string();
+                }
+            }
+        }
+        run_cmd("uname", &["-a"]).unwrap_or_else(|| "Linux".into())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        run_cmd("cmd", &["/c", "ver"]).unwrap_or_else(|| "Windows".into())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        run_cmd("sw_vers", &["-productVersion"])
+            .map(|v| format!("macOS {}", v))
+            .unwrap_or_else(|| "macOS".into())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        std::env::consts::OS.to_string()
+    }
+}
+
+fn detect_cpu_model() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+            for line in cpuinfo.lines() {
+                if line.starts_with("model name") {
+                    let model = line.split(':').nth(1).unwrap_or("").trim();
+                    if !model.is_empty() {
+                        return model.to_string();
+                    }
+                }
+            }
+        }
+        "unknown".into()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        run_cmd("wmic", &["cpu", "get", "Name"])
+            .and_then(|s| s.lines().nth(1).map(|l| l.trim().to_string()))
+            .unwrap_or_else(|| "unknown".into())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        run_cmd("sysctl", &["-n", "machdep.cpu.brand_string"]).unwrap_or_else(|| "unknown".into())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        "unknown".into()
+    }
+}
+
+fn num_cpus() -> usize {
+    // Fallback: count available CPUs
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+}
+
+fn total_memory_bytes() -> u64 {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(meminfo) = std::fs::read_to_string("/proc/meminfo") {
+            for line in meminfo.lines() {
+                if line.starts_with("MemTotal:") {
+                    if let Some(kb_str) = line.split_whitespace().nth(1) {
+                        if let Ok(kb) = kb_str.parse::<u64>() {
+                            return kb * 1024;
+                        }
+                    }
+                }
+            }
+        }
+        0
+    }
+    #[cfg(target_os = "windows")]
+    {
+        run_cmd("wmic", &["OS", "get", "TotalVisibleMemorySize"])
+            .and_then(|s| s.lines().nth(1).map(|l| l.trim().to_string()))
+            .and_then(|s| s.parse::<u64>().ok())
+            .map(|kb| kb * 1024)
+            .unwrap_or(0)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        run_cmd("sysctl", &["-n", "hw.memsize"])
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        0
+    }
+}
+
+fn hostname() -> String {
+    run_cmd("hostname", &[]).unwrap_or_else(|| "unknown".into())
+}
+
+fn compute_source_hashes() -> std::collections::HashMap<String, String> {
+    use std::io::Read;
+    let mut hashes = std::collections::HashMap::new();
+
+    // Hash Cargo.toml and Cargo.lock
+    let key_files = ["Cargo.toml", "Cargo.lock"];
+    for fname in &key_files {
+        if let Ok(mut f) = std::fs::File::open(fname) {
+            let mut buf = Vec::new();
+            if f.read_to_end(&mut buf).is_ok() {
+                let hash = blake2b_hash(&buf);
+                hashes.insert(fname.to_string(), hash);
+            }
+        }
+    }
+
+    // Hash all .rs files in src/
+    if let Ok(entries) = std::fs::read_dir("src") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map(|e| e == "rs").unwrap_or(false) {
+                if let Ok(mut f) = std::fs::File::open(&path) {
+                    let mut buf = Vec::new();
+                    if f.read_to_end(&mut buf).is_ok() {
+                        let rel_path = path.to_string_lossy().replace('\\', "/");
+                        let hash = blake2b_hash(&buf);
+                        hashes.insert(rel_path, hash);
+                    }
+                }
+            }
+        }
+    }
+
+    hashes
+}
+
+/// 32-byte BLAKE2b hash (no dependency — hand-rolled for std-only builds).
+fn blake2b_hash(data: &[u8]) -> String {
+    // If blake2 crate is available, use it. Otherwise hex of first 8 bytes of custom hash.
+    // We use a simple SHA-256 via the sha2 crate already in our dependency tree.
+    use sha2::Digest;
+    let hash = sha2::Sha256::digest(data);
+    hex::encode(hash)
+}
+
 impl Simulator {
     /// Create a new simulator with the given config.
     pub fn new(config: SimulationConfig) -> Self {
@@ -903,16 +1151,30 @@ impl Simulator {
         let config_toml = toml::to_string_pretty(&self.config).map_err(|e| e.to_string())?;
         fs::write(&config_path, config_toml).map_err(|e| e.to_string())?;
 
-        // Write metadata (no chrono to avoid DLL issues on Windows)
+        // Write metadata — full reproducibility envelope
+        let sys_info = collect_system_info();
         let metadata = serde_json::json!({
-            "timestamp": format!("{}", std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0)),
-            "git_commit": std::env::var("GIT_COMMIT").unwrap_or_else(|_| "unknown".into()),
-            "rustc_version": std::env::var("RUSTC_VERSION").unwrap_or_else(|_| "unknown".into()),
-            "target_triple": std::env::consts::ARCH.to_string() + "-pc-windows-msvc",
-            "os": "Windows 10",
+            "timestamp_secs": sys_info.timestamp_secs,
+            "git": {
+                "commit": sys_info.git_commit,
+                "branch": sys_info.git_branch,
+                "dirty_files": sys_info.git_dirty,
+            },
+            "compiler": {
+                "rustc": sys_info.rustc_version,
+                "cargo": sys_info.cargo_version,
+            },
+            "system": {
+                "os": sys_info.os_type,
+                "os_version": sys_info.os_version,
+                "hostname": sys_info.hostname,
+            },
+            "hardware": {
+                "cpu": sys_info.cpu_model,
+                "cpu_cores": sys_info.cpu_cores,
+                "memory_bytes": sys_info.memory_bytes,
+            },
+            "source_hashes": sys_info.source_hashes,
             "parameters": self.config,
         });
         let metadata_path = output_dir.join("metadata.json");

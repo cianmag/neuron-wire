@@ -1,0 +1,22 @@
+[experiment]
+name = "figure-6-node-churn-recovery"
+description = "Node churn and recovery behavior (Figure 6)"
+paper_mode = true
+seed = 42
+trials = 3
+
+[simulation]
+node_count = 10
+duration_secs = 60
+stale_ping_secs = 10
+tick_interval_us = 1000
+
+[failure]
+mode = "node-death"
+at_secs = 15
+percent = 0.3
+
+[output]
+directory = "results/figure-6"
+include_raw_logs = true
+snapshot_interval_ticks = 100
