@@ -16,6 +16,19 @@
 # Exit code: 0 = all figures reproduced and validated, 1 = any failure
 
 set -euo pipefail
+
+# ── Windows path conversion (MSYS → native) ────────────────────────────
+winpath() {
+  # Convert MSYS/Unix path to Windows native path for Python compatibility
+  if command -v cygpath &>/dev/null; then
+    cygpath -m "$1"
+  elif command -v pwd &>/dev/null && [ -d "$1" ]; then
+    (cd "$1" && pwd -W 2>/dev/null || echo "$1")
+  else
+    echo "$1"
+  fi
+}
+
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")/..")"
 
 REPO_ROOT="$(pwd)"
@@ -23,6 +36,10 @@ RESULTS_DIR="$REPO_ROOT/results"
 EXPERIMENTS="$REPO_ROOT/experiments"
 KNOWN_GOOD="$REPO_ROOT/known-good"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+# Windows-native paths for Python compatibility
+RESULTS_DIR_WIN=$(winpath "$RESULTS_DIR")
+REPO_ROOT_WIN=$(winpath "$REPO_ROOT")
+KNOWN_GOOD_WIN=$(winpath "$KNOWN_GOOD")
 
 # ── Colours ──────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -46,7 +63,13 @@ done
 # ── Step 0: Check prerequisites ─────────────────────────────────────────
 heading "Prerequisites"
 command -v cargo &>/dev/null || { fail "Rust not found"; exit 1; }
-command -v python3 &>/dev/null || { fail "Python 3 not found"; exit 1; }
+# First check for real Python (not Windows Store stub)
+PYTHON=""
+{ command -v python &>/dev/null && python --version &>/dev/null && PYTHON="python"; } || \
+{ command -v python3 &>/dev/null && python3 --version &>/dev/null && PYTHON="python3"; } || \
+{ fail "Python 3 not found"; exit 1; }
+info "Using: $PYTHON ($($PYTHON --version 2>&1))"
+export PYTHON
 command -v git &>/dev/null || { fail "git not found"; exit 1; }
 rustc --version | head -1
 cargo --version | head -1
@@ -60,7 +83,7 @@ mkdir -p "$RESULTS_DIR/figures"
 # ── Step 1: Capture environment ────────────────────────────────────────
 if [ "$PLOTS_ONLY" = false ] && [ "$VALIDATE_ONLY" = false ]; then
   heading "Capturing Environment"
-  bash "$REPO_ROOT/scripts/capture_env.sh" "$RESULTS_DIR/env/$TIMESTAMP"
+  bash "$REPO_ROOT/scripts/capture_env.sh" "$(winpath "$RESULTS_DIR/env/$TIMESTAMP")"
   pass "Environment captured → $RESULTS_DIR/env/$TIMESTAMP"
 fi
 
@@ -112,7 +135,7 @@ fi
 # ── Step 4: Validate against known-good ─────────────────────────────────
 heading "Validation"
 if [ -d "$KNOWN_GOOD" ]; then
-  python3 "$REPO_ROOT/scripts/validate_repro.py" "$RESULTS_DIR" --known-good "$KNOWN_GOOD" && {
+  $PYTHON "$REPO_ROOT_WIN/scripts/validate_repro.py" "$RESULTS_DIR_WIN" --known-good "$KNOWN_GOOD_WIN" && {
     pass "All results validated against known-good"
   } || {
     fail "Results differ from known-good — see diff above"
@@ -125,12 +148,12 @@ fi
 
 # ── Step 5: Generate figures ────────────────────────────────────────────
 heading "Generating Figures"
-if command -v python3 &>/dev/null && [ -f "$REPO_ROOT/scripts/requirements.txt" ]; then
+if [ -n "$PYTHON" ] && [ -f "$REPO_ROOT/scripts/requirements.txt" ]; then
   # Check if matplotlib is available
-  if python3 -c "import matplotlib" 2>/dev/null; then
-    python3 "$REPO_ROOT/scripts/generate_figures.py" \
-      --input-dir "$RESULTS_DIR" \
-      --output-dir "$RESULTS_DIR/figures" \
+  if $PYTHON -c "import matplotlib" 2>/dev/null; then
+    $PYTHON "$REPO_ROOT_WIN/scripts/generate_figures.py" \
+      --input-dir "$RESULTS_DIR_WIN" \
+      --output-dir "$RESULTS_DIR_WIN/figures" \
       --format png
     pass "Figures generated → $RESULTS_DIR/figures/"
   else

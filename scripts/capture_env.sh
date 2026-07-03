@@ -107,7 +107,7 @@ hash_outputs() {
 }
 
 # ── Consolidated JSON ────────────────────────────────────────────────────
-python3 -c "
+${PYTHON:-python3} -c "
 import json, os
 
 def read_file(path):

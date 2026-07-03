@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NWP · P2P Neural Network Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Main visualization canvas -->
+  <canvas id="canvas"></canvas>
+
+  <!-- Stats overlay -->
+  <div id="stats">
+    <div class="stat-row">
+      <span class="stat-label">Node</span>
+      <span class="stat-value" id="stat-node-id">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Tick</span>
+      <span class="stat-value" id="stat-tick">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Rate</span>
+      <span class="stat-value" id="stat-rate">0 Hz</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Peers</span>
+      <span class="stat-value" id="stat-peers">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Neurons</span>
+      <span class="stat-value" id="stat-neurons">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Sent</span>
+      <span class="stat-value" id="stat-sent">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Recv</span>
+      <span class="stat-value" id="stat-recv">0</span>
+    </div>
+  </div>
+
+  <!-- Event log -->
+  <div id="event-log">
+    <div class="event-header">Activity</div>
+    <div id="event-list"></div>
+  </div>
+
+  <!-- Instructions overlay -->
+  <div id="instructions">
+    <div class="instruction-title">⏎ NWP · P2P Neural Network</div>
+    <div class="instruction-body">
+      Open this page in another tab.</br>
+      They'll discover each other automatically.</br>
+      No server. No install. Just works.
+    </div>
+  </div>
+
+  <script type="module" src="index.js"></script>
+</body>
+</html>

@@ -3,3 +3,4 @@ known-good/
 target/
 __pycache__/
 *.pyc
+demo/www/pkg/
