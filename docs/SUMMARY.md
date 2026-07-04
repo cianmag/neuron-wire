@@ -19,6 +19,9 @@
 # Architecture
 - [System Architecture (Diagrams)](ARCHITECTURE_DIAGRAMS.md)
 - [Formal Architecture](ARCHITECTURE.md)
+# Reference Documents
+- [Grant Pitch](GRANT.md)
+- [Research Brief](docs/RESEARCH_BRIEF.md)
 - [Protocol Specification](PROTOCOL_SPEC.md)
 - [Architecture Decision Records](ADR/README.md)
   - [001: Single-Threaded Engine Loop](ADR/001-single-threaded-engine-loop.md)
