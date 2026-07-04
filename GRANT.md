@@ -4,7 +4,7 @@
 
 > **Target:** Sentient Foundation — Open Source AGI Grant Programme  
 > **Track:** Grants (no strings — public goods builder)  
-> **Amount requested:** To be determined based on scope  
+> **Amount requested:** $25,000 (Grant track)  
 > **Status:** Draft — ready for submission review
 
 ---
@@ -25,7 +25,7 @@ We are requesting support to:
 
 1. **Deploy neuron-wire across 100+ real Internet nodes on multiple continents** — measure latency, churn, and convergence under realistic network conditions for the first time.
 2. **Release reproducible datasets, benchmarks, and a peer-reviewed publication** — including negative findings.
-3. **Build a developer SDK that makes neuron-wire installable in five minutes** — `cargo add neuron-wire`, Python bindings, and documented integration patterns for five real applications.
+3. **Build a developer SDK that makes neuron-wire installable in five minutes** — `cargo add neuron-wire`, Python bindings, and documented integration patterns for five potential applications.
 
 ---
 
@@ -91,7 +91,7 @@ Neuron Wire is an infrastructure layer — the operating system for decentralize
 
 ### Research Infrastructure
 
-- **Formal mathematical model** — `FORMAL_MODEL.md` (1,760 lines, 17 sections): network model, linear convergence proof, DHT convergence theorem, redundancy bounds, partition tolerance proof, trust convergence proof, entropy bounds, failure probabilities
+- **Formal mathematical model** — `FORMAL_MODEL.md` (1,760 lines, 17 sections): network model, convergence analysis, DHT convergence theorem, redundancy bounds, partition tolerance analysis, trust convergence analysis, entropy bounds, failure probabilities
 - **Reproducible experiments** — 10 TOML configs covering DHT convergence, scaling, bandwidth, churn, failure injection, multi-trial stats, SGA comparison
 - **One-command reproduction** — `scripts/reproduce.sh` captures env → builds → runs all 10 experiments → validates against known-good → generates 9 publication-ready matplotlib figures
 - **Tutorial series** — 6 tutorials covering everything from first node to deep observability (2,010 lines)
@@ -118,12 +118,26 @@ Sentient Foundation funds projects that are open, accessible, private, empowerin
 | **Accessible** | Runs on hardware people actually own — single-threaded engine, `opt-level="z"`, 512 MB RAM target. The WASM demo runs in any browser tab on any device. |
 | **Private by default** | Data never leaves the device. Only activation gradients are exchanged over the network, decayed exponentially over 100 ms half-life. The hash-chained audit log provides verifiable proof of what was shared. |
 | **Empowering, not extractive** | Any device with a UDP port can join. No coordinator, no fees, no central authority can revoke access. The network belongs to its participants. |
-| **Good for humanity** | Applications we already see: decentralized LLM inference for underserved languages, collaborative edge learning for medical imaging in low-infrastructure regions, disaster communication AI when infrastructure is destroyed. |
+| **Good for humanity** | Potential applications: decentralized LLM inference for underserved languages, collaborative edge learning for medical imaging in low-infrastructure regions, disaster communication AI when infrastructure is destroyed. These are directions the infrastructure enables, not features we have demonstrated. |
 | **Decentralized AI infrastructure** | This is the explicit design goal. Not an ML framework retrofitted for distribution, but a distributed systems protocol built from the ground up with AI workloads as its first-class concern. |
 | **Identity & verification** | Ed25519 signatures on every message, trust scoring for Sybil resistance, hash-chained audit log for verifiable provenance. |
 | **Compute without central control** | P2P by design — no parameter server, no orchestrator, no single point of failure or control. |
 
 ---
+
+## Research Philosophy
+
+Two sentences guide every decision in this project:
+
+> **Evidence, not features.** Every claim deserves an experiment.
+
+When planning experiments, we ask: *Can I measure it? Can someone else reproduce it? Would a skeptical reviewer believe it? Does it answer our research question?* If the answer is "no," it doesn't belong in v1.0.
+
+Success will not be measured by GitHub stars or downloads. Success means producing reproducible evidence about decentralized collaborative learning that other researchers can independently validate, reproduce, and extend.
+
+Before deploying a single node across continents, the experimental protocol — hypothesis, null hypothesis, independent and dependent variables, controlled variables, success and failure criteria, statistical analysis plan — will be written, timestamped, and committed to the repository. This prevents rewriting hypotheses to fit results after seeing them.
+
+When reporting findings, the language is precise: "our experiments suggest," "under the evaluated conditions," and "in the tested configuration." Cautious claims are believed more readily than sweeping ones, and the project is strongest when it is understated.
 
 ## Requested Deliverables
 
@@ -132,7 +146,7 @@ Sentient Foundation funds projects that are open, accessible, private, empowerin
 **Problem:** Every benchmark so far is localhost UDP. Real networks have NAT, jitter, loss, asymmetric routing, and heterogeneous hardware. We don't know if any of our assumptions survive contact with the real Internet.
 
 **Plan:**
-- Deploy 100+ neuron-wire nodes across AWS free-tier instances in us-east-1 (Virginia), eu-west-1 (Ireland), and ap-southeast-2 (Sydney)
+- Deploy 100+ neuron-wire nodes across cloud infrastructure in North America (us-east-1), Europe (eu-west-1), and Asia-Pacific (ap-southeast-2)
 - Each node runs the standard engine loop with DHT routing, gradient exchange, and observability pipeline
 - Collect: latency distribution (intra-region, inter-region), packet loss rate, churn patterns, DHT convergence time, gradient delivery success rate
 - Implement: Noise Protocol encryption (DTLS-style, zero-alloc), STUN-based NAT traversal for non-VPS participation
