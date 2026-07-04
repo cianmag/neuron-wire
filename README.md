@@ -18,6 +18,17 @@
 
 ---
 
+## Governing Principles
+
+> **Evidence, not features.**
+> **Every claim deserves an experiment.**
+
+This project treats research discipline as seriously as engineering. Before adding anything, we ask: *Can I measure it? Can someone else reproduce it? Would a skeptical reviewer believe it? Does it answer our research question?* If the answer is "no," it doesn't belong in v1.0.
+
+v1.0 is intentionally boring. All experimental ideas go into separate repos (`neuron-wire-labs`, `neuron-wire-experiments`, `neuron-wire-next`). The core stays predictable, stable, documented, and dependable.
+
+---
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
