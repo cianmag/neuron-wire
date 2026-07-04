@@ -24,9 +24,9 @@ static RECENT_EVENTS: Mutex<Vec<DemoEvent>> = Mutex::new(Vec::new());
 
 const NEURON_COUNT: usize = 6;
 const K_BUCKET_SIZE: usize = 4;
-const HEARTBEAT_INTERVAL_TICKS: u64 = 30;  // every ~500ms at 60fps
+const HEARTBEAT_INTERVAL_TICKS: u64 = 30; // every ~500ms at 60fps
 const GRADIENT_EXCHANGE_INTERVAL: u64 = 60; // every ~1s
-const PEER_TIMEOUT_TICKS: u64 = 180;       // 3s without heartbeat = dead
+const PEER_TIMEOUT_TICKS: u64 = 180; // 3s without heartbeat = dead
 const HEBBIAN_ETA: f32 = 0.05;
 const HEBBIAN_LAMBDA: f32 = 0.01;
 
@@ -56,7 +56,7 @@ struct Peer {
     latency_ticks: u32,
     last_seen_tick: u64,
     alive: bool,
-    activations: Vec<f32>,  // last received activations
+    activations: Vec<f32>, // last received activations
     x: f32,
     y: f32,
 }
@@ -73,7 +73,7 @@ enum DemoEvent {
 
 #[derive(Clone, Serialize)]
 struct OutgoingMessage {
-    channel: String,  // "broadcast" for all, or peer ID for direct
+    channel: String, // "broadcast" for all, or peer ID for direct
     msg_type: String,
     body: String,
 }
@@ -135,7 +135,9 @@ struct PacketAnim {
 pub fn init(tab_id: &str, seed_floats: &str) {
     let seeds: Vec<f32> = serde_json::from_str(seed_floats).unwrap_or_else(|_| vec![0.5; 20]);
     let mut rng = (seeds[0] * 65536.0) as u32;
-    if rng == 0 { rng = 1; }
+    if rng == 0 {
+        rng = 1;
+    }
 
     let node = DemoNode::new(tab_id, &mut rng, seeds);
     *NODE.lock().unwrap() = Some(node);
@@ -145,7 +147,9 @@ pub fn init(tab_id: &str, seed_floats: &str) {
 #[wasm_bindgen]
 pub fn tick(dt_ms: f64) -> String {
     let mut guard = NODE.lock().unwrap();
-    let node = guard.as_mut().expect("DemoNode not initialised — call init() first");
+    let node = guard
+        .as_mut()
+        .expect("DemoNode not initialised — call init() first");
     let state = node.tick(dt_ms);
     serde_json::to_string(&state).unwrap_or_else(|_| "null".into())
 }
@@ -266,7 +270,8 @@ impl DemoNode {
 
         // 4. Generate heartbeat
         if self.tick % HEARTBEAT_INTERVAL_TICKS == 0 {
-            let avg_act = self.neurons.iter().map(|n| n.activation).sum::<f32>() / self.neurons.len() as f32;
+            let avg_act =
+                self.neurons.iter().map(|n| n.activation).sum::<f32>() / self.neurons.len() as f32;
             let hb = HeartbeatMessage {
                 from: self.id.clone(),
                 tick: self.tick,
@@ -296,7 +301,9 @@ impl DemoNode {
                     body,
                 });
                 self.packets_sent += 1;
-                RECENT_EVENTS.lock().unwrap().push(DemoEvent::PacketSent { to: peer_id.clone() });
+                RECENT_EVENTS.lock().unwrap().push(DemoEvent::PacketSent {
+                    to: peer_id.clone(),
+                });
                 // Add visual packet
                 self.packets_in_flight.push(PacketAnim {
                     id: self.tick as u32,
@@ -349,7 +356,10 @@ impl DemoNode {
 
             // Firing event
             if neuron.activation > 0.8 && lcg_random(&mut self.rng) < 0.1 {
-                RECENT_EVENTS.lock().unwrap().push(DemoEvent::NeuronFired { id: neuron.id });
+                RECENT_EVENTS
+                    .lock()
+                    .unwrap()
+                    .push(DemoEvent::NeuronFired { id: neuron.id });
             }
         }
     }
@@ -371,13 +381,22 @@ impl DemoNode {
         };
 
         let from = parsed.get("from").and_then(|v| v.as_str()).unwrap_or("");
-        let msg_type = parsed.get("msg_type").and_then(|v| v.as_str()).unwrap_or("");
+        let msg_type = parsed
+            .get("msg_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         match msg_type {
             "heartbeat" => {
                 if !from.is_empty() && from != self.id {
-                    let avg_act = parsed.get("avg_activation").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                    let ncount = parsed.get("neuron_count").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                    let avg_act = parsed
+                        .get("avg_activation")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0) as f32;
+                    let ncount = parsed
+                        .get("neuron_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as usize;
 
                     if let Some(peer) = self.peers.get_mut(from) {
                         // Existing peer — update
@@ -399,9 +418,12 @@ impl DemoNode {
                         };
                         self.peers.insert(from.to_string(), peer);
                         self.peer_id_counter += 1;
-                        RECENT_EVENTS.lock().unwrap().push(DemoEvent::PeerDiscovered {
-                            id: from.to_string(),
-                        });
+                        RECENT_EVENTS
+                            .lock()
+                            .unwrap()
+                            .push(DemoEvent::PeerDiscovered {
+                                id: from.to_string(),
+                            });
                         self.packets_recv += 1;
                     }
                 }
@@ -412,7 +434,8 @@ impl DemoNode {
                         peer.last_seen_tick = self.tick;
                         peer.alive = true;
                         if let Some(acts) = parsed.get("activations").and_then(|v| v.as_array()) {
-                            peer.activations = acts.iter()
+                            peer.activations = acts
+                                .iter()
                                 .filter_map(|v| v.as_f64().map(|f| f as f32))
                                 .collect();
                         }
@@ -452,7 +475,10 @@ impl DemoNode {
             if let Some(peer) = self.peers.get_mut(&id) {
                 peer.alive = false;
             }
-            RECENT_EVENTS.lock().unwrap().push(DemoEvent::PeerLost { id: id.clone() });
+            RECENT_EVENTS
+                .lock()
+                .unwrap()
+                .push(DemoEvent::PeerLost { id: id.clone() });
         }
     }
 
@@ -461,7 +487,9 @@ impl DemoNode {
         for syn in &self.synapses {
             let i = syn.from as usize;
             let j = syn.to as usize;
-            if i >= self.neurons.len() || j >= self.neurons.len() { continue; }
+            if i >= self.neurons.len() || j >= self.neurons.len() {
+                continue;
+            }
             let (x1, y1) = (self.neurons[i].x, self.neurons[i].y);
             let (x2, y2) = (self.neurons[j].x, self.neurons[j].y);
             let dx = x2 - x1;
@@ -492,18 +520,22 @@ impl DemoNode {
 
     fn build_render_state(&self) -> RenderState {
         // Position peers based on alive/dead
-        let peer_connections: Vec<PeerRender> = self.peers.values().map(|p| {
-            PeerRender {
+        let peer_connections: Vec<PeerRender> = self
+            .peers
+            .values()
+            .map(|p| PeerRender {
                 id: p.id.clone(),
                 alive: p.alive,
                 latency_ticks: p.latency_ticks,
                 x: p.x,
                 y: p.y,
-                avg_activation: p.activations.iter().sum::<f32>() / p.activations.len().max(1) as f32,
-            }
-        }).collect();
+                avg_activation: p.activations.iter().sum::<f32>()
+                    / p.activations.len().max(1) as f32,
+            })
+            .collect();
 
-        let avg_act = self.neurons.iter().map(|n| n.activation).sum::<f32>() / self.neurons.len() as f32;
+        let avg_act =
+            self.neurons.iter().map(|n| n.activation).sum::<f32>() / self.neurons.len() as f32;
 
         RenderState {
             neuron_id: self.id.clone(),
