@@ -57,6 +57,7 @@
 # Roadmap & Release Notes
 - [Grant Pitch](GRANT.md)
 - [Roadmap](ROADMAP.md)
+- [Prioritized Improvement Tiers](PRIORITIZATION.md)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
 - [Reproducibility](REPRODUCIBILITY.md)
