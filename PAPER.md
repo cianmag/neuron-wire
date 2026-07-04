@@ -1,4 +1,4 @@
-# neuron-wire: A Decentralized Adaptive Runtime for Distributed Learning Experiments
+# neuron-wire: Open Infrastructure for Decentralized AI Experiments
 
 **Author:** Independent researcher
 **Date:** June 2026
@@ -8,9 +8,13 @@
 
 ## Abstract
 
-We present **neuron-wire**, a 6,656-line Rust implementation of a decentralized adaptive runtime for large-scale distributed learning experiments. neuron-wire implements the Neural Wire Protocol (NWP), a P2P communication fabric that combines modified Kademlia DHT routing, custom UDP transport with gradient-weight decay, and local Hebbian learning into a single-threaded non-blocking engine loop. Nodes discover each other autonomously, exchange neural activation gradients, and update local weights through Spike-Timing-Dependent Plasticity (STDP) — with no central coordination, no GPU cluster, and no data leaving the device. The current prototype achieves 60/60 test coverage, zero compiler warnings in core subsystems, DHT discovery with peer routing on localhost, and a tick rate exceeding 400KHz per node.
+We present **neuron-wire**, an open-source infrastructure layer for decentralized AI systems. Neuron-wire implements the Neural Wire Protocol (NWP), a P2P communication fabric that combines modified Kademlia DHT routing, custom UDP transport with gradient-weight decay, and distributed learning primitives into a single-threaded non-blocking engine loop. Nodes discover each other autonomously, exchange neural activation gradients, and update local weights through biologically inspired plasticity — with no central coordination, no GPU cluster, and no data leaving the device.
 
-**Keywords:** distributed systems, P2P networking, Hebbian learning, Kademlia DHT, Rust, active inference
+The current prototype spans 42 source modules (19,220 lines of Rust), 256 tests across 35 modules, 4 CI workflows, a formal mathematical model (1,760 lines), 7 baseline comparisons against established distributed ML architectures, 10 reproducible experiment configurations, and a working browser-based P2P demo (pure WASM, two tabs, no server).
+
+**Positioning:** Neuron-wire is not an AGI architecture. It is an experimental decentralized runtime for studying learning over dynamic peer-to-peer networks — an infrastructure substrate that enables downstream researchers to ask questions about decentralized AI without rebuilding the networking stack from scratch.
+
+**Keywords:** distributed systems, P2P networking, decentralized AI infrastructure, Hebbian learning, Kademlia DHT, Rust
 
 ---
 

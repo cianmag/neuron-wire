@@ -2,7 +2,7 @@
 
 ## Architecture Specification
 
-**A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
+**Zero-Infrastructure AI** — An open-source infrastructure layer for decentralized AI systems.
 
 *Document version 2.1 — June 2026*
 *Corresponding code: `https://github.com/cianmag/neuron-wire` (commit `5dabe67`)*
@@ -12,21 +12,11 @@
 
 ## Abstract
 
-The Neuron Wire Protocol (NWP) is a decentralised runtime for distributed neural
-computation across untrusted peer-to-peer networks. Unlike federated learning
-(central coordinator), All-Reduce (static topology), or parameter-server
-architectures (single point of failure), NWP distributes both the model and the
-learning process across a dynamic P2P mesh where each node is a self-contained
-neural substrate.
+The Neuron Wire Protocol (NWP) is an open-source infrastructure layer for decentralized AI systems. It provides the primitives that every decentralized AI application needs — peer discovery, secure transport, distributed learning, reproducible experimentation, and identity — as a single auditable runtime. Unlike federated learning (central coordinator), All-Reduce (static topology), or parameter-server architectures (single point of failure), NWP is a P2P fabric where any device that can reach another device can join a collaborative AI network without provisioning servers or trusting a central coordinator.
 
-This document specifies every protocol detail: wire format, transport reliability,
-distributed hash table routing, the six-phase event engine, neural computation
-subsystems (forward pass, Hebbian STDP, neurogenesis, apoptosis), and failure
-mode analysis. All claims are backed by reproducible benchmarks with known-good
-reference outputs.
+This document specifies every protocol detail: wire format, transport reliability, distributed hash table routing, the six-phase event engine, neural computation subsystems (forward pass, Hebbian STDP, neurogenesis, apoptosis), and failure mode analysis. All claims are backed by reproducible benchmarks with known-good reference outputs.
 
-**Key result:** A 50-node mesh converges to full connectivity in 4.0 seconds
-(σ = 0.0) with zero packet loss and zero node evictions during steady state.
+**Key result:** A 50-node mesh converges to full connectivity in 4.0 seconds (σ = 0.0) with zero packet loss and zero node evictions during steady state.
 
 ---
 

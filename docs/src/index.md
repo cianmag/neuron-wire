@@ -1,6 +1,6 @@
 # Neuron-Wire Documentation
 
-> **A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
+> **Zero-Infrastructure AI** — open-source infrastructure layer for decentralized AI systems.
 
 Welcome to the Neuron Wire Protocol (NWP) documentation. This book covers everything from getting started with your first node to contributing research experiments.
 

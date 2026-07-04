@@ -1,22 +1,20 @@
-# Neuron Wire Protocol (NWP)
+# Neuron Wire (NWP)
 
-**A Decentralised Adaptive Runtime for Large-Scale Distributed Learning**
+**Zero-Infrastructure AI** — An open-source infrastructure layer for decentralized AI systems.
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![Tests](https://img.shields.io/badge/tests-110%2B-brightgreen)](#)
-[![Lines of Rust](https://img.shields.io/badge/rust-8%2C154%20LOC-blue)](#)
+[![Tests](https://img.shields.io/badge/tests-256+-brightgreen)](#)
+[![Lines of Rust](https://img.shields.io/badge/rust-19,220%20LOC-blue)](#)
 [![Crates.io](https://img.shields.io/badge/crate-v0.3.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 [![Discord](https://img.shields.io/badge/discord-join-5865F2)](https://discord.gg/neuron-wire)
 [![Documentation](https://img.shields.io/badge/docs-mdBook-00c853)](https://cianmag.github.io/neuron-wire)
-[![Website](https://img.shields.io/badge/website-project-7c3aed)](website/)
 [![Reproducible](https://img.shields.io/badge/reproducible-yes-brightgreen)](REPRODUCIBILITY.md)
 [![Architecture](https://img.shields.io/badge/architecture-formal-7c3aed)](ARCHITECTURE.md)
-[![Q&A](https://img.shields.io/badge/q%26a-foundational-ff6b6b)](FOUNDATIONAL_QNA.md)
-[![Roadmap](https://img.shields.io/badge/roadmap-20%20directions-ffc107)](ROADMAP.md)
-[![Lessons](https://img.shields.io/badge/lessons-learned-00c853)](LESSONS_LEARNED.md)
+[![Grant Pitch](https://img.shields.io/badge/grant-sentient-ff6b6b)](GRANT.md)
+[![Roadmap](https://img.shields.io/badge/roadmap-3%20deliverables-ffc107)](ROADMAP.md)
 [![Tutorials](https://img.shields.io/badge/tutorials-6%20series-00c8ff)](docs/src/tutorials/README.md)
-[![Good First Issue](https://img.shields.io/badge/good%20first%20issue-welcome-7057ff)](https://github.com/cianmag/neuron-wire/issues?q=is:issue+is:open+label:"good+first+issue")
+[![Good First Issue](https://img.shields.io/badge/good%20first%20issue-welcome-7057ff)](https://github.com/cianmag/neuron-wire/issues?q=is:issue+is:open+label:good+first+issue)
 
 ---
 
@@ -44,27 +42,46 @@
 
 ## Problem Statement
 
-Modern machine learning trains on centralised GPU clusters. This approach has three hard ceilings:
+Building distributed AI today requires cloud infrastructure, orchestration, and centralized coordination. Every node needs a server, every gradient flows through a parameter server, and every participant must trust a central operator. This creates three hard problems:
 
-1. **Data gravity** — training data must move to the compute, not the other way around. Privacy regulations (GDPR, CCPA) and bandwidth economics make this increasingly untenable.
-2. **Parameter-server bottlenecks** — every gradient update flows through a central coordinator. At 10⁹ parameters, synchronisation latency dominates wall-clock time even with All-Reduce.
-3. **Static topology** — once a model architecture is fixed, it cannot grow, shrink, or rewire in response to new data sources or node churn. The network is a snapshot, not an organism.
+1. **Access.** A developer in Lagos, Bangalore, or São Paulo can lose the model their work depends on without warning. The most sensitive data must leave the person's own device. There is no way to participate in collaborative AI without provisioning infrastructure.
 
-Neuron Wire Protocol (NWP) treats these constraints as a *distributed systems* problem rather than an ML problem. Instead of centralising compute, NWP distributes both the *model* and the *learning process* across a decentralised P2P network where each node is a self-contained neural substrate that discovers peers, exchanges activation gradients, and adapts its local connectivity through biologically inspired mechanisms — all without a coordinator.
+2. **Privacy.** Federated learning still requires a central coordinator. All-Reduce requires a static, known participant set. Every approach assumes data moves to compute, not the other way around.
 
----
+3. **Trust.** Closed labs meter access, set prices, and revoke capabilities overnight. Open models exist, but the infrastructure to *run them collaboratively* — discovery, routing, secure exchange, reproducible experimentation — does not.
 
-## Why Existing Approaches Struggle
+Neuron Wire explores a different model: **any device that can reach another device should be able to join a collaborative AI network without provisioning servers or trusting a central coordinator.** We are building the networking and runtime substrate required to test whether this vision is practical.
 
-| Approach | Limitation |
-|---|---|
-| **Federated Learning (FL)** | Central coordinator, synchronous rounds, fixed architecture. Clients train locally then upload weights — no peer-to-peer emergence. |
-| **All-Reduce / Ring-Reduce** | Requires a static, known set of participants. Gradient synchronisation cost grows linearly with model size. No support for dynamic topology. |
-| **Gossip-Based SGD** | Asynchronous, but still operates on a fixed parameter vector. No notion of individual neurons, neurogenesis, or apoptosis. |
-| **Blockchain-Based ML** | Enormous overhead (consensus every transaction, storage replication). Throughput is measured in transactions/second, not activations/second. |
-| **Kademlia DHT (vanilla)** | XOR routing is excellent for file lookup but treats all peers equally. No latency awareness, no gradient-weight decay, no support for soft-state updates. |
+## What Neuron Wire Is
 
-NWP is none of these. It is a purpose-built substrate for *adaptive distributed neural computation* — not a general-purpose ML framework retrofitted for distribution, but a distributed systems protocol designed from the ground up with neural computation as its first-class workload.
+Neuron Wire (NWP) is an **open-source infrastructure layer** for decentralized AI systems. It provides the primitives that every decentralized AI application needs and that no existing library provides together:
+
+| Primitive | What it does |
+|-----------|-------------|
+| **Peer discovery** | Nodes find each other via latency-weighted Kademlia DHT — no central registry |
+| **Secure transport** | Custom UDP protocol with reliability tiers, ACK bitfield, gradient decay |
+| **Distributed learning** | Hebbian STDP runs locally on each node; gradients propagate via sparse gossip |
+| **Reproducible experiments** | Deterministic paper-mode simulator, metadata capture, known-good validation |
+| **Observability** | Prometheus metrics, live dashboard, hash-chained audit log |
+| **Identity & Trust** | Ed25519 signatures, trust scoring, Sybil-resistant routing |
+| **Browser demo** | Pure WASM — open a tab, open another, they discover each other automatically |
+
+The protocol is ~40 bytes overhead per message, runs on a single-threaded non-blocking engine loop at ~400 KHz–1 MHz tick rate, and compiles to a statically linked binary with zero external runtime dependencies.
+
+## Sentient Foundation Alignment
+
+Neuron Wire aligns with every priority the Sentient Foundation funds:
+
+| Sentient Priority | Neuron Wire |
+|------------------|-------------|
+| **Open source** | MIT-licensed, 55 source files, full CI/CD |
+| **Decentralized AI infrastructure** | Purpose-built P2P transport + DHT + distributed learning |
+| **Privacy by default** | Data never leaves the device; only gradients gossip over the network |
+| **Runs on hardware people own** | Single-threaded engine, opt-level=z, 512 MB RAM target |
+| **Reproducible science** | One-command reproduction, metadata capture, known-good validation |
+| **Empowering, not extractive** | Any device with a UDP port can join; no coordinator, no fees |
+| **Identity & safe agents** | Ed25519, trust scoring, hash-chained audit log |
+| **Compute without central control** | P2P by design — no parameter server, no orchestrator
 
 ---
 
@@ -381,17 +398,17 @@ NWP v0.2.0 is a functional research prototype. The following limitations are kno
 
 Beyond this README, the following documents provide deeper coverage of specific aspects:
 
-| Document | What it covers |
-|----------|----------------|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full subsystem design, engine loop phases, data flow, design decisions |
-| [`FOUNDATIONAL_QNA.md`](FOUNDATIONAL_QNA.md) | 20 categories of research questions answered from codebase evidence (includes glossary) |
-| [`ROADMAP.md`](ROADMAP.md) | 20-direction research plan with effort estimates and priority matrix |
-| [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Personal reflections on hypothesis failure, reproducibility, and process |
-| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Detailed guide for reproducing every benchmark |
-| [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) | Codebase tour, module dependencies, testing patterns, debugging, profiling |
-| [`PROTOCOL_SPEC.md`](PROTOCOL_SPEC.md) | Formal wire format, message types, handshake, DHT routing, reliability |
-| [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Level 1–5 readiness inventory for publication |
-| [`PAPER.md`](PAPER.md) | Paper outline and target venues |
+|| Document | What it covers |
+||----------|----------------|
+|| [`GRANT.md`](GRANT.md) | Full grant application pitch for Sentient Foundation |
+|| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full subsystem design, engine loop phases, data flow, design decisions |
+|| [`FOUNDATIONAL_QNA.md`](FOUNDATIONAL_QNA.md) | 20 categories of research questions answered from codebase evidence (includes glossary) |
+|| [`ROADMAP.md`](ROADMAP.md) | Three grant deliverables with concrete milestones |
+|| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Detailed guide for reproducing every benchmark |
+|| [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) | Codebase tour, module dependencies, testing patterns, debugging, profiling |
+|| [`PROTOCOL_SPEC.md`](PROTOCOL_SPEC.md) | Formal wire format, message types, handshake, DHT routing, reliability |
+|| [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Level 1–5 readiness inventory for publication |
+|| [`PAPER.md`](PAPER.md) | Research paper outline and target venues |
 
 For API-level documentation, build with `cargo doc --no-deps --open`.
 
@@ -399,36 +416,36 @@ For API-level documentation, build with `cargo doc --no-deps --open`.
 
 ## Roadmap
 
-### v0.3.0 — Hardening & Real-World Networking
-- [ ] STUN-based NAT traversal
-- [ ] Noise Protocol encryption (wire-level, zero-alloc)
-- [ ] Peer cache persistence across restarts (filesystem-backed)
-- [ ] Configurable gradient half-life per message type
-- [ ] Automated benchmark suite (latency, throughput, convergence)
+This roadmap is structured around three deliverables for the Sentient Foundation grant programme. Each deliverable is a concrete, fundable milestone.
 
-### v0.4.0 — Scalability
-- [ ] Multi-threaded sharded engine (one shard per core, shard-local routing table)
-- [ ] Adaptive gossip fanout (proportional to `log₂(network_size)`)
-- [ ] Sparse gradient compression (top-k sparsification before gossip)
-- [ ] Deterministic snapshot/restore (full state serialisation)
+### Deliverable 1 — Real Internet Deployment (100 Nodes, 3 Continents)
 
-### v0.5.0 — Advanced Neural Computation
-- [ ] LSTM-style gated memory cells as first-class neuron types
-- [ ] Homeostatic plasticity (adjust firing thresholds to maintain target activity)
-- [ ] Structural plasticity (dendritic spine growth: create synapses without spawning a new neuron)
-- [ ] Reward-modulated Hebbian learning (3-factor learning rule)
+Take neuron-wire from localhost to the real Internet. Deploy across free-tier VPS in North America, Europe, and Asia. Measure what actually happens.
 
-### v0.6.0 — Research Platform
-- [ ] Reproducible experiment harness (paper-mode simulation with CSV exports — partially implemented in simulator.rs)
-- [ ] Prometheus metrics export (tick rate, peer count, synapse count, gradient throughput)
-- [ ] Python bindings (PyO3) for integration with ML research tooling
-- [ ] Published paper(s) with accompanying reproduction package
+- [ ] Global testbed: 100+ nodes across AWS free-tier (us-east-1, eu-west-1, ap-southeast-2)
+- [ ] Real metrics: latency distribution, packet loss, churn rate, convergence time vs. simulator predictions
+- [ ] Public dashboard: live peer count, routing table health, gradient throughput per continent
+- [ ] Noise Protocol encryption at wire level (zero-alloc, DTLS-style handshake)
+- [ ] STUN-based NAT traversal for non-VPS nodes
+- [ ] Negative results published alongside positive ones
 
-### Future Directions
-- **Hierarchical DHT**: multiple routing layers for geographical vs. topical proximity.
-- **Gossip-based consensus**: replace the current simple majority vote with a BFT gossip protocol (HoneyBadgerBFT or similar).
-- **Differentiable routing**: learn routing weights end-to-end using gradient information.
-- **Hardware acceleration**: offload tanh squashing and STDP updates to GPU or SIMD.
+### Deliverable 2 — Publication & Reproducible Benchmarks
+
+- [ ] Reproducible evaluation paper with open datasets
+- [ ] Comparison against: vanilla Kademlia, gossip SGD, federated averaging on same testbed
+- [ ] All baselines (7 comparison frameworks in `baselines/`) validated against real measurements
+- [ ] Registered report at workshop venue (e.g., SysML, MLSys, HotOS, DSN)
+- [ ] One-command `cargo run --release -- --reproduce-all` reproduces every figure
+
+### Deliverable 3 — Developer SDK & Ecosystem
+
+Make neuron-wire the `cargo add`-able foundation for decentralized AI.
+
+- [ ] `cargo add neuron-wire` — five minutes to a running node
+- [ ] Python bindings (PyO3) for ML research tooling
+- [ ] Five projects built on neuron-wire (decentralized LLM inference, collaborative edge learning, disaster communication AI, decentralized robotics, distributed scientific computing)
+- [ ] Peer cache persistence and snapshot/restore (ephemeral → durable)
+- [ ] WebRTC transport for browser-to-browser across machines (not just BroadcastChannel tabs)
 
 ---
 

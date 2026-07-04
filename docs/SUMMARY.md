@@ -52,6 +52,7 @@
 - [Security Policy](SECURITY.md)
 
 # Roadmap & Release Notes
+- [Grant Pitch](GRANT.md)
 - [Roadmap](ROADMAP.md)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
