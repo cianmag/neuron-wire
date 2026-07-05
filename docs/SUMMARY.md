@@ -43,6 +43,7 @@
 - [Formal Mathematical Model](FORMAL_MODEL.md)
 - [Research Paper](PAPER.md)
 - [Foundational Q&A](FOUNDATIONAL_QNA.md)
+- [Research Questions](RESEARCH_QUESTIONS.md)
 - [Benchmark Results](ARCHITECTURE.md#9-benchmark-results)
 - [Baseline Comparisons](ARCHITECTURE.md#10-baseline-comparisons)
 - [Complexity Analysis](ARCHITECTURE.md#8-complexity-analysis)

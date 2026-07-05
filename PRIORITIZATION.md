@@ -4,6 +4,20 @@
 
 ---
 
+## Five Governing Rules
+
+> **1. Evidence beats elegance.** A beautiful architecture without experiments is an idea.
+
+> **2. Validation beats implementation.** Another 5,000 lines will impress GitHub. Another independent reproduction will impress researchers.
+
+> **3. Adoption beats architecture.** The best protocol nobody uses has almost no impact. A good protocol thousands of people build on changes a field.
+
+> **4. A limitation documented is stronger than an assumption hidden.** The "Limitations" section should grow as fast as the "Features" section.
+
+> **5. Protect the core.** After v1.0, every feature should answer: *Does this help validate the research question?* If not, don't merge it.
+
+---
+
 ## Tier 1 — 10/10 Impact ⭐⭐⭐⭐⭐
 
 *These change how the project is perceived.*

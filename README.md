@@ -20,8 +20,15 @@
 
 ## Governing Principles
 
-> **Evidence, not features.**
-> **Every claim deserves an experiment.**
+> **Evidence, not features.** Every claim deserves an experiment.
+
+### Five Rules
+
+1. **Evidence beats elegance** — A beautiful architecture without experiments is an idea.
+2. **Validation beats implementation** — Another 5,000 lines impresses GitHub. Another independent reproduction impresses researchers.
+3. **Adoption beats architecture** — The best protocol nobody uses has almost no impact.
+4. **A limitation documented is stronger than an assumption hidden** — The limitations section should grow as fast as the features section.
+5. **Protect the core** — After v1.0, every feature answers: *Does this help validate the research question?*
 
 This project treats research discipline as seriously as engineering. Before adding anything, we ask: *Can I measure it? Can someone else reproduce it? Would a skeptical reviewer believe it? Does it answer our research question?* If the answer is "no," it doesn't belong in v1.0.
 
