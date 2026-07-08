@@ -1,6 +1,6 @@
 # Lessons Learned
 
-> Personal reflections from building neuron-wire.
+> Engineering reflections from building neuron-wire at [Zylvon](https://zylvon.com).
 > Not everything that counts can be measured, and not everything that can be measured counts.
 
 ---
@@ -37,7 +37,7 @@ I chose to document. The `results/` directory contains benchmark data showing ex
 
 This felt vulnerable at first. Wouldn't it look better to only show the successes?
 
-No. Reviewers, professors, and admissions officers have seen hundreds of projects that claim everything works perfectly. They trust the ones that admit what they don't know. A document that says "here are our limitations" is more persuasive than one that pretests limitations don't exist.
+No. Reviewers and professors have seen hundreds of projects that claim everything works perfectly. They trust the ones that admit what they don't know. A document that says "here are our limitations" is more persuasive than one that pretends limitations don't exist.
 
 **Lesson:** Trust is built by what you admit, not what you claim. If you hide your failures, you're hiding the evidence that you know how to do research.
 
@@ -73,7 +73,7 @@ Before this review cycle, I would have told you the project was about "decentral
 
 When the reviewer asked for a concrete capability — "what becomes possible that is not practical today?" — I didn't have a good answer. I had architectural descriptions, not use cases.
 
-The answer I settled on — "zero-infrastructure collaborative learning" — reframes every design decision. Would a teenager in a village with a phone be able to join this network? If not, why not? What's the bottleneck? What's the minimum viable deployment?
+The answer I settled on — "zero-infrastructure collaborative learning" — reframes every design decision. Would someone in a village with a phone be able to join this network? If not, why not? What's the bottleneck? What's the minimum viable deployment?
 
 This question is harder to answer than "what does your architecture look like?" But it's also the question that makes people care.
 

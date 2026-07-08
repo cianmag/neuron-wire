@@ -1,6 +1,6 @@
 # Neuron Wire (NWP)
 
-**Zero-Infrastructure AI** — An open-source infrastructure layer for decentralized AI systems.
+**Zero-Infrastructure AI** — An open-source infrastructure layer for decentralized AI systems, developed by [Zylvon](https://zylvon.com).
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
 [![Tests](https://img.shields.io/badge/tests-256+-brightgreen)](#)
@@ -8,13 +8,10 @@
 [![Crates.io](https://img.shields.io/badge/crate-v0.3.0-blue)](#)
 [![Live Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 [![Discord](https://img.shields.io/badge/discord-join-5865F2)](https://discord.gg/neuron-wire)
-[![Documentation](https://img.shields.io/badge/docs-mdBook-00c853)](https://cianmag.github.io/neuron-wire)
+[![Documentation](https://img.shields.io/badge/docs-mdBook-00c853)](https://github.com/cianmag/neuron-wire)
 [![Reproducible](https://img.shields.io/badge/reproducible-yes-brightgreen)](REPRODUCIBILITY.md)
 [![Architecture](https://img.shields.io/badge/architecture-formal-7c3aed)](ARCHITECTURE.md)
-[![Grant Pitch](https://img.shields.io/badge/grant-sentient-ff6b6b)](GRANT.md)
 [![Roadmap](https://img.shields.io/badge/roadmap-3%20deliverables-ffc107)](ROADMAP.md)
-[![Tutorials](https://img.shields.io/badge/tutorials-6%20series-00c8ff)](docs/src/tutorials/README.md)
-[![Good First Issue](https://img.shields.io/badge/good%20first%20issue-welcome-7057ff)](https://github.com/cianmag/neuron-wire/issues?q=is:issue+is:open+label:good+first+issue)
 
 ---
 
@@ -86,13 +83,13 @@ Neuron Wire (NWP) is an **open-source infrastructure layer** for decentralized A
 
 The protocol is ~40 bytes overhead per message, runs on a single-threaded non-blocking engine loop at ~400 KHz–1 MHz tick rate, and compiles to a statically linked binary with zero external runtime dependencies.
 
-## Sentient Foundation Alignment
+## Zylvon Alignment
 
-Neuron Wire aligns with every priority the Sentient Foundation funds:
+Neuron Wire is a core infrastructure project under **Zylvon** — building the foundational layers for decentralized AI. Every design decision is driven by the principle that **AI infrastructure should be open, verifiable, and accessible from any device without centralized gatekeeping.**
 
-| Sentient Priority | Neuron Wire |
-|------------------|-------------|
-| **Open source** | MIT-licensed, 55 source files, full CI/CD |
+| Zylvon Priority | Neuron Wire |
+|----------------|-------------|
+| **Open source** | MIT-licensed, 55+ source files, full CI/CD |
 | **Decentralized AI infrastructure** | Purpose-built P2P transport + DHT + distributed learning |
 | **Privacy by default** | Data never leaves the device; only gradients gossip over the network |
 | **Runs on hardware people own** | Single-threaded engine, opt-level=z, 512 MB RAM target |
@@ -280,6 +277,9 @@ Apoptosis runs every ~1 s during Phase 5. It enforces four pruning criteria:
 | External dependencies | 5 (crc32fast, rand, serde, toml, csv) |
 | Subsystems | 7 |
 | Engine tick rate | ~400 KHz–1 MHz (commodity x86-64) |
+| **Fast Sim: max nodes converged** | **100,000 (100%)** |
+| **Fast Sim: convergence time (100k)** | **7.0s sim-time / 43.4s wall** |
+| **Fast Sim: avg peers at 100k** | **59.3 per node** |
 | Transport header size | 16 bytes |
 | NWP header size | 16 bytes |
 | DHT bucket size (K) | 20 |
@@ -416,17 +416,14 @@ NWP v0.2.0 is a functional research prototype. The following limitations are kno
 
 Beyond this README, the following documents provide deeper coverage of specific aspects:
 
-|| Document | What it covers |
-||----------|----------------|
-|| [`GRANT.md`](GRANT.md) | Full grant application pitch for Sentient Foundation |
-|| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full subsystem design, engine loop phases, data flow, design decisions |
-|| [`FOUNDATIONAL_QNA.md`](FOUNDATIONAL_QNA.md) | 20 categories of research questions answered from codebase evidence (includes glossary) |
-|| [`ROADMAP.md`](ROADMAP.md) | Three grant deliverables with concrete milestones |
-|| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Detailed guide for reproducing every benchmark |
-|| [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) | Codebase tour, module dependencies, testing patterns, debugging, profiling |
-|| [`PROTOCOL_SPEC.md`](PROTOCOL_SPEC.md) | Formal wire format, message types, handshake, DHT routing, reliability |
-|| [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Level 1–5 readiness inventory for publication |
-|| [`PAPER.md`](PAPER.md) | Research paper outline and target venues |
+||| Document | What it covers |
+|||----------|----------------|
+||| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Full subsystem design, engine loop phases, data flow, design decisions |
+||| [`ROADMAP.md`](ROADMAP.md) | Three deliverables with concrete milestones |
+||| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Detailed guide for reproducing every benchmark |
+||| [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) | Codebase tour, module dependencies, testing patterns, debugging, profiling |
+||| [`PROTOCOL_SPEC.md`](PROTOCOL_SPEC.md) | Formal wire format, message types, handshake, DHT routing, reliability |
+||| [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Level 1–5 readiness inventory for publication |
 
 For API-level documentation, build with `cargo doc --no-deps --open`.
 
@@ -434,7 +431,7 @@ For API-level documentation, build with `cargo doc --no-deps --open`.
 
 ## Roadmap
 
-This roadmap is structured around three deliverables for the Sentient Foundation grant programme. Each deliverable is a concrete, fundable milestone.
+This roadmap is structured around three deliverables towards a production-ready decentralized AI infrastructure layer.
 
 ### Deliverable 1 — Real Internet Deployment (100 Nodes, 3 Continents)
 
@@ -469,6 +466,10 @@ Make neuron-wire the `cargo add`-able foundation for decentralized AI.
 
 ## License
 
-[MIT](LICENSE-MIT) © 2025–2026 Neuron Wire Contributors
+[MIT](LICENSE-MIT) © 2025–2026 Zylvon & Neuron Wire Contributors
 
 *Built with Rust 2021 edition. Single-threaded, non-blocking, and intentionally free of async runtimes.*
+
+---
+
+**[Zylvon](https://zylvon.com)** — open infrastructure for decentralized AI.

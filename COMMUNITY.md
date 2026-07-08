@@ -62,7 +62,7 @@ neuron-wire is a research-first project. The community norms reflect that:
 ## Maintainer Contact
 
 **Cian Magic** — Project maintainer  
-Email: [ci@cianmag.com](mailto:ci@cianmag.com)  
+Email: [team@zylvon.com](mailto:team@zylvon.com)  
 GitHub: [@cianmag](https://github.com/cianmag)
 
 For sensitive or security-related issues, see [SECURITY.md](SECURITY.md).

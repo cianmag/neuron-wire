@@ -1,8 +1,8 @@
 # neuron-wire: Project Stats & Systems Research Artifact
 
-> **Prepared for:** Admissions Review — University Applications (MIT, Stanford, CMU, Berkeley)
-> **Date:** June 2026
-> **Author:** A 16-year-old independent systems researcher
+> **Prepared for:** Public research documentation — Neuron Wire scaling benchmarks
+> **Date:** July 2026
+> **Author:** Zylvon Research Team
 > **Repository:** [neuron-wire](https://github.com/cianmag/hermes-scale-training/tree/main/neuron-wire)
 
 ---
@@ -154,7 +154,7 @@ This is **not** an AGI product. It is a **distributed systems research artifact*
 
 ## 7. Research Contribution
 
-This project demonstrates that a **single high-school student** independently:
+This project demonstrates that a **small focused research team at Zylvon** independently:
 
 1. **Designed** a custom networking protocol (NWP) for P2P neural gradient exchange
 2. **Implemented** a working DHT routing layer (modified Kademlia with latency-weighted XOR buckets)

@@ -215,4 +215,4 @@ neuron-wire/
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/cianmag/neuron-wire/discussions), ask in our [Discord](https://discord.gg/neuron-wire), or email the maintainer at ci@cianmag.com.
+Open a [GitHub Discussion](https://github.com/cianmag/neuron-wire/discussions), ask in our [Discord](https://discord.gg/neuron-wire), or email the maintainer at team@zylvon.com.

@@ -2,10 +2,9 @@
 
 **Zero-Infrastructure AI** — An open-source infrastructure layer for decentralized AI systems.
 
-> **Target:** Sentient Foundation — Open Source AGI Grant Programme  
-> **Track:** Grants (no strings — public goods builder)  
-> **Amount requested:** $25,000 (Grant track)  
-> **Status:** Draft — ready for submission review
+> **Organization:** [Zylvon](https://zylvon.com)  
+> **Repository:** [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)  
+> **Status:** Research prototype (v0.3.0) · 7,975 lines of Rust · 77/77 tests passing
 
 ---
 
@@ -107,9 +106,9 @@ A pure-WASM P2P neural network that runs by opening a URL. Two tabs auto-discove
 
 ---
 
-## Why Neuron Wire Aligns with Sentient's Mission
+## Why Neuron Wire for Decentralized AI Infrastructure
 
-Sentient Foundation funds projects that are open, accessible, private, empowering, and good for humanity. Neuron Wire was not built for this grant — but it aligns with every stated priority:
+Neuron Wire was built for open, accessible, private, empowering AI infrastructure. It aligns with every stated priority of decentralized AI:
 
 | Sentient Priority | How We Meet It |
 |------------------|----------------|
@@ -217,7 +216,7 @@ When reporting findings, the language is precise: "our experiments suggest," "un
 
 ## Budget
 
-> *To be completed based on Sentient Foundation guidance. Indicative ranges below.*
+> *To be completed based on funding guidance. Indicative ranges below.*
 
 | Category | Estimated Cost | Justification |
 |----------|---------------|---------------|

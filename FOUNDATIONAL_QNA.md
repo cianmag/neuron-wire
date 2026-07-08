@@ -7,9 +7,9 @@
 
 ## How to Read This Document
 
-**Who wrote this:** A 16-year-old independent researcher applying to university while building a peer-to-peer learning runtime in Rust.
+**Who wrote this:** The Neuron Wire team at Zylvon — building open infrastructure for decentralized AI.
 
-**Who this is for:** Admissions officers, professors, researchers, and anyone who wants to understand the project without reading 8,000 lines of code.
+**Who this is for:** Researchers, engineers, and anyone who wants to understand the project without reading 8,000 lines of code.
 
 **What this document is:** 20 categories of questions that every research project should be able to answer — from "what problem does this solve?" to "what would prove you wrong?"
 

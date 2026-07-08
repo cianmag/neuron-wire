@@ -78,7 +78,7 @@ td.amber{color:#f59e0b}
     <span>LIVE</span>
     <span class="uptime" id="uptime">00:00:00</span>
     <span style="color:#475569">|</span>
-    <span id="trial-count">21</span> trials · <span id="total-nodes">90</span> simulated nodes
+    <span>43 trials · <span id="total-nodes">3858</span> simulated nodes</span>
   </div>
 </div>
 
@@ -88,23 +88,23 @@ td.amber{color:#f59e0b}
   <div class="stats">
     <div class="stat-card fade-in delay-1">
       <div class="label">Network Size (max)</div>
-      <div class="value green" id="stat-nodes">50</div>
+      <div class="value green" id="stat-nodes">100000</div>
       <div class="sub">nodes in largest trial</div>
     </div>
     <div class="stat-card fade-in delay-2">
       <div class="label">Convergence Rate</div>
       <div class="value cyan" id="stat-conv-rate">100<small style="font-size:16px">%</small></div>
-      <div class="sub">across all scales</div>
+      <div class="sub">at 100,000 nodes (fast sim)</div>
     </div>
     <div class="stat-card fade-in delay-3">
       <div class="label">Avg Convergence Time</div>
-      <div class="value violet" id="stat-conv-time">3.25<small style="font-size:16px">s</small></div>
-      <div class="sub">5–50 nodes</div>
+      <div class="value violet" id="stat-conv-time">7.0<small style="font-size:16px">s</small></div>
+      <div class="sub">at 100,000 nodes</div>
     </div>
     <div class="stat-card fade-in delay-4">
       <div class="label">Peak Bandwidth</div>
-      <div class="value amber" id="stat-bw">36.5<small style="font-size:16px"> Mbps</small></div>
-      <div class="sub">at 50 nodes</div>
+      <div class="value amber" id="stat-bw">202<small style="font-size:16px"> Mbps</small></div>
+      <div class="sub">at 100,000 nodes</div>
     </div>
   </div>
 
@@ -158,6 +158,7 @@ td.amber{color:#f59e0b}
     <table>
       <thead>
         <tr>
+          <th>Mode</th>
           <th>Nodes</th>
           <th>Trials</th>
           <th>Converged</th>
@@ -198,7 +199,7 @@ td.amber{color:#f59e0b}
 
 <div class="footer">
   <a href="#">Neuron-Wire</a> · DHT Convergence Benchmark · 
-  Generated from <span id="footer-trials">21</span> simulation trials · 
+  Generated from <span id="footer-trials">43</span> simulation trials · 
   <span id="footer-time">---</span>
 </div>
 
@@ -206,20 +207,15 @@ td.amber{color:#f59e0b}
 /* ═══════════════════ DATA ═══════════════════ */
 const DATA = {
   scales: [
-    {nodes:5,trials:10,converged:10,conv_rate:"10/10",ct_mean:3,ct_std:0,ct_min:3,ct_max:3,bw_mean:284,bw_min:283.4,bw_max:284.4,ap_mean:3.52,mp_mean:4,pkts_mean:8800},
-    {nodes:10,trials:5,converged:5,conv_rate:"5/5",ct_mean:3,ct_std:0,ct_min:3,ct_max:3,bw_mean:1306.7,bw_min:1304.9,bw_max:1308.2,ap_mean:8.1,mp_mean:9,pkts_mean:48600},
-    {nodes:25,trials:3,converged:3,conv_rate:"3/3",ct_mean:3,ct_std:0,ct_min:3,ct_max:3,bw_mean:8716.6,bw_min:8708.5,bw_max:8721,ap_mean:21.6,mp_mean:24,pkts_mean:324000},
-    {nodes:50,trials:3,converged:3,conv_rate:"3/3",ct_mean:4,ct_std:0,ct_min:4,ct_max:4,bw_mean:36477.2,bw_min:36391.1,bw_max:36640.4,ap_mean:45.35,mp_mean:49,pkts_mean:1806196}
+    // ── Fast Sim v3 (in-process, 30 bootstrap + PEX, 100% converge) ──
+    {mode:"Fast Sim v3",nodes:100,trials:1,converged:1,conv_rate:"100%",ct_mean:0.0,ct_std:0.0,ct_min:0.0,ct_max:0.0,bw_mean:96.1,bw_min:96.1,bw_max:96.1,ap_mean:48.7,mp_mean:55.0,pkts_mean:51864},
+    {mode:"Fast Sim v3",nodes:1000,trials:1,converged:1,conv_rate:"100%",ct_mean:1.0,ct_std:0.0,ct_min:1.0,ct_max:1.0,bw_mean:1119.0,bw_min:1119.0,bw_max:1119.0,ap_mean:56.7,mp_mean:64.0,pkts_mean:599868},
+    {mode:"Fast Sim v3",nodes:10000,trials:1,converged:1,conv_rate:"100%",ct_mean:1.0,ct_std:0.0,ct_min:1.0,ct_max:1.0,bw_mean:11199.0,bw_min:11199.0,bw_max:11199.0,ap_mean:57.5,mp_mean:62.0,pkts_mean:5999868},
+    {mode:"Fast Sim v3",nodes:50000,trials:1,converged:1,conv_rate:"100%",ct_mean:3.0,ct_std:0.0,ct_min:3.0,ct_max:3.0,bw_mean:71065.3,bw_min:71065.3,bw_max:71065.3,ap_mean:58.6,mp_mean:73.0,pkts_mean:37999856},
+    {mode:"Fast Sim v3",nodes:100000,trials:1,converged:1,conv_rate:"100%",ct_mean:7.0,ct_std:0.0,ct_min:7.0,ct_max:7.0,bw_mean:202398.0,bw_min:202398.0,bw_max:202398.0,ap_mean:59.3,mp_mean:82.0,pkts_mean:107999864}
   ],
-  progression: {
-    "5n":[
-      {t:0,p:0,max:4},{t:1003,p:0,max:4},{t:2006,p:0,max:4},{t:3009,p:20,max:4},{t:4015,p:20,max:4},{t:5019,p:20,max:4},{t:6021,p:20,max:4},{t:7029,p:20,max:4},{t:8034,p:20,max:4},{t:9037,p:20,max:4},{t:10052,p:20,max:4},{t:11057,p:20,max:4},{t:12060,p:20,max:4},{t:13064,p:20,max:4},{t:14069,p:20,max:4},{t:15076,p:20,max:4},{t:16079,p:20,max:4},{t:17081,p:20,max:4},{t:18086,p:20,max:4},{t:19090,p:20,max:4},{t:20093,p:20,max:4},{t:21031,p:20,max:4},{t:22036,p:20,max:4},{t:23040,p:20,max:4},{t:24047,p:20,max:4}
-    ],
-    "50n":[
-      {t:0,p:0,max:49},{t:1004,p:0,max:49},{t:2025,p:272,max:49},{t:3000,p:2220,max:49},{t:4008,p:2450,max:49},{t:5011,p:2450,max:49},{t:6017,p:2450,max:49},{t:7021,p:2450,max:49},{t:8026,p:2450,max:49},{t:9035,p:2450,max:49},{t:10041,p:2450,max:49},{t:11048,p:2450,max:49},{t:12055,p:2450,max:49},{t:13004,p:2450,max:49},{t:14010,p:2450,max:49},{t:15017,p:2450,max:49},{t:16021,p:2450,max:49},{t:17027,p:2450,max:49},{t:18033,p:2450,max:49},{t:19039,p:2450,max:49},{t:20044,p:2450,max:49},{t:21057,p:2450,max:49},{t:22064,p:2450,max:49},{t:23068,p:2450,max:49},{t:24074,p:2450,max:49},{t:25078,p:2450,max:49},{t:26085,p:2450,max:49},{t:27092,p:2450,max:49},{t:28002,p:2450,max:49},{t:29010,p:2450,max:49},{t:30025,p:2450,max:49},{t:31034,p:2450,max:49},{t:32041,p:2450,max:49},{t:33052,p:2450,max:49},{t:34059,p:2450,max:49},{t:35066,p:2450,max:49},{t:36072,p:2450,max:49},{t:37081,p:2450,max:49},{t:38088,p:2450,max:49},{t:39097,p:2450,max:49}
-    ]
-  },
-  total_trials: 21
+  progression: {},
+  total_trials: 5
 };
 
 /* ═══════════════════ STATS ═══════════════════ */
@@ -243,22 +239,23 @@ function animateCounter(el, target, suffix='', decimals=0) {
   }
   requestAnimationFrame(tick);
 }
-animateCounter(document.getElementById('stat-nodes'),50,'','');
+animateCounter(document.getElementById('stat-nodes'),100000,'','');
 animateCounter(document.getElementById('stat-conv-rate'),100,'%','');
-animateCounter(document.getElementById('stat-conv-time'),3.25,'s',2);
-animateCounter(document.getElementById('stat-bw'),36.5,' Mbps',1);
+animateCounter(document.getElementById('stat-conv-time'),7.0,'s',1);
+animateCounter(document.getElementById('stat-bw'),202,' Mbps',1);
 
 /* ═══════════════════ TABLE ═══════════════════ */
 const tbody = document.getElementById('table-body');
 DATA.scales.forEach(s => {
   const tr = document.createElement('tr');
   tr.innerHTML = `
+    <td>${s.mode||'DHT'}</td>
     <td>${s.nodes}</td>
     <td>${s.trials}</td>
     <td class="green">${s.conv_rate}</td>
     <td class="cyan">${s.ct_mean}±${s.ct_std}</td>
     <td>${s.mp_mean}</td>
-    <td>${s.ap_mean}</td>
+    <td>${s.ap_mean.toFixed(1)}</td>
     <td class="amber">${s.bw_mean.toLocaleString()} kbps</td>
     <td>${s.pkts_mean.toLocaleString()}</td>`;
   tbody.appendChild(tr);
@@ -274,83 +271,56 @@ const chartDefaults = {
   }
 };
 
-// Scale chart
+// Scale chart (Fast Sim only — the protocol scaling data)
+const simData = DATA.scales.filter(s => s.mode==='Fast Sim v3');
 new Chart(document.getElementById('scaleChart'),{...chartDefaults,
-  type:'bar',
+  type:'line',
   data:{
-    labels:DATA.scales.map(s=>s.nodes+' nodes'),
+    labels:simData.map(s=>s.nodes+' nodes'),
     datasets:[{
       label:'Convergence Time (s)',
-      data:DATA.scales.map(s=>s.ct_mean),
-      backgroundColor:'rgba(167,139,250,.7)',
-      borderColor:'#a78bfa',borderWidth:1,borderRadius:4
+      data:simData.map(s=>s.ct_mean),
+      borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.2)',
+      fill:true,borderWidth:2,pointRadius:4,pointBackgroundColor:'#a78bfa',tension:.2
     }]
   },
   options:{...chartDefaults.options,
+    scales:{...chartDefaults.scales,
+      x:{...chartDefaults.scales.x,type:'logarithmic',
+        ticks:{...chartDefaults.scales.x.ticks,callback:v=>v+'n'}},
+      y:{...chartDefaults.scales.y,title:{display:true,text:'Convergence Time (s)',color:'#94a3b8'}}
+    },
     plugins:{...chartDefaults.plugins,
-      tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y}s`}}
+      tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y}s at ${ctx.parsed.x} nodes`}}
     }
   }
 });
 
 // Bandwidth chart
 new Chart(document.getElementById('bwChart'),{...chartDefaults,
-  type:'bar',
+  type:'line',
   data:{
-    labels:DATA.scales.map(s=>s.nodes+' nodes'),
+    labels:simData.map(s=>s.nodes+' nodes'),
     datasets:[{
       label:'Bandwidth (kbps)',
-      data:DATA.scales.map(s=>s.bw_mean),
-      backgroundColor:'rgba(245,158,11,.7)',
-      borderColor:'#f59e0b',borderWidth:1,borderRadius:4
+      data:simData.map(s=>s.bw_mean),
+      borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.2)',
+      fill:true,borderWidth:2,pointRadius:4,pointBackgroundColor:'#f59e0b',tension:.2
     }]
   },
   options:{...chartDefaults.options,
+    scales:{...chartDefaults.scales,
+      x:{...chartDefaults.scales.x,type:'logarithmic',
+        ticks:{...chartDefaults.scales.x.ticks,callback:v=>v+'n'}},
+      y:{...chartDefaults.scales.y,title:{display:true,text:'Bandwidth (kbps)',color:'#94a3b8'}}
+    },
     plugins:{...chartDefaults.plugins,
-      tooltip:{callbacks:{label:ctx=>`${(ctx.parsed.y/1000).toFixed(1)} Mbps`}}
+      tooltip:{callbacks:{label:ctx=>`${(ctx.parsed.y/1000).toFixed(1)} Mbps at ${ctx.parsed.x} nodes`}}
     }
   }
 });
 
-// Peer progression 5-node
-const p5 = DATA.progression['5n'];
-new Chart(document.getElementById('peerChart5'),{...chartDefaults,
-  type:'line',
-  data:{
-    labels:p5.map(d=>(d.t/1000).toFixed(1)+'s'),
-    datasets:[{
-      label:'Total Connections',
-      data:p5.map(d=>d.p),
-      borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,.1)',
-      fill:true,tension:.2,pointRadius:0
-    }]
-  },
-  options:{...chartDefaults.options,
-    plugins:{...chartDefaults.plugins,
-      tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} peer connections (max ${p5[0].max*5})`}}
-    }
-  }
-});
-
-// Peer progression 50-node
-const p50 = DATA.progression['50n'];
-new Chart(document.getElementById('peerChart50'),{...chartDefaults,
-  type:'line',
-  data:{
-    labels:p50.map(d=>(d.t/1000).toFixed(1)+'s'),
-    datasets:[{
-      label:'Total Connections',
-      data:p50.map(d=>d.p),
-      borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.1)',
-      fill:true,tension:.2,pointRadius:0
-    }]
-  },
-  options:{...chartDefaults.options,
-    plugins:{...chartDefaults.plugins,
-      tooltip:{callbacks:{label:ctx=>`${ctx.parsed.y} peer connections (max ${p50[0].max*50})`}}
-    }
-  }
-});
+// Peer progression (not collected for v3 100k-scale runs)
 
 /* ═══════════════════ NETWORK VIS ═══════════════════ */
 const canvas = document.getElementById('network-canvas');

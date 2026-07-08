@@ -75,7 +75,7 @@ When `--paper-mode` is set:
 - Regression detection: if a code change alters benchmark numbers, CI catches it
 - Raw data is checked into the repository — reviewers can analyze it themselves, not just look at summary tables
 - The SGA negative result is independently reproducible: any contributor can run the same command and see the same bandwidth numbers
-- Builds trust with reviewers, professors, and admissions officers
+- Builds trust with reviewers and professors
 
 **Negative:**
 - Deterministic simulation is not the same as real-world testing — results may not generalize to WAN conditions (documented in the "Limitations" section of every published result)

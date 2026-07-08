@@ -34,6 +34,6 @@ cargo run --example simulate -- --nodes 5 --duration 25 --seed 42
 
 ## License
 
-MIT © 2025–2026 Neuron Wire Contributors
+MIT © 2025–2026 Zylvon & Neuron Wire Contributors
 
 *Built with Rust 2021 edition. Single-threaded, non-blocking, and intentionally free of async runtimes.*

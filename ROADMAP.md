@@ -2,7 +2,7 @@
 
 > **Date:** 2026-07-03  
 > **Repository:** [neuron-wire](https://github.com/cianmag/neuron-wire)  
-> **Status:** Aligned with Sentient Foundation grant deliverables (see [GRANT.md](GRANT.md))
+> **Status:** Aligned with Zylvon infrastructure roadmap (see [GRANT.md](GRANT.md))
 
 This document maps the three deliverables that would transform neuron-wire from a sophisticated localhost prototype into a funded, published, and adopted decentralized AI infrastructure platform.
 
