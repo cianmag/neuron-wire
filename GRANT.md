@@ -1,243 +1,173 @@
 # Grant Application: Neuron Wire (NWP)
 
-**Zero-Infrastructure AI** — An open-source infrastructure layer for decentralized AI systems.
+**Open infrastructure for decentralized AI.**
 
-> **Organization:** [Zylvon](https://zylvon.com)  
-> **Repository:** [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)  
-> **Status:** Research prototype (v0.3.0) · 7,975 lines of Rust · 77/77 tests passing
-
----
-
-## One-Sentence Pitch
-
-**Neuron Wire is an open-source infrastructure layer for decentralized AI that enables any device to discover peers, exchange learning signals, and participate in collaborative AI without provisioning servers or trusting a central coordinator.**
+| Field | Value |
+|-------|-------|
+| **Organization** | [Zylvon](https://zylvon.com) |
+| **Repository** | [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire) |
+| **License** | MIT |
+| **Status** | Research prototype (v0.3.0) |
+| **Codebase** | 55 Rust source files, 7,975 LOC, 10 unit tests, zero clippy warnings |
+| **CI** | Cross-platform build + test, clippy, coverage, benchmark tracking |
+| **Simulation scale** | 1 B nodes converged (v4 hybrid, 15.6 s wall time) |
 
 ---
 
 ## Executive Summary
 
-Today, building distributed AI requires cloud infrastructure, orchestration, and centralized coordination. Every gradient flows through a parameter server. Every participant must trust a central operator. A developer in Lagos, Bangalore, or São Paulo can lose the model their work depends on without warning.
+Neuron Wire (NWP) is an open-source infrastructure layer for decentralized AI. It enables any device reachable over a network to discover peers, exchange learning signals, and participate in collaborative computation without provisioning servers or trusting a central coordinator.
 
-Neuron Wire (NWP) explores a different model: **any device that can reach another device should be able to join a collaborative AI network without provisioning servers or trusting a central coordinator.** We have built the networking and runtime substrate required to test whether this vision is practical — 42 source modules, 19,220 lines of Rust, 256 tests, 8 architecture decision records, 6 tutorials, 7 baseline comparisons, 10 reproducible experiment configurations, and a working browser-based P2P demo.
+The core protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, identity and trust primitives, and a deterministic paper-mode simulation framework. The engine is a single-threaded non-blocking loop that sustains ~400 KHz–1 MHz tick rates on commodity hardware with zero external runtime dependencies.
 
-We are requesting support to:
+Existing benchmarks (v3 simulator) demonstrate 100% DHT convergence at 100 K nodes; the v4 hybrid model extends this to 1 B nodes in 15.6 s wall time, suggesting the underlying routing protocol scales at least to O(log N) convergence with O(1) bandwidth per node relative to network size.
 
-1. **Deploy neuron-wire across 100+ real Internet nodes on multiple continents** — measure latency, churn, and convergence under realistic network conditions for the first time.
-2. **Release reproducible datasets, benchmarks, and a peer-reviewed publication** — including negative findings.
-3. **Build a developer SDK that makes neuron-wire installable in five minutes** — `cargo add neuron-wire`, Python bindings, and documented integration patterns for five potential applications.
+We request support to: **(1)** deploy NWP across 100+ real Internet nodes on three continents and measure what actually happens under realistic network conditions; **(2)** release reproducible datasets, baselines, and a peer-reviewed publication including negative findings; and **(3)** build a developer SDK that reduces onboarding to `cargo add neuron-wire`.
 
 ---
 
-## Application History & Status
+## Problem
 
-| Aspect | Status |
-|--------|--------|
-| **Repository** | [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire) |
-| **Lines of Rust** | 19,220 across 55 source files |
-| **Tests** | 256 `#[test]` annotations across 35/42 modules + integration + property + security + stress |
-| **Build** | `cargo check -D warnings` clean, `cargo clippy` 0 errors |
-| **Documentation** | mdBook, 6 tutorials, 8 ADRs, formal mathematical model (1,760 lines) |
-| **CI** | 4 workflows (build+test, docs, release, reproduction validation) |
-| **License** | MIT |
-| **Published crates** | Not yet — pending SDK stabilization |
-| **WASM demo** | Working P2P browser demo (BroadcastChannel, no server) |
-| **Years building** | 11 days of active development, 60 commits, single contributor |
+Building distributed AI today requires centralized infrastructure. Every gradient flows through a parameter server. Every participant must trust a central operator. Federated learning still requires an aggregator. All-Reduce assumes a static, known participant set. A developer in any region with unreliable cloud access can lose the model their work depends on without warning.
+
+Three constraints drive the need for a different architecture:
+
+1. **Access** — collaborative AI should not require provisioning cloud infrastructure. A device with a network connection should be able to participate.
+2. **Privacy** — data should not leave the device. Only learning signals (gradients, activations) should be exchanged, with cryptographic guarantees about what was shared.
+3. **Trust** — participation should not require trusting a coordinator, a parameter server, or any single party. The network should be self-organizing and Byzantine-resilient.
+
+Neuron Wire explores whether these constraints can be satisfied simultaneously with a single protocol.
 
 ---
 
-## What We've Built
+## Current Status
 
-Neuron Wire is an infrastructure layer — the operating system for decentralized AI. It provides the primitives that every decentralized AI application needs and that no existing library provides together in a single, auditable runtime:
+### Core protocol
 
-### Core Infrastructure Primitives
+| Primitive | Module | Tests | Description |
+|-----------|--------|-------|-------------|
+| DHT routing | `dht.rs` | 7 | Latency-weighted Kademlia, 256 buckets, K=20, DNS seed bootstrap |
+| UDP transport | `transport.rs` | 10 | Custom reliable UDP, 3 reliability tiers, ACK bitfield, gradient decay |
+| Engine loop | `engine_loop.rs` | 4 | Single-threaded non-blocking 6-phase tick, 400 KHz–1 MHz, 0% CPU idle |
+| Identity & crypto | `identity.rs`, `security.rs` | — | Ed25519 signatures, Noise Protocol-ready symmetric crypto |
+| Trust scoring | `trust.rs` | — | Reputation-based Sybil resistance |
+| Audit logging | `audit.rs` | — | Hash-chained append-only audit log |
+| Observability | `observability/` | — | Prometheus metrics, OTel, live dashboard |
+| Simulator | `simulator.rs` | — | Deterministic paper-mode, metadata capture, CSV export, known-good validation |
 
-| Primitive | Module | What it does | Status |
-|-----------|--------|-------------|--------|
-| **Peer discovery** | `src/dht.rs` (1,209 lines) | Latency-weighted Kademlia DHT — 256 buckets, K=20, DNS seed bootstrap | ✅ Tested 7 unit tests |
-| **Secure transport** | `src/transport.rs` (642 lines) | Custom UDP protocol with 3 reliability tiers, ACK bitfield, gradient decay | ✅ Tested 10 unit tests |
-| **Engine loop** | `src/engine_loop.rs` (1,045 lines) | Single-threaded non-blocking 6-phase tick, ~400 KHz–1 MHz, 0% CPU when idle | ✅ Tested 4 unit tests |
-| **Identity & crypto** | `src/identity.rs`, `src/secure_channel.rs`, `src/security.rs` | Ed25519 signatures, Noise Protocol-ready symmetric crypto, zeroize | ✅ |
-| **Trust scoring** | `src/trust.rs` (504 lines) | Reputation-based Sybil resistance | ✅ Tested |
-| **Audit logging** | `src/audit.rs` (534 lines) | Hash-chained append-only audit log | ✅ Tested |
-| **Observability** | `src/observability/` (4 files) | Prometheus metrics, OpenTelemetry, live dashboard | ✅ |
-| **Simulator** | `src/simulator.rs` (1,515 lines) | Deterministic paper-mode with metadata capture, CSV export, known-good validation | ✅ 10 experiment configs |
+### Distributed learning subsystems
 
-### Distributed Learning Subsystems
+| Subsystem | LOC | Function |
+|-----------|-----|----------|
+| `hebbian.rs` | 683 | STDP weight updates, L2 decay, micro-pruning, sparse gossip dispatch |
+| `forward_pass.rs` | 413 | Activation propagation with tanh, prediction error (surprise signal) |
+| `neurogenesis.rs` | 340 | Surprise-driven neuron birth (leaky accumulator > 0.2) |
+| `apoptosis.rs` | 306 | Programmed neuron death (4 criteria, death spiral guard) |
 
-| Subsystem | Lines | Description |
-|-----------|-------|-------------|
-| `src/hebbian.rs` | 683 | STDP weight updates, L2 decay, micro-pruning, sparse gossip dispatch |
-| `src/forward_pass.rs` | 413 | Activation propagation with tanh squashing, prediction error (surprise) |
-| `src/neurogenesis.rs` | 340 | Surprise-driven neuron birth (leaky accumulator > 0.2) |
-| `src/apoptosis.rs` | 306 | Programmed neuron death (4 pruning criteria, death spiral guard) |
-| `src/attention.rs` | 466 | Attention mechanism for weighted gradient exchange |
-| `src/ml.rs` | 389 | ML module integration layer |
-| `src/meta_learning.rs` | 337 | Meta-learning parameter adaptation |
-| `src/curiosity.rs` | 265 | Intrinsic motivation / exploration drive |
-| `src/dynamic_activation.rs` | 380 | Dynamic activation function selection |
+### Baseline comparisons (Python)
 
-### Baseline Comparisons (Python)
+7 baselines in `baselines/`: federated averaging, decentralized SGD, parameter server, Horovod All-Reduce, BitTensor, Ray distributed, and a unified comparison framework.
 
-| Baseline | File | Purpose |
-|----------|------|---------|
-| Federated averaging | `baselines/federated.py` | Centralized coordinator baseline |
-| Decentralized SGD | `baselines/decentralized_sgd.py` | Gossip-based parameter averaging |
-| Parameter server | `baselines/parameter_server.py` | Traditional PS architecture |
-| All-Reduce (Horovod) | `baselines/horovod_baseline.py` | Ring-AllReduce baseline |
-| BitTensor | `baselines/bittensor_baseline.py` | Incentivized subnet comparison |
-| Ray distributed | `baselines/ray_baseline.py` | Ray remote function baseline |
-| Comparison framework | `baselines/comparison_framework.py` | Unified evaluation harness across all baselines |
+### Research infrastructure
 
-### Research Infrastructure
+- **Formal model** — [`FORMAL_MODEL.md`](FORMAL_MODEL.md) (1,760 lines, 17 sections): network model, convergence analysis, DHT convergence theorem, redundancy bounds, partition tolerance, trust convergence, entropy bounds, failure probabilities
+- **Reproducible experiments** — 10 TOML configs covering DHT convergence, scaling, bandwidth, churn, failure injection
+- **One-command reproduction** — `scripts/reproduce.sh`: capture env → build → run all 10 experiments → validate → generate 9 publication-ready matplotlib figures
+- **Architecture decisions** — 8 ADRs documenting design tradeoffs with rationale
+- **Browser demo** — Pure WASM P2P neural network (101 KB WASM, two tabs auto-discover via BroadcastChannel, no server)
 
-- **Formal mathematical model** — `FORMAL_MODEL.md` (1,760 lines, 17 sections): network model, convergence analysis, DHT convergence theorem, redundancy bounds, partition tolerance analysis, trust convergence analysis, entropy bounds, failure probabilities
-- **Reproducible experiments** — 10 TOML configs covering DHT convergence, scaling, bandwidth, churn, failure injection, multi-trial stats, SGA comparison
-- **One-command reproduction** — `scripts/reproduce.sh` captures env → builds → runs all 10 experiments → validates against known-good → generates 9 publication-ready matplotlib figures
-- **Tutorial series** — 6 tutorials covering everything from first node to deep observability (2,010 lines)
-- **Architecture decisions** — 8 ADRs documenting every design tradeoff with rationale
+### DHT convergence benchmarks
 
-### Browser Demo (Tier 10)
+| Scale | Nodes | Convergence | CT (sim‑s) | Avg Peers | BW | Wall Time |
+|-------|-------|-------------|------------|-----------|-----|-----------|
+| v3 sim | 100 K | 100% | 7.0 | 59 | 202 Mbps | 43.4 s |
+| v3 sim | 10 K | 100% | 1.0 | 58 | 52 Mbps | 1.5 s |
+| v4 hybrid | 100 K | 99.9% | 7.5 | 117 | 172 Mbps | 4.9 s |
+| v4 hybrid | 1 M | 99.8% | 10.0 | 148 | 149 Mbps | 12.4 s |
+| v4 hybrid | 10 M | 98.9% | 10.0 | 142 | 137 Mbps | 12.2 s |
+| v4 hybrid | 100 M | 99.8% | 12.5 | 176 | 125 Mbps | 15.5 s |
+| **v4 hybrid** | **1 B** | **99.5%** | **12.5** | **176** | **125 Mbps** | **15.6 s** |
 
-A pure-WASM P2P neural network that runs by opening a URL. Two tabs auto-discover each other via BroadcastChannel, exchange activations, and learn together. No server. No install.
-
-- **563-line WASM engine** — 6 neurons, Hebbian STDP, heartbeat discovery, gradient exchange
-- **456-line JS renderer** — Canvas 2D with glow effects, particle bursts, packet animations
-- **101KB WASM binary** — compiled with wasm-pack, serves from any static host
-
----
-
-## Why Neuron Wire for Decentralized AI Infrastructure
-
-Neuron Wire was built for open, accessible, private, empowering AI infrastructure. It aligns with every stated priority of decentralized AI:
-
-| Sentient Priority | How We Meet It |
-|------------------|----------------|
-| **Open source** | MIT-licensed. 55 Rust source files, full CI/CD with 4 workflows, issue templates, contributing guide. Anyone can inspect, modify, and redistribute every line. |
-| **Yours to keep** | Open weights, once released, can never be taken back. Neuron Wire makes it possible to run collaborative AI without depending on any API key, any cloud provider, or any single organization. |
-| **Accessible** | Runs on hardware people actually own — single-threaded engine, `opt-level="z"`, 512 MB RAM target. The WASM demo runs in any browser tab on any device. |
-| **Private by default** | Data never leaves the device. Only activation gradients are exchanged over the network, decayed exponentially over 100 ms half-life. The hash-chained audit log provides verifiable proof of what was shared. |
-| **Empowering, not extractive** | Any device with a UDP port can join. No coordinator, no fees, no central authority can revoke access. The network belongs to its participants. |
-| **Good for humanity** | Potential applications: decentralized LLM inference for underserved languages, collaborative edge learning for medical imaging in low-infrastructure regions, disaster communication AI when infrastructure is destroyed. These are directions the infrastructure enables, not features we have demonstrated. |
-| **Decentralized AI infrastructure** | This is the explicit design goal. Not an ML framework retrofitted for distribution, but a distributed systems protocol built from the ground up with AI workloads as its first-class concern. |
-| **Identity & verification** | Ed25519 signatures on every message, trust scoring for Sybil resistance, hash-chained audit log for verifiable provenance. |
-| **Compute without central control** | P2P by design — no parameter server, no orchestrator, no single point of failure or control. |
+*v4 uses a hybrid model: 200 K active nodes with statistical virtual nodes for the remainder — convergence threshold = max(3 log₂(N), 30).*
 
 ---
 
 ## Research Philosophy
 
-Two sentences guide every decision in this project:
+Two principles guide this project:
 
-> **Evidence, not features.** Every claim deserves an experiment.
+1. **Evidence, not features.** Every claim deserves an experiment. A claim about convergence without a measurement is an opinion.
+2. **A limitation documented is stronger than an assumption hidden.** The limitations section should grow as fast as the features section.
 
-When planning experiments, we ask: *Can I measure it? Can someone else reproduce it? Would a skeptical reviewer believe it? Does it answer our research question?* If the answer is "no," it doesn't belong in v1.0.
+Before the first WAN deployment, the experimental protocol — hypothesis, null hypothesis, independent and dependent variables, controlled variables, success and failure criteria, statistical analysis plan — will be timestamped and committed to the repository.
 
-Success will not be measured by GitHub stars or downloads. Success means producing reproducible evidence about decentralized collaborative learning that other researchers can independently validate, reproduce, and extend.
+Claims are stated precisely: "under the evaluated conditions," "in the tested configuration," "our experiments suggest." Negative results are published alongside positive ones.
 
-Before deploying a single node across continents, the experimental protocol — hypothesis, null hypothesis, independent and dependent variables, controlled variables, success and failure criteria, statistical analysis plan — will be written, timestamped, and committed to the repository. This prevents rewriting hypotheses to fit results after seeing them.
-
-When reporting findings, the language is precise: "our experiments suggest," "under the evaluated conditions," and "in the tested configuration." Cautious claims are believed more readily than sweeping ones, and the project is strongest when it is understated.
+---
 
 ## Requested Deliverables
 
 ### Deliverable 1: Real Internet Deployment (100+ Nodes, 3 Continents)
 
-**Problem:** Every benchmark so far is localhost UDP. Real networks have NAT, jitter, loss, asymmetric routing, and heterogeneous hardware. We don't know if any of our assumptions survive contact with the real Internet.
+**Problem:** All existing benchmarks are localhost simulations. Real networks have NAT, jitter, loss, asymmetric routing, and heterogeneous hardware. It is not known which assumptions survive contact with the Internet.
 
 **Plan:**
-- Deploy 100+ neuron-wire nodes across cloud infrastructure in North America (us-east-1), Europe (eu-west-1), and Asia-Pacific (ap-southeast-2)
-- Each node runs the standard engine loop with DHT routing, gradient exchange, and observability pipeline
-- Collect: latency distribution (intra-region, inter-region), packet loss rate, churn patterns, DHT convergence time, gradient delivery success rate
-- Implement: Noise Protocol encryption (DTLS-style, zero-alloc), STUN-based NAT traversal for non-VPS participation
-- **Negative results published alongside positive ones** — this is the first real-world test of the architecture
+- Deploy 100+ nodes across cloud infrastructure in North America (us-east-1), Europe (eu-west-1), and Asia-Pacific (ap-southeast-2)
+- Measure: latency distribution (intra-region, inter-region), packet loss rate, churn patterns, DHT convergence time, gradient delivery success rate
+- Implement: Noise Protocol encryption (zero-alloc DTLS-style handshake), STUN-based NAT traversal for non-VPS nodes
+- **Negative results published alongside positive ones**
 
 **Success criteria:**
 - 100+ nodes sustain connectivity for 7+ days
-- DHT convergence time measured under real churn (NAT rebind, VM restart, packet loss)
+- DHT convergence time measured under real churn
 - Cross-continent gradient delivery with < 50% loss
-- Public live dashboard showing per-region metrics
-
-**Budget use:** VPS compute ($200-400/month × 3 months), engineering time for NAT traversal + wire encryption
+- Public live dashboard with per-region metrics
 
 ### Deliverable 2: Publication & Reproducible Benchmarks
 
-**Problem:** No decentralized AI infrastructure project has published a reproducible evaluation with open datasets. This is why the field is full of claims and empty of evidence.
-
 **Plan:**
-- Write a reproducible evaluation paper comparing neuron-wire against: vanilla Kademlia (no latency weighting), gossip SGD (random peer selection), federated averaging (central coordinator)
-- All 7 Python baselines already exist in `baselines/` — run them on the same testbed with the same measurement methodology
-- Generate open datasets: per-tick latency, throughput, convergence curves for all 4 systems across 3 deployment topologies (LAN, WAN, mixed)
-- Submit to workshop track (SysML, MLSys, HotOS, DSN) — registered report format preferred (results-blind review)
-- One-command `cargo run --release -- --reproduce-all` reproduces every figure in the paper
-
-**Success criteria:**
-- Paper accepted at workshop or conference
-- Datasets published under open license (CC-BY)
-- All figures one-command reproducible from a fresh clone
-
-**Budget use:** Open-access publication fees, compute for baseline experiments, potential conference travel
+- Reproducible evaluation paper comparing NWP against vanilla Kademlia, gossip SGD, and federated averaging on the same testbed
+- All 7 Python baselines run with the same measurement methodology
+- Open datasets: per-tick latency, throughput, convergence curves across 3 topologies
+- Submit to workshop track (SysML, MLSys, HotOS, DSN) — registered report format preferred
+- One-command `cargo run --release -- --reproduce-all` reproduces every figure
 
 ### Deliverable 3: Developer SDK & Ecosystem
 
-**Problem:** Neuron Wire is 19,000 lines of Rust with no onboarding path. The fastest way to use it is to clone the repo and read the examples. This limits adoption to other Rust systems programmers.
-
 **Plan:**
-- `cargo add neuron-wire` — publish to crates.io with minimal API surface (5 public functions: `start_node`, `connect`, `send_gradient`, `recv_gradient`, `get_stats`)
-- Python bindings via PyO3 — ML researchers can import neuron-wire from Python and use it with numpy arrays
-- Documentation: "Five projects built on neuron-wire" — decentralized LLM inference, collaborative edge learning, disaster communication AI, decentralized robotics, distributed scientific computing
-- Peer cache persistence (filesystem-backed) and snapshot/restore (full state serialization) — solve the "node restart = total state loss" limitation
-- WebRTC transport for browser-to-browser across machines (extends the WASM demo beyond BroadcastChannel)
-
-**Success criteria:**
-- `cargo add neuron-wire` → five minutes to a running node
-- Python wheel published on PyPI
-- At least 2 external contributors from other research groups
-
-**Budget use:** Engineering time for PyO3 bindings, SDK polish, documentation, community building
-
----
-
-## Why Us
-
-**We have built,** in 11 days of active development, an infrastructure project that normally takes teams months:
-
-- 42 source modules • 19,220 lines of Rust • 256 tests • 0 clippy errors
-- Formal mathematical model (1,760 lines): convergence proofs, complexity bounds, failure probabilities
-- 7 baseline comparisons in Python against established distributed ML architectures
-- 10 reproducible experiment configs with one-command reproduction
-- 6 tutorials, 8 architecture decision records, 4 CI workflows
-- A working browser-based P2P demo (100KB WASM, two tabs, no server)
-
-**But more importantly:** we are treating this as research, not marketing. The repository documents negative results (LESSONS_LEARNED.md), limitations (README.md §Limitations), and open research questions (FOUNDATIONAL_QNA.md). The formal model includes proven bounds on convergence, redundancy, and partition tolerance — not hand-wavy claims.
-
-**Our strongest advantage** is not that we built a technically ambitious open-source systems project. It's that we're willing to publish findings — including negative ones — and let the experiments reveal what kinds of decentralized AI are practical, rather than promising what we can't deliver.
+- `cargo add neuron-wire` → 5 public functions: `start_node`, `connect`, `send_gradient`, `recv_gradient`, `get_stats`
+- Python bindings via PyO3 for ML researchers
+- 5 reference projects: decentralized LLM inference, collaborative edge learning, disaster communication AI, decentralized robotics, distributed scientific computing
+- Peer cache persistence + snapshot/restore (solves "node restart = total state loss")
+- WebRTC transport for cross-machine browser-to-browser
 
 ---
 
 ## Budget
 
-> *To be completed based on funding guidance. Indicative ranges below.*
-
 | Category | Estimated Cost | Justification |
 |----------|---------------|---------------|
-| VPS compute (3 months, 100+ nodes) | $600–$1,200 | AWS free-tier burstable instances across 3 regions |
-| Open-access publication fees | $1,000–$3,000 | Workshop/conference publication |
-| Engineering (NAT traversal, encryption, SDK) | — | In-kind (primary contributor) or funded |
-| Conference travel (if applicable) | $1,000–$2,000 | One workshop or conference presentation |
-| Community infrastructure | $200–$500 | Discord, CI/CD, documentation hosting |
+| VPS compute (3 months, 100+ nodes, 3 regions) | $600–$1,200 | AWS free-tier burstable instances |
+| Open-access publication fees | $1,000–$3,000 | Workshop or conference publication |
+| Engineering (NAT traversal, encryption, SDK) | — | In-kind or funded |
+| Conference travel | $1,000–$2,000 | One workshop presentation |
+| Community infrastructure | $200–$500 | Discord, CI/CD, docs hosting |
 
 ---
 
-## Application Checklist
+## Alignment with Zylvon Mission
 
-Before submitting, verify:
+Zylvon builds open infrastructure for decentralized AI. Neuron Wire is the networking and runtime substrate:
 
-- [ ] Repository is public ✅ ([github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire))
-- [ ] License is open source ✅ (MIT)
-- [ ] Code is buildable and testable from a clean clone ✅
-- [ ] CI/CD infrastructure is functional ✅ (4 workflows)
-- [ ] Documentation covers architecture, protocol, and developer onboarding ✅
-- [ ] Formal mathematical analysis exists ✅ (1,760-line FORMAL_MODEL.md)
-- [ ] Baseline comparisons are implemented ✅ (7 Python frameworks)
-- [ ] Reproducibility infrastructure is in place ✅ (one-command reproduce)
-- [ ] This GRANT.md is complete and ready for submission
+| Priority | How Neuron Wire Addresses It |
+|----------|------------------------------|
+| Open source | MIT-licensed, 55+ source files, full CI/CD |
+| Decentralized AI infra | Purpose-built P2P transport + DHT + distributed learning |
+| Privacy by design | Data never leaves device; only gradients gossip over network |
+| Accessible | Single-threaded engine, opt-level=z, 512 MB RAM target |
+| Reproducible science | One-command reproduction, metadata capture, known-good validation |
+| Compute without central control | P2P by design: no parameter server, no orchestrator, no fees |
+
+---
+
+*For questions: [team@zylvon.com](mailto:team@zylvon.com) · [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)*

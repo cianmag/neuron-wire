@@ -14,7 +14,7 @@ This is a **research prototype**, not production infrastructure. Security is exp
 That said, if you discover a vulnerability that affects the safety of anyone deploying or experimenting with this software:
 
 1. **Do not** open a public GitHub issue.
-2. Send a description to the maintainer at **ci@cianmag.com** (or open a [GitHub Security Advisory](https://github.com/cianmag/neuron-wire/security/advisories)).
+2. Send a description to the maintainer at **team@zylvon.com** (or open a [GitHub Security Advisory](https://github.com/cianmag/neuron-wire/security/advisories)).
 3. Include the word "neuron-wire" in the subject line.
 4. Provide detailed steps to reproduce the issue.
 

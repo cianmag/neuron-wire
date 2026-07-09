@@ -6,14 +6,14 @@ name = "neuron-wire"
 version = "0.3.0"
 edition = "2021"
 rust-version = "1.87"
-description = "Zero-Copy FlatBuffer Protocol for Planetary Brain"
-authors = ["Cian Mac an tSaoir <cian@nousresearch.com>"]
+description = "Infrastructure layer for decentralized AI — P2P peer discovery, gradient exchange, and distributed learning"
+authors = ["Zylvon <team@zylvon.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/cianmag/neuron-wire"
 homepage = "https://neuron-wire-dashboard.vercel.app"
 documentation = "https://github.com/cianmag/neuron-wire/blob/master/ARCHITECTURE.md"
-keywords = ["dht", "kademlia", "p2p", "neural-network", "distributed"]
-categories = ["network", "science", "simulation"]
+keywords = ["dht", "kademlia", "p2p", "neural-network", "distributed", "hebbian", "stdp", "decentralized", "federated-learning"]
+categories = ["network", "science", "simulation", "wasm"]
 
 [dependencies]
 crc32fast = "1"
