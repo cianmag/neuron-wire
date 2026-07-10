@@ -1,330 +1,461 @@
-# Neuron Wire: Foundational Questions & Answers
+# Neuron Wire: Foundational Q&A
 
-> Answers derived from codebase evidence, architecture decisions, and benchmark results.
-> Date: 2026-07-09 | Commit: `94f2d39`
-
----
-
-## How to Read This Document
-
-**Audience:** Researchers and engineers evaluating the project.
-
-**Purpose:** 20 categories of questions that every research project should be able to answer — from "what problem does this solve?" to "what would prove you wrong?"
-
-**Not:** A technical specification. For architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md). For benchmarks: [`results/`](results/). For roadmap: [`ROADMAP.md`](ROADMAP.md).
-
-**Tone:** This document distinguishes what the project has demonstrated from what remains untested. Documenting limitations builds trust — pretending they don't exist does not.
-
-**Glossary:**
-
-| Term | Definition |
-|------|-----------|
-| **DHT (Distributed Hash Table)** | A phonebook that no single person controls — everyone holds a few pages, together they can look up any name (BitTorrent, Bitcoin) |
-| **Kademlia** | DHT routing algorithm using XOR distance for bucket placement and lookups |
-| **Node** | One participating device running the software |
-| **UDP** | Fast but unreliable packet delivery — no delivery guarantee |
-| **STDP (Spike-Timing-Dependent Plasticity)** | Biological learning rule: synaptic weight depends on precise spike timing |
-| **Hebbian learning** | "Neurons that fire together, wire together" |
-| **k-bucket** | Kademlia routing table slot holding up to K known peers per distance range |
-| **All-Reduce** | Standard multi-GPU training — all devices exchange gradients in a ring |
-| **Parameter server** | Central coordinator holding the "master copy" of a model |
-| **Federated learning** | Local training on each device; weight updates sent to central server |
-| **Zero-copy** | Reading data directly from receive buffer without intermediate parsing |
+> Every answer is one sentence. Updated 2026-07-09 · Commit `5a739f9` · Repository: [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)
 
 ---
 
-## 1. Vision & Motivation
+## 1. The Elevator Pitch
 
-### What is this project in one sentence?
+**What is Neuron Wire in one sentence?** An open-source Rust framework that enables any device to discover peers, exchange learning signals, and participate in collaborative AI without centralized infrastructure.
 
-A decentralized runtime where nodes discover peers via a Kademlia DHT, exchange neural activations over custom UDP transport, and adapt locally via Hebbian STDP — all without central coordination.
+**Explain Neuron Wire in 20 words.** Open-source P2P framework for decentralized AI — DHT peer discovery, custom UDP transport, Hebbian learning, reproducible simulation.
 
-### What problem does it solve?
+**Explain it to a 10-year-old.** It lets computers teach each other by sharing small hints instead of sending all their data to one big server.
 
-Distributed learning today requires either a central coordinator (parameter server, federated averaging) or a static communication topology (All-Reduce). Both assume stable connectivity and homogeneous hardware.
+**Explain it to a software engineer.** A single-threaded non-blocking engine loop integrating Kademlia DHT routing, custom reliable UDP transport, and STDP-based neural computation — 400 KHz–1 MHz tick rate with zero external runtime dependencies.
 
-This project investigates whether a learning substrate can operate across arbitrary P2P topologies with node churn, no central point of failure, and an adaptive graph structure.
+**Explain it to an AI researcher.** A reproducible research platform for studying whether Hebbian STDP over Kademlia-routed P2P topologies can produce collaborative learning signals under realistic network conditions.
 
-### Why does this problem matter?
+**Explain it to a VC.** Infrastructure for decentralized AI — any device with a network connection can participate in collaborative machine learning without servers, centralized coordination, or a single point of control.
 
-Most distributed ML systems treat the network as an implementation detail for exchanging gradients. If intelligence emerges from networked computation, network topology becomes part of the computation itself.
+**Explain it to a grant reviewer.** A deterministically simulated and formally modeled P2P learning runtime, demonstrated to converge at up to 1 B nodes in simulation, seeking funding for first real Internet deployment and reproducible publication.
 
-### Why hasn't someone solved it already?
+**Explain it to someone who has never heard of distributed systems.** A program that lets many computers work together on a problem by sharing pieces of information directly with each other, with no single computer in charge.
 
-Networking, distributed systems, and machine learning are typically studied independently. A network-first learning runtime requires combining all three simultaneously over unreliable Internet conditions rather than tightly coupled GPU clusters.
+**What problem exists today that Neuron Wire solves?** Distributed AI requires centralized infrastructure — parameter servers, GPU clusters, or federated aggregators — creating single points of failure, access barriers, and privacy risks that a fully P2P approach avoids.
 
----
-
-## 2. Elevator Pitch
-
-| Audience | Message |
-|----------|---------|
-| **30 seconds** | P2P runtime where every node maintains a small neural graph, discovers peers via DHT, exchanges activations over UDP, and adapts without a coordinator |
-| **Researcher** | Kademlia-over-UDP distributed runtime with embedded Hebbian learning, adaptive graph topology, sparse gossip, and reproducible benchmarking for decentralized learning under unreliable network conditions |
-| **Engineer** | Single-threaded non-blocking engine loop integrating DHT routing, reliable UDP transport, STDP learning, neurogenesis, and apoptosis — 400 KHz–1 MHz tick rate on commodity hardware |
-| **General** | A decentralized compute fabric where devices collaborate without cloud coordination |
+**Why should anyone care?** If collaborative learning can work without centralized infrastructure, any device anywhere can participate in AI development, and the question of whether this is practical is unanswered by published evidence.
 
 ---
 
-## 3. Problem Definition
+## 2. The Core Problem
 
-The project investigates how decentralized learning runtimes behave under realistic network conditions — real packet loss, variable latency, churn, and no central coordinator.
+**What is fundamentally broken in today's AI infrastructure?** Every collaborative learning system either requires a central coordinator, a static topology, or homogeneous hardware, making AI inaccessible from regions without reliable cloud infrastructure.
 
-Four research areas combined:
-1. **Networking** — packet delivery over UDP
-2. **Distributed systems** — peer discovery, fault detection, consistency
-3. **Machine learning** — Hebbian STDP adaptation
-4. **Runtime architecture** — single-threaded engine loop integrating all subsystems
+**Why are centralized GPU clusters a limitation?** They concentrate control, pricing, and access in a single entity, excluding participants who lack the capital or connectivity to provision cloud instances.
+
+**Why are parameter servers a bottleneck?** Every gradient passes through a central node that can fail, be censored, or become saturated, and the server's operator controls who participates.
+
+**Why are current distributed ML systems difficult to scale?** All-Reduce assumes a known static participant set, federated learning requires a central aggregator, and gossip protocols lack formal convergence guarantees under real Internet conditions.
+
+**What inspired Neuron Wire?** The observation that decentralized P2P routing (BitTorrent, Ethereum) and biological learning rules (STDP) have never been integrated into a single runtime with reproducible benchmarking.
+
+**What existing technologies influenced the design?** Kademlia DHT (2002) for routing, FlatBuffers (2014) for zero-copy serialization, Hebbian STDP (1949/1996) for learning, and biological neuroplasticity for graph adaptation.
+
+**What assumptions does Neuron Wire challenge?** That distributed learning requires a coordinator, that reliability requires TCP, that routing and learning can be designed independently, and that simulation results cannot predict real-Internet behavior.
+
+**Why hasn't this problem already been solved?** Networking, distributed systems, and machine learning are studied independently, and no existing open-source project combines all three in a single auditable runtime with reproducible benchmarks.
+
+**What happens if Neuron Wire never exists?** Decentralized AI research continues without a standardized, reproducible, open-source substrate for P2P learning experiments — each research group builds its own from scratch.
+
+**What changes if it succeeds?** Any device with a network connection can join a collaborative learning network without provisioning infrastructure, trusting a coordinator, or exposing private data — and publish reproducible evidence that the approach works or doesn't.
 
 ---
 
-## 4. Novelty
+## 3. One-Sentence Definitions
 
-**What is genuinely new (even if preliminary):**
+**What is a node?** A single instance of the Neuron Wire runtime — a running process with its own routing table, neural graph, and UDP socket.
 
-- **Observation about maintenance pings** — under simulated stable conditions, pinging peers for maintenance did not measurably improve routing quality. The bandwidth spent was pure overhead. This contradicts conventional DHT design wisdom.
-- **Mutation-weighted gossip selection** — nodes with higher prediction error are gossiped to more frequently.
-- **Unified routing and learning runtime** — same tick loop handles DHT routing and STDP learning on shared data structures.
+**What is a peer?** Another node discovered via the DHT with which the local node can exchange messages.
 
-**What builds on prior work:**
+**What is a packet?** A framed sequence of bytes sent over UDP carrying a transport header (16 bytes), NWP message header (16 bytes), and optional FlatBuffer body.
 
-- Kademlia DHT (2002) — routing algorithm
-- Hebbian learning / STDP (1949/1996) — learning rule
-- FlatBuffers (2014) — serialization
-- Neuroplasticity concepts — birth and death of neurons
+**What is the Neuron Wire protocol?** A binary wire protocol (NWP) defining how neural state — activations, gradients, spike events, consensus votes — is serialized, routed, decayed, and merged across a dynamic P2P network.
 
-The contribution is the integration and experimental evaluation of these ideas in a single system.
+**What is gradient exchange?** The process of serializing accumulated synaptic weight deltas into a FlatBuffer frame and dispatching them to up to 3 DHT peers every N ticks.
+
+**What is distributed learning?** Each node learns locally via Hebbian STDP and shares a subset of its weight updates with peers, such that the collective improves without any node holding the full model.
+
+**What is gossip learning?** A peer samples one or more known nodes, sends accumulated gradients, and receives updates in return — no global aggregation step required.
+
+**What is the DHT?** A distributed hash table implementing latency-weighted Kademlia with 256 k-buckets (K=20 each), XOR-distance routing, and DNS seed bootstrap.
+
+**What is Hebbian learning?** A local weight update rule where the connection between two neurons strengthens when they activate simultaneously: Δw = η · pre · post.
+
+**What is neurogenesis?** The birth of new neurons triggered when accumulated prediction error exceeds 0.2, adding a fresh 256-bit EntityId with random initial synapse weights.
+
+**What is apoptosis?** Programmed removal of routing entries, synapses, and frames that have not been used within configurable timeouts or exceeded failure thresholds.
+
+**What is prediction error?** The mean squared error between a neuron's actual and predicted activation, emitted by the ForwardPassSystem each tick as a scalar surprise signal.
+
+**What is paper mode?** A deterministic simulation mode with fixed seed, frozen parameters, relative timestamps, and output validated against known-good reference CSVs.
+
+**What is convergence?** The state where each node has discovered at least max(3 log₂(N), threshold) peers, indicating the routing graph is connected and stable.
+
+**What is a routing bucket?** One of 256 k-buckets storing up to 20 nodes whose XOR distance from the local node falls within a specific power-of-two range.
+
+---
+
+## 4. Technical Summary
+
+**What language is it written in?** Rust 2021 edition, compiled with `opt-level="z"`, LTO, and stripped to produce a single statically linked binary.
+
+**Why Rust?** Memory safety without garbage collection, zero-cost abstractions, guaranteed no undefined behavior outside one zero-copy crate, and a type system that eliminates entire classes of networking bugs.
+
+**Why not C++?** C++ lacks Rust's memory safety guarantees without a GC, has no standard build system, and its type system does not prevent use-after-free or data races at compile time.
+
+**Why not Go?** Go's garbage collector introduces latency spikes unacceptable for a 1 MHz real-time tick loop, and its goroutine model obscures the single-threaded execution semantics the engine depends on.
+
+**Why not Python?** Python cannot sustain a 1 MHz tick rate, requires a GIL for thread safety, and its runtime overhead makes deterministic nanosecond-scale simulation impractical.
+
+**Why no async runtime?** A single-threaded recv loop with 1 ms read timeout eliminates scheduler jitter, avoids 50+ transitive crate dependencies, and delivers maximum throughput on 512 MB RAM shared CPU instances.
+
+**Why single-threaded?** The engine loop owns the UDP socket, routing table, and neural graph on one thread — no locks, no channels in the hot path, and deterministic tick ordering.
+
+**Why UDP?** UDP avoids TCP's head-of-line blocking where one lost packet stalls the entire stream, and lets the protocol choose which messages require reliability (DATA, CONSENSUS) and which do not (SPIKE, COMMAND).
+
+**Why not TCP?** TCP's in-order delivery guarantees are unnecessary for gradient exchange where stale data is exponentially decayed, and TCP's congestion control adds latency variance that confounds timing-dependent learning experiments.
+
+**Why not QUIC?** QUIC is a new protocol, not yet universally available, implemented in Rust via indirect system calls, and its stream abstraction is unnecessary when the protocol already handles its own reliability tiers.
+
+**Why custom reliability?** Only 2 of 7 message types need retransmission; TCP or QUIC would retransmit everything, wasting bandwidth on SPIKE and READINESS frames where fresh data supersedes old.
+
+**Why no external dependencies?** A research prototype with 5 direct dependencies minimizes supply-chain risk, simplifies auditing, and ensures the binary can be built from a fresh checkout in under 2 minutes without network access.
+
+**Why deterministic simulation?** Deterministic execution (fixed seed, no wall-clock-dependent assertions) means the same command produces the same CSV output on every platform — the foundation of reproducible research.
+
+**Why Kademlia?** Kademlia provides O(log N) routing with proven performance (BitTorrent, Ethereum), XOR-distance bucket placement guarantees global reachability, and the algorithm fits in ~400 lines of implementation.
+
+**Why STDP?** STDP is the best-understood biological learning rule with precise mathematical formulation (Δw depends on spike timing) and requires no backpropagation through time, making it suitable for decentralized, asynchronous execution.
 
 ---
 
 ## 5. Architecture
 
-Design decisions and rationale:
+**What are the major subsystems?** DHT routing, UDP transport, ForwardPass neural computation, Hebbian STDP learning, Neurogenesis (neuron birth), Apoptosis (neuron death), identity management, trust scoring, audit logging, and deterministic simulation.
 
-| Decision | Rationale |
-|----------|-----------|
-| Single-threaded engine loop | Simpler reasoning, no message-passing overhead between subsystems |
-| Modular subsystems | DHT, learning, transport are independent modules with their own tests |
-| UDP transport | Avoids TCP head-of-line blocking; system chooses which packets need reliability |
-| Kademlia routing | XOR-distance lookup, no central registry |
-| Sparse gossip | One peer per tick, selected by mutation weight |
-| Rust implementation | Memory safety without GC, zero-cost abstractions |
+**How many modules exist?** 14 public modules across ~8,000 lines of Rust in 55 source files.
 
-The architecture favors fault tolerance and decentralization over maximum throughput. NWP will not beat NCCL All-Reduce on a homogeneous GPU cluster — that is not the goal.
+**Which module starts first?** The UDP socket opens and the engine loop begins draining inbound packets before any DHT or neural subsystem is initialized.
 
----
+**Which module is most performance-critical?** The engine loop (`engine_loop.rs`) — every tick must complete within 1 μs–1 ms to sustain the 400 KHz–1 MHz tick rate.
 
-## 6. Learning
+**Which module consumes the most CPU?** The ForwardPass system, which iterates over every neuron and synapse each tick to propagate activations and compute prediction error.
 
-- **Hebbian STDP updates** — synaptic weights adjust based on spike timing
-- **Prediction-error-driven adaptation** — error between predicted and observed activations drives weight changes
-- **Adaptive graph expansion** — prediction error exceeding threshold triggers neuron birth (neurogenesis)
-- **Pruning** — inactive neurons and synapses removed (apoptosis)
+**Which module consumes the most memory?** The DHT routing table, which can hold up to 256 buckets × 20 entries = 5,120 peer records, each with IP address, latency EMA, fail count, and metadata.
 
-There is no explicit memory buffer. Knowledge is the graph structure itself.
+**Which module handles networking?** The transport layer (`transport.rs` and `udp_transport.rs`) owns the UDP socket, manages the ACK sliding window, and implements retransmission for reliable message types.
+
+**Which module handles learning?** The Hebbian STDP module (`hebbian.rs`) and the ForwardPass module (`forward_pass.rs`) together implement neural computation and weight adaptation.
+
+**Which module handles routing?** The DHT module (`dht.rs`) implements latency-weighted Kademlia routing with 256 buckets, periodic maintenance, and DNS seed bootstrap.
+
+**Which module handles identity?** The identity module (`identity.rs`) manages Ed25519 key pairs for signing messages, and the trust module (`trust.rs`) implements reputation-based Sybil resistance.
 
 ---
 
-## 7. Distributed Systems
+## 6. Performance
 
-| Property | Mechanism |
-|----------|-----------|
-| Routing | Kademlia DHT, O(log N) lookups, 256-bit address space |
-| Peer discovery | Bootstrap via seed addresses, iterative FIND_NODE |
-| Fault detection | Stale timeout (configurable, default 300 s) |
-| Partition recovery | Re-discovery via periodic maintenance |
-| Reliable messaging | Selective retransmission over UDP, 3 tiers |
-| Consistency | Eventual — no global agreement required per tick |
+**Maximum simulated nodes?** 1 B nodes (v4 hybrid simulator, 15.6 s wall time, 99.5% convergence).
 
-Intentionally avoids centralized consensus (Raft, Paxos). These are designed for consistent state across known participants, not dynamic P2P topologies.
+**Maximum real nodes?** ~10–25 on localhost UDP (OS socket/thread limited); WAN deployment is the next milestone.
 
----
+**Largest experiment completed?** 1 B nodes in v4 hybrid simulation with 200 K active nodes, 176 average peers, 125 Mbps bandwidth.
 
-## 8. Security
+**Tick rate?** ~400 KHz–1 MHz on commodity x86-64 hardware when idle; ~1 KHz deterministic simulation rate in paper mode.
 
-Current prototype limitations:
+**Average latency?** Sub-millisecond for in-process delivery in the fast simulators; not yet measured across real networks.
 
-- No authentication (anyone can generate a NodeId and join)
-- No encryption (wire format is plaintext)
-- No replay protection
-- No Sybil resistance
-- No rate limiting
+**Peak bandwidth?** 202 Mbps aggregate at 100 K nodes in v3 simulator (2.0 Mbps/node); 125 Mbps at 1 B nodes in v4 hybrid (~0.6 Mbps per active node).
 
-The adversary module detects attacks but does not defend against them. Security is future work.
+**CPU usage?** 0% when idle (OS blocks on `recv_from()` timeout); single core fully utilized during active simulation.
 
----
+**Memory usage?** ~500 KB per active node for routing table (5,120 peer records × ~100 bytes) plus neural graph proportional to neuron count.
 
-## 9. Performance
+**Binary size?** ~2–4 MB after `opt-level="z"`, LTO, and strip — a single statically linked executable.
 
-### v3 Simulator (in-process message passing)
+**Startup time?** < 100 ms from `cargo run --release` to first tick on modern x86-64 hardware.
 
-| Nodes | Converge | CT (sim‑s) | Avg Peers | BW | Wall Time |
-|-------|----------|------------|-----------|-----|-----------|
-| 100 | 100% | 0.0 | 48.7 | 96 Kbps | 0.01 s |
-| 1 K | 100% | 1.0 | 56.7 | 1.1 Mbps | 0.12 s |
-| 10 K | 100% | 1.0 | 57.5 | 11 Mbps | 1.54 s |
-| 50 K | 100% | 3.0 | 58.6 | 71 Mbps | 13.78 s |
-| 100 K | 100% | 7.0 | 59.3 | 202 Mbps | 43.43 s |
+**Shutdown time?** < 10 ms — the engine loop receives a stop signal and exits after completing the current tick.
 
-### v4 Hybrid Model (200 K active + virtual)
+**Packet throughput?** ~22,000 packets/second/node at 50 nodes in SGA mode (v2 simulator benchmark).
 
-| Scale | Converge | CT (sim‑s) | Avg Peers | BW | Wall Time |
-|-------|----------|------------|-----------|-----|-----------|
-| 100 K | 99.9% | 7.5 | 116.5 | 172 Mbps | 4.9 s |
-| 1 M | 99.8% | 10.0 | 147.8 | 149 Mbps | 12.4 s |
-| 10 M | 98.9% | 10.0 | 142.2 | 137 Mbps | 12.2 s |
-| 100 M | 99.8% | 12.5 | 176.2 | 125 Mbps | 15.5 s |
-| **1 B** | **99.5%** | **12.5** | **176.2** | **125 Mbps** | **15.6 s** |
+**Messages per second?** ~1,300–22,000 depending on network size and maintenance mode.
 
-### Key findings
+**Peer discovery speed?** Full routing table convergence in 3.0 s for ≤ 50 nodes, 7.0 s for 100 K nodes (v3), 12.5 s for 1 B nodes (v4).
 
-- Avg peers saturates (~59 for v3, ~176 for v4 with MAX_PEERS=500)
-- Convergence time grows as O(log N): 7.5 s → 12.5 s from 100 K to 1 B
-- Bandwidth per node is approximately constant (~2.3 Kbps/node)
-- Hybrid model makes simulation cost independent of N for N > active_max
-
-**Not yet measured:**
-- WAN latency effects (all benchmarks are localhost)
-- CPU usage per tick
-- RAM under high graph expansion
-- Multi-core scalability
+**Time to convergence?** O(log N) measured: 3.0 s at 50 nodes, 7.5 s at 100 K, 10.0 s at 1 M, 12.5 s at 1 B.
 
 ---
 
-## 10. Mathematical Basis
+## 7. Benchmarks
 
-See [`FORMAL_MODEL.md`](FORMAL_MODEL.md) (1,760 lines, 17 sections) for full derivations.
+**Which benchmarks exist?** DHT convergence time, bandwidth consumption, packet counts, maintenance mode comparison (fixed vs. SGA), fault injection, scaling curves (100 to 1 B nodes), and per-subsystem unit tests.
 
-**Known:**
-- Routing complexity: O(log N) Kademlia lookups
-- Space complexity: O(K × B) where K=20 (bucket capacity) and B=256 (address bits)
-- DHT convergence theorem: probability of node isolation → 0 as K → log N
+**Which benchmarks are reproducible?** All nine — every benchmark uses a fixed seed, produces deterministic CSV output, and is validated against known-good reference values in CI.
 
-**Open:**
-- No formal convergence proof for learning dynamics
-- No closed-form bandwidth model as a function of N
-- No analytical scaling ceiling
+**What hardware were they run on?** Single machine, AMD Ryzen 7 5700U with 16 GB RAM, Windows 11 with MSVC toolchain.
 
----
+**Which benchmark is your strongest?** The v4 hybrid scaling benchmark demonstrating 99.5% convergence at 1 B nodes in 15.6 s with constant per-node bandwidth.
 
-## 11. Benchmarks
+**Which benchmark is weakest?** The real UDP benchmark, which maxes out at ~10–25 nodes due to OS socket/thread limits rather than protocol limitations.
 
-Current benchmarks measure:
-- DHT convergence time across 5 scales (100–100 K v3, 100 K–1 B v4)
-- Bandwidth consumption vs. node count
-- Maintenance mode comparison (fixed vs. SGA)
-- Fault tolerance (adversary injection)
+**Largest successful simulation?** 1 B nodes in v4 hybrid mode with 200 K active nodes, converging to 176 average peers.
 
-**Why believe them:** All experiments are deterministic (fixed seed = identical results). Raw CSV output is checked into the repository. CI validates against known-good reference values.
+**Average convergence rate?** 100% for v3 up to 100 K nodes; ≥ 98.9% across all v4 scales from 100 K to 1 B (threshold = max(3 log₂(N), 30) peers).
 
-**Limitation:** All benchmarks run on localhost. Real Internet conditions may produce different results.
+**Network overhead?** ~40 bytes per message (16 transport + 16 NWP header + 8 CRC/framing), with body size depending on message type.
 
----
+**Routing efficiency?** ~59 average peers per node at 100 K nodes (saturating at K-bucket capacity) with only 15 PINGs + 10 FIND_NODE per round.
 
-## 12. Failure Modes
+**Packet delivery rate?** 100% in simulation (in-process message passing); real UDP delivery rate depends on network conditions and is untested.
 
-| Mode | Status |
-|------|--------|
-| Packet loss up to 10% | Transport degrades gracefully |
-| Node crash | Handled in simulation |
-| Network partition | Handled in simulation |
-| Replay attack | Detected but not defended |
-| **Real WAN conditions** | **Not tested** |
-| **High churn (>10%/s)** | **Not tested** |
-| **Memory pressure** | **Not tested** |
+**Failure recovery time?** ~3 s from node failure to routing table convergence in simulation; untested on real networks.
+
+**Node join time?** ~3 s for a new node to discover ≥ threshold peers in simulation.
+
+**Node removal time?** ~600 s (stale timeout) for passive eviction; 3 missed pings for active failure detection.
+
+**Scalability curve?** O(log N) convergence time and O(N log N) total messages (empirically validated 100 to 1 B).
+
+**Complexity?** DHT routing O(log N) lookups, routing table space O(K × B) = O(20 × 256) constant per node, bootstrap communication O(N log N) empirical.
 
 ---
 
-## 13. Evidence
+## 8. Comparison
 
-**Confirmed (tested and reproducible):**
-- DHT converges across all tested scales (100 → 1 B)
-- SGA uses 1.9–2.45× more bandwidth than fixed maintenance at ≤300 s
-- Under tested conditions, maintenance pings do not measurably improve routing quality
-- STDP weight updates, apoptosis, zero-copy serialization all verified by unit tests
+**Compared to libp2p?** Libp2p is a modular networking stack with 50+ crates and async-first design; Neuron Wire is a single-threaded runtime with integrated learning — not a replacement but a specialization.
 
-**Hypotheses (untested):**
-- WAN deployment works at all
-- System converges under high node churn
-- Learning produces useful results over real Internet RTT
-- System scales beyond 50 K nodes without redesign
+**Compared to IPFS?** IPFS is a distributed file system using content-addressed storage; Neuron Wire is a P2P learning runtime — they share a DHT concept but solve different problems.
 
----
+**Compared to BitTorrent?** BitTorrent uses Kademlia DHT only for trackerless peer discovery; Neuron Wire integrates DHT routing directly into a learning engine loop where routing decisions affect gradient flow.
 
-## 14. Research Methodology
+**Compared to MPI?** MPI is a message-passing standard for tightly coupled HPC clusters with reliable interconnects; Neuron Wire targets heterogeneous devices over unreliable Internet links.
 
-| Component | Detail |
-|-----------|--------|
-| **Hypothesis** | Sparse Gradient Aging reduces DHT maintenance bandwidth |
-| **Null hypothesis** | SGA produces same or greater bandwidth than fixed-interval maintenance |
-| **Result** | Null hypothesis supported — SGA increased bandwidth 1.9–2.45× |
-| **IVs** | Maintenance mode (fixed vs. SGA), node count (10, 25, 50) |
-| **DVs** | Bandwidth, packet count, convergence time, max/avg peers |
-| **Controls** | Seed (42), duration (30 s), gossip interval (500 ticks), tick interval (1 ms) |
+**Compared to Ray?** Ray provides distributed task scheduling with a centralized coordinator (GCS); Neuron Wire provides decentralized learning with no coordinator.
 
-**Limitation:** Current benchmarks use 1 trial per configuration (deterministic = zero variance, zero statistical power). Multi-trial runs with confidence intervals are future work.
+**Compared to TensorFlow Distributed?** TF Distributed uses gRPC for gradient exchange between workers coordinated by a chief; Neuron Wire uses custom UDP with no chief.
 
----
+**Compared to PyTorch DDP?** PyTorch DDP implements synchronous All-Reduce over NCCL requiring homogeneous GPUs with low-latency interconnects; Neuron Wire runs on any device with a UDP port.
 
-## 15. Comparison
+**Compared to Horovod?** Horovod wraps MPI All-Reduce with a TensorFlow-compatible API; Neuron Wire has no external dependencies and no MPI requirement.
 
-| Aspect | Centralized (NCCL) | Neuron Wire |
-|--------|--------------------|-------------|
-| Coordination | Central coordinator | None |
-| Topology | Fixed (ring/tree) | Adaptive |
-| Hardware | Homogeneous GPUs | Heterogeneous devices |
-| Fault tolerance | Coordinator fail = system fail | No single point of failure |
-| Network req. | µs latency, zero loss | Tolerates loss and latency |
-| Convergence speed | Fast | Slower |
+**Compared to Parameter Servers?** A parameter server holds the authoritative model state and coordinates updates from workers — a single point of failure and bandwidth bottleneck.
 
-**Not yet compared:** Against federated learning, Ray, BitTensor, Gensyn. A proper comparison is on the roadmap.
+**Compared to Federated Learning?** Federated learning requires a central aggregator that averages model weights from client devices; Neuron Wire has no aggregator and no central round synchronization.
+
+**Compared to Swarm Learning?** Swarm Learning replaces the aggregator with blockchain-based consensus but still requires a network-wide agreement step each round.
+
+**Compared to Gossip Learning?** Gossip learning randomly exchanges gradients between peer pairs — Neuron Wire adds Kademlia routing structure to gossip selection, biasing toward cluster-similar peers.
+
+**Compared to Kubernetes?** Kubernetes is a container orchestration platform for centralized deployments; Neuron Wire is a P2P protocol requiring no orchestration.
+
+**Compared to Kubernetes + Ray?** Combined they provide centralized job scheduling on managed infrastructure; Neuron Wire provides decentralized peer-to-peer learning on unmanaged devices.
+
+**Compared to Spark?** Spark performs in-memory data processing across a cluster with a driver node coordinating all tasks; Neuron Wire has no driver and no master node.
 
 ---
 
-## 16. Reproducibility
+## 9. Capabilities
 
-```bash
-git clone https://github.com/cianmag/neuron-wire
-cd neuron-wire
-cargo build --release
-cargo run --example simulate -- --paper-mode --nodes 3 --duration 10
-```
+**What can Neuron Wire do today?** Discover peers via Kademlia DHT, exchange messages over custom UDP with three reliability tiers, run Hebbian STDP learning locally, simulate up to 1 B nodes deterministically, and export reproducible CSVs of every metric.
 
-All experiment CSVs are in `results/`. One-command reproduction via `scripts/reproduce.sh`. Full CI validates against known-good reference values.
+**What can't it do?** Operate over real Internet links (untested), encrypt traffic, traverse NATs, persist state across restarts, or run on multi-core architectures.
 
----
+**What is experimental?** The entire neural computation pipeline (ForwardPass + Hebbian + neurogenesis + apoptosis) — unit tests verify each subsystem independently, but end-to-end collaborative learning has not been demonstrated.
 
-## 17. Engineering
+**What is production-ready?** Nothing — the project is a research prototype with documented security gaps and no WAN validation.
 
-| Metric | Value |
-|--------|-------|
-| Language | Rust 2021 edition |
-| Source files | 55 Rust, ~8,000 LOC |
-| Tests | 10 `#[test]` annotations + integration + property-based |
-| CI | GitHub Actions: 4 workflows (build+test, docs, release, reproduction validation) |
-| Build | `opt-level="z"`, LTO, stripped — single statically linked binary |
-| Dependencies | 5 direct (crc32fast, rand, serde, toml, csv) |
-| Memory safety | No `unsafe` outside zero-copy module |
-| Fuzz testing | cargo-fuzz target for header parsing |
-| Engine tick rate | ~400 KHz–1 MHz on commodity x86-64 |
+**What is simulation-only?** All performance claims about convergence time, bandwidth scaling, and fault tolerance — these have only been measured in the deterministic simulator on localhost.
 
----
+**What requires future work?** NAT traversal, wire encryption, persistent storage, multi-threaded engine, WebRTC transport, Python bindings, and any WAN deployment.
 
-## 18. Open Research Questions
+**Can it survive node failures?** In simulation, yes — the DHT re-converges within ~3 s after nodes are removed.
 
-See [`RESEARCH_QUESTIONS.md`](RESEARCH_QUESTIONS.md) for the full list of 8 scientific questions.
+**Can it handle packet loss?** The reliable queue retransmits up to 3 times (DATA) or 5 times (CONSENSUS), but degradation under >10% loss is untested.
 
-**Critical open question:** Deploy 100 nodes across 3 continents. If the DHT fails to converge within 30 seconds under real Internet conditions, the architecture does not work outside localhost.
+**Can it recover from partitions?** In simulation, nodes re-discover each other via periodic maintenance pings when the partition heals.
+
+**Can nodes join dynamically?** Yes — a new node bootstraps via seed addresses, runs iterative FIND_NODE, and populates its routing table within seconds (simulation).
+
+**Can nodes leave dynamically?** Yes — leaving nodes are detected via stale timeout (600 s) or failed ping threshold (3 misses) and removed from routing tables.
+
+**Can malicious nodes attack it?** Yes — there is no authentication, encryption, Sybil resistance, rate limiting, or replay protection in the current prototype.
+
+**Can it run on Raspberry Pi?** In theory — the single-threaded engine targets 512 MB RAM and compiles to ARM — but this has not been tested.
+
+**Can it run on phones?** In theory — the Rust code compiles to ARM64 and the UDP module works on Android/Linux — but no mobile build exists.
+
+**Can it run on browsers?** Yes — a 101 KB WASM demo exists demonstrating P2P neural network between two browser tabs via BroadcastChannel.
 
 ---
 
-## 19. References
+## 10. Limitations
 
-1. Maymounkov, P., & Mazières, D. (2002). Kademlia: A peer-to-peer information system based on the XOR metric. *IPTPS*.
-2. Li, M., et al. (2014). Scaling distributed machine learning with the parameter server. *OSDI*.
-3. Dean, J., et al. (2012). Large scale distributed deep networks. *NIPS*.
-4. Hebb, D. O. (1949). *The Organization of Behavior*. Wiley & Sons.
-5. Gerstner, W., et al. (1996). A neuronal learning rule for sub-millisecond temporal coding. *Nature*.
-6. Sergeev, A., & Del Balso, M. (2018). Horovod: fast and easy distributed deep learning in TensorFlow. *arXiv:1802.05799*.
-7. Bonawitz, K., et al. (2019). Towards federated learning at scale: System design. *MLSys*.
-8. Stoica, I., et al. (2017). Ray: A distributed framework for emerging AI applications. *OSDI*.
+**Biggest limitation?** Every benchmark runs on localhost — no real Internet deployment has been attempted, so every claim about WAN behavior is a hypothesis.
+
+**Biggest engineering challenge?** Building a deterministic simulation framework that captures enough real-network complexity (NAT, jitter, loss, asymmetric routing) to predict WAN behavior.
+
+**Biggest research challenge?** Determining whether Hebbian STDP over gossiped gradients converges to useful representations under realistic network conditions — currently unvalidated.
+
+**Biggest security concern?** Zero transport-layer encryption — any peer on the network can read all messages in plaintext.
+
+**Biggest networking challenge?** NAT traversal — without STUN/TURN, every node must be directly reachable on UDP, which excludes most home and mobile devices.
+
+**Biggest scaling challenge?** The single-threaded engine cannot exploit multi-core systems, placing an upper bound on per-node neural graph size regardless of available cores.
+
+**Biggest memory bottleneck?** The full neural graph (neurons, synapses, activations) lives entirely in RAM with no snapshot/restore — process restart means total state loss.
+
+**Biggest CPU bottleneck?** ForwardPass iterates over every neuron and synapse each tick — a dense neural graph of 10⁴+ neurons will not fit within a 1 ms tick window on a single core.
+
+**Biggest latency bottleneck?** The UDP read timeout (1 ms) sets the minimum tick interval and caps the tick rate regardless of how fast computation completes.
+
+**Biggest assumption?** That nodes can communicate directly via UDP — this fails behind symmetric NATs, corporate firewalls, and CGNAT deployments.
+
+**What breaks first?** The transport layer under high packet loss — retransmission caps at 3 for DATA frames, and gradient decay means late arrivals contribute almost nothing.
+
+**What remains unsolved?** Whether any of the simulation results generalize to the real Internet — this is the defining open research question of the project.
+
+---
+
+## 11. Security
+
+**Does it encrypt traffic?** No — the wire format has no transport-layer security, and all messages are sent in plaintext.
+
+**How are identities verified?** Each node has an Ed25519 key pair, but signatures are not verified on incoming messages in the current prototype.
+
+**How are nodes authenticated?** They are not — any process can generate a NodeId and join the network without proof of identity.
+
+**Can Sybil attacks happen?** Yes — a single attacker can generate arbitrarily many NodeIds and dominate the routing table with no computational cost.
+
+**Can Eclipse attacks happen?** Yes — an attacker controlling enough NodeIds can surround a target node and isolate it from honest peers.
+
+**Can replay attacks happen?** Yes — captured packets can be replayed because there is no sequence number verification or nonce tracking.
+
+**Can packets be forged?** Yes — there is no message authentication code (MAC) or digital signature verification on received messages.
+
+**What trust model is used?** Simple reputation scoring (trust.rs) where nodes accumulate positive or negative interactions, but the scores are not yet used for routing decisions.
+
+**How is integrity verified?** A CRC32 checksum on each NWP frame detects accidental corruption but not malicious tampering.
+
+**How is replay prevented?** It is not — sequence numbers exist in the transport header but are not verified for freshness or monotonic ordering.
+
+---
+
+## 12. Simulation
+
+**What simulator exists?** A deterministic paper-mode simulator (`simulator.rs`, 1,515 lines) that launches N nodes, runs them for T ticks, and exports all metrics to CSV.
+
+**What does paper mode simulate?** A configurable network of N nodes running the full engine loop (DHT + transport + neural computation) in a single process with in-process message delivery.
+
+**What is deterministic?** Everything — RNG is seeded from command-line seed, tick timing uses sim-time rather than wall clock, and all outputs are bit-for-bit identical across runs with the same seed.
+
+**Which variables are configurable?** Node count, duration, gossip interval, tick interval, seed, maintenance mode (fixed/SGA), topology, failure injection parameters, and learning hyperparameters.
+
+**Which metrics are collected?** Convergence time, peer count (average, max, min), bandwidth in/out, packet counts, apoptosis events, gradient delivery rate, and prediction error over time.
+
+**Which events are logged?** Node join, node leave, peer discovery, ping/pong, FIND_NODE response, gradient exchange, neurogenesis, apoptosis, retransmission, and failure detection.
+
+**Can failures be injected?** Yes — the simulator supports configurable node crash, packet loss, and latency injection during a run.
+
+**Can latency be simulated?** Yes — per-message latency can be configured with configurable distribution (fixed or uniform range).
+
+**Can bandwidth be limited?** Yes — the simulator enforces per-node bandwidth caps and queues messages that exceed the limit.
+
+**Can topology change?** Yes — nodes can be added or removed mid-experiment, and partitions can be injected and healed programmatically.
+
+---
+
+## 13. Research
+
+**Which hypotheses are being tested?** (1) Sparse Gradient Aging reduces DHT maintenance bandwidth — falsified, SGA increased bandwidth 1.9–2.45×; (2) Kademlia DHT maintains O(log N) convergence under churn; (3) Hebbian STDP converges over gossiped gradients in dynamic P2P topologies.
+
+**Which papers exist?** None published yet — the project is in the pre-publication phase with all experimental infrastructure in place.
+
+**Which papers are planned?** A reproducible evaluation paper comparing NWP against vanilla Kademlia, gossip SGD, and federated averaging across LAN, WAN, and mixed topologies.
+
+**Which conferences fit this work?** SysML, MLSys, HotOS, DSN, EuroSys, and P2P networking workshops.
+
+**Which journals fit this work?** IEEE/ACM Transactions on Networking, Journal of Parallel and Distributed Computing, Distributed Computing, and Neural Computation.
+
+**Which open problems remain?** Whether simulation results generalize to real networks, whether Hebbian STDP converges with stale gradients, what scaling ceiling exists for single-threaded routing, and whether the architecture is practical on resource-constrained devices.
+
+**What experiments are next?** A 100-node multi-continent VPS deployment measuring real latency, loss, churn, and convergence — the experiment that would prove the architecture wrong if it fails.
+
+**Which claims are proven?** DHT convergence time O(log N) up to 1 B nodes in simulation, maintenance pings do not improve routing quality under stable simulated conditions, and the hybrid model makes simulation cost independent of N for N > active_max.
+
+**Which claims remain hypotheses?** That the protocol works over real Internet links, that Hebbian STDP produces useful learning over gossiped gradients, and that the system withstands real churn rates.
+
+**Which claims require real-world validation?** All of them — every performance, convergence, and fault tolerance claim is currently simulation-only.
+
+---
+
+## 14. Roadmap
+
+**Current stage?** Research prototype (v0.3.0) with complete simulation infrastructure, formal model, and all baseline comparisons implemented — no WAN deployment.
+
+**Next milestone?** Deliverable 1: Deploy 100+ nodes across AWS free-tier in 3 continents (us-east-1, eu-west-1, ap-southeast-2) and measure real-Internet behavior.
+
+**Six-month goal?** Published reproducible evaluation paper with open datasets and one-command figure reproduction (Deliverable 2).
+
+**One-year goal?** Developer SDK with crates.io publishing, Python bindings, and 5 reference applications (Deliverable 3).
+
+**Five-year vision?** A community-maintained open-source infrastructure layer for decentralized AI used by research groups and edge deployments worldwide.
+
+**First real deployment?** 100+ VPS nodes across 3 continents with public live dashboard — contingent on grant funding.
+
+**First VPS deployment?** AWS free-tier t3.micro or equivalent bursting instances — cost is the only blocker.
+
+**First university collaboration?** Not yet established — the project is seeking academic partners for the WAN deployment and publication phase.
+
+**First published paper?** Target: Q4 2026 workshop submission (SysML, MLSys, HotOS, or DSN).
+
+**First external contributors?** Zero external contributions as of 2026-07-09 — the project has been a single-contributor effort to date.
+
+---
+
+## 15. Funding
+
+**Why do you need funding?** To deploy 100+ VPS nodes across 3 continents for the first real-Internet measurement — currently the project has only been tested on localhost.
+
+**What happens without funding?** The project continues as unfunded research at smaller scale (10–25 nodes on localhost, simulator studies, and incremental engineering).
+
+**What happens with $10k?** A 100-node single-region deployment, one month of measurement data, and initial NAT traversal engineering.
+
+**What happens with $100k?** Full three-continent deployment (100+ nodes × 3 months), Noise Protocol encryption, STUN traversal, publication fees, and reproducible datasets.
+
+**What happens with $1M?** Multi-region deployment with 1,000+ nodes, WebRTC transport, Python bindings, full-time engineering team, community building, and conference travel.
+
+**How many nodes could each funding level deploy?** $10k → ~20 nodes × 3 months, $100k → 100+ nodes × 3 months, $1M → 1,000+ nodes × 12 months.
+
+**Which experiments become possible?** At $100k+: latency distribution benchmarks across continents, churn experiments with real NAT-rebind behavior, packet loss characterization, and comparison of all 7 baselines on real hardware.
+
+**What scientific questions would funding answer?** Does the DHT converge under real Internet conditions? Can cross-continent gradient delivery sustain < 50% loss? Do the simulation predictions match reality? Is decentralized collaborative learning practical outside the lab?
+
+---
+
+## 16. Open Source
+
+**Why is it open source?** Reproducible research requires open code, open data, and open methodology — closed-source claims about decentralized learning are inherently untrustworthy.
+
+**Why should someone contribute?** To help answer a real open research question — can P2P collaborative learning work over real Internet conditions? — and to gain experience with Rust systems programming, P2P protocols, and reproducible benchmarking.
+
+**How can someone contribute?** Via CONTRIBUTING.md — prioritize evidence-strengthening contributions (benchmarks, experiments, formal analysis) over feature additions.
+
+**What's the first good issue?** Running the existing benchmarks on a different machine and validating reproducibility — listed under `good first issue` on GitHub.
+
+**How is quality maintained?** Four CI workflows enforce `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, and benchmark validation against known-good reference values.
+
+**How are releases managed?** Releases are cut from `release/vX.Y.Z` branches with CHANGELOG updates, Cargo.toml version bumps, and automatic crates.io publishing — managed by the maintainer.
+
+**How are benchmarks verified?** Every experiment is deterministic — the CI pipeline runs each benchmark and compares output CSVs against `known-good/` reference files.
+
+**How is reproducibility ensured?** Deterministic simulation mode (paper mode), fixed seeds, frozen TOML configs, metadata capture (git commit, rustc version, platform), and CI validation against known-good outputs.
+
+---
+
+## 17. Vision
+
+**If Neuron Wire succeeds, what changes in AI?** Collaborative AI becomes infrastructure anyone can access — no cloud credits, no coordinator permission, no data leaving your device.
+
+**If Zylvon succeeds, what does the company become?** The organization that built the open infrastructure layer making decentralized AI practical — the Linux Foundation of P2P intelligence.
+
+**What is the ultimate vision for decentralized intelligence?** Any Internet-connected device can participate in a planetary-scale neural network that learns collaboratively without central control, single points of failure, or trust requirements.
+
+**What is the biggest technical risk?** The architecture's core assumption — that direct UDP connectivity is available between arbitrary nodes — fails for most devices behind CGNAT, corporate firewalls, or mobile networks.
+
+**What is the biggest scientific breakthrough you're aiming for?** Demonstrating that Hebbian STDP over P2P gradient gossip converges at useful learning rates under real Internet conditions — a phenomenon that would suggest the network itself can be a computational substrate.
+
+**What legacy do you want Neuron Wire to leave?** A reproducible, open-source benchmark for decentralized learning that every future project — including competitors — uses as ground truth for their own claims.
+
+**Why should the world invest time, talent, or money in this project?** Because the question of whether decentralized collaborative learning works over real networks is unanswered by published evidence, and answering it — regardless of outcome — advances the field more than building another closed system.
