@@ -168,6 +168,7 @@ If a proposed question cannot be expressed with all fields filled, it is not yet
 
 | Priority | Question | Status |
 |----------|----------|--------|
+| Tier 0 | **RQ9 — Hebbian STDP learning benchmark** | **❓ Unknown** |
 | Tier 1 | RQ1 — WAN convergence | ❓ Unknown |
 | Tier 1 | RQ2 — Latency-weighted vs vanilla Kademlia | ❓ Untested |
 | Tier 1 | RQ3 — Packet loss tolerance | ❓ Unknown |
@@ -175,4 +176,21 @@ If a proposed question cannot be expressed with all fields filled, it is not yet
 | Tier 2 | RQ5 — Byzantine detection | ❓ Untested |
 | Tier 2 | RQ6 — Engine loop scaling | ❓ Unknown |
 | Tier 2 | RQ7 — Gradient decay effect | ❓ Untested |
-| Tier 2 | RQ8 — Gossip hop SNR | ❓ Unknown |
+| Tier 2 | RQ8 — Gradient SNR over gossip hops | ❓ Unknown |
+
+|---
+
+## RQ9 — Does Hebbian STDP over P2P gradient gossip converge to the correct weights in a distributed regression task? (THE LEARNING BENCHMARK)
+
+| Field | Value |
+|-------|-------|
+| **Hypothesis** | N nodes (3–100) running Hebbian STDP with gradient gossip can learn a linear mapping y = w · x + b from streaming data, converging to within 1% of known ground-truth weights within 500 epochs, albeit requiring more communication epochs than centralized SGD to reach equivalent MSE. |
+| **Current Status** | ❓ Unknown — no end-to-end learning benchmark has ever been executed on the system |
+| **Existing Evidence** | Forward pass propagates activations correctly (7 unit tests). STDP weight update rule is mathematically correct (8 unit tests). Gradient gossip serialization/deserialization round-trips correctly (3 tests). But the three subsystems have never been evaluated as a pipeline. |
+| **Experiment** | Distributed linear regression protocol defined in PROJECT_INTELLIGENCE.md §8 — 10 000 samples, 80/10/10 split per node, 32-sample batches, Hebbian STDP (lr=0.01, λ=0.999), gossip every 500 ticks to 3 peers, compare against centralized SGD and federated averaging (scikit-learn). |
+| **Independent Variables** | Number of nodes (3, 10, 30, 100), gossip interval (100, 500, 2000 ticks), learning rate (0.001, 0.01, 0.1) |
+| **Dependent Variables** | Epochs to convergence (MSE < 0.01 × ground truth variance), final test MSE, communication cost per node (bytes), wall-clock time per epoch, packet count |
+| **Success Criteria** | All node configurations achieve MSE < 0.01 × ground truth variance within 500 epochs. Convergence time scales sub-linearly with node count. Decentralized Hebbian-STDP requires ≤ 3× the communication of centralized SGD. |
+| **Failure Criteria** | System never converges (MSE stays flat or diverges), or convergence requires > 500 epochs at any configuration. Hebbian-STDP requires > 10× the communication of centralized SGD. Nodes converge to different weights. |
+| **Priority** | **Tier 0** — Single highest-impact scientific gap. Every claim about "collaborative learning" depends on this question being answered. This benchmark must be executed before any paper submission. |
+| **Blocked By** | Harness code to wire: (a) synthetic data generation into the neural graph, (b) per-node MSE logging at configurable intervals, (c) epoch tracking independent of tick rate, (d) centralized SGD and federated averaging baselines via Python. Estimated 200–400 lines of Rust + Python. |

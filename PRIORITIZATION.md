@@ -111,3 +111,7 @@ Think PyTorch, Ray, Apache Spark, Kubernetes. Not famous because they "solve AI"
 5. **Build a small community that can reproduce, critique, and extend your work.**
 
 > *"Evidence, not features" is exactly the right filter for deciding what comes next.*
+
+> *"Every unanswered question deserves a benchmark before it deserves another thousand lines of code."*
+>
+> This second principle is the guard that prevents the first from being silently abandoned. A new subsystem that passes unit tests but has never been evaluated end-to-end is not evidence — it is unfinished work. The learning subsystem is the current reminder of why this rule exists.

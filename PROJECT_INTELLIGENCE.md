@@ -341,6 +341,8 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 ## 8. Machine Learning
 
 > **⚠️ Weakest area.** This is the project's least developed capability. Routing is proven at scale; learning is not. No end-to-end benchmark (MNIST, distributed regression, or similar) has been run. This is the single biggest scientific gap and the highest-risk area for claims about the system.
+>
+> **Status:** The benchmark below is concretely designed on paper with exact protocol, success criteria, failure criteria, and estimated implementation cost (~200–400 lines of Rust + Python). It has not been coded or executed. See `RESEARCH_QUESTIONS.md` RQ9 for the full research question and priority index.
 
 **Why Hebbian learning?** Hebbian STDP is the only well-understood local learning rule that requires no global state, no backpropagation, and no central coordinator — each synapse updates based purely on local pre- and post-synaptic activation timing. **[I]**
 
@@ -356,7 +358,17 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 
 **How is convergence measured?** The routing-side convergence is measured as the fraction of nodes that have discovered at least threshold = max(3 log₂(N), 30) peers; learning-side convergence is an open research question. **[S+F]**
 
-**What should the first learning benchmark be?** A distributed regression task where N nodes (3–100) collaboratively learn a linear or simple nonlinear mapping from streaming data, with convergence measured as mean squared error over a held-out test set, compared against a centralized SGD baseline. **[F]**
+**What should the first learning benchmark be?** A distributed linear regression experiment: N nodes (3–100) each hold a subset of synthetic data generated from y = w · x + b + ε where w, b are known ground truth and ε ∼ N(0, 0.1), and each node learns the mapping via Hebbian STDP (single-input→single-output neuron) while gossiping accumulated gradients with DHT peers — the benchmark measures epochs-to-convergence (MSE < 0.01 on held-out test set), communication cost (bytes/node), wall-clock time, and final test MSE, compared against centralized SGD and federated averaging (scikit-learn, same data). **[F]**
+
+> **Protocol (exact steps the benchmark follows):**
+> 1. Generate T = 10 000 (x, y) pairs from known w, b with noise; split into 80/10/10 train/val/test per node.
+> 2. Initialize each node's neural graph: 1 input neuron, 1 output neuron, 1 synapse with random w ~ U(0.1, 1.0), 1 bias neuron.
+> 3. Per epoch: for each batch of 32 samples, set input neuron activation = x, run ForwardPass → prediction → surprise, run Hebbian STDP update.
+> 4. Every 500 ticks: serialize accumulated Δw to FlatBuffer, gossip to up to 3 DHT peers.
+> 5. Every 10 epochs: compute MSE over held-out test set at each node, log to CSV.
+> 6. Repeat until MSE < 0.01 × ground truth variance or 500 epochs elapsed.
+> 7. Compare against centralized SGD (lr=0.01, batch=32, same epochs) and federated averaging (rounds=N_EPOCHS, local epochs=1, 10 clients sampled/round).
+> 8. Output: convergence curves (epoch vs. MSE), communication cost wall-clock per epoch, final test MSE, packet count. Runs in deterministic simulator mode; every result is reproducible from seed 42.
 
 **Can supervised learning work?** In theory — labeled inputs produce prediction error that drives STDP updates — but no supervised learning experiment has been conducted with the framework. **[F]**
 
@@ -765,7 +777,7 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 | Neurogenesis triggers on sustained surprise | **[I]** | Verified | High | Leaky accumulator correctly filters vs. integrates |
 | Apoptosis prunes stale entries | **[I]** | Verified | High | 5 unit tests + death spiral guard validation |
 | UDP transport works on localhost | **[I]** | Verified | High | 10 unit tests + small cluster (3–5 nodes) |
-| **Learning subsystem produces useful results at any task** | **[F]** | **Not tested — biggest scientific gap** | **Low** | **No end-to-end benchmark exists (no MNIST, no regression, no classification). Individual subsystems pass unit tests but have never been evaluated as a pipeline — see §8.** |
+| **Learning subsystem produces useful results at any task** | **[F]** | **Not tested — biggest scientific gap** | **Low** | **No end-to-end benchmark exists. Benchmark protocol is designed (PROJECT_INTELLIGENCE.md §8 + RESEARCH_QUESTIONS.md RQ9) but not executed. Estimated 200–400 lines of harness code to produce the first graph.** |
 | Protocol works over real WAN links | **[F]** | Not tested | Low | All benchmarks are localhost; WAN deployment is D1 milestone |
 | Hebbian STDP converges over P2P gossip | **[F]** | Not tested | Low | Subsystems tested individually; end-to-end learning not demonstrated |
 | Protocol withstands > 10% packet loss | **[F]** | Not tested | Low | Retransmission cap = 3; degradation curve uncharacterized |
