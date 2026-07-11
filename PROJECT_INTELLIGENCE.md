@@ -3,7 +3,7 @@
 > **Single source of truth.** Every README, grant application, paper, website page, investor deck, conference talk, and interview derives from this document.
 >
 > **Maintainer:** Zylvon Research · **Repository:** [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)
-> **Version:** 0.3.0 · **Updated:** 2026-07-09 · **Commit:** `d82f2d7`
+> **Version:** 0.3.0 · **Updated:** 2026-07-09 · **Commit:** `39591ad`
 
 ---
 
@@ -117,6 +117,8 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 **What is impossible today but possible tomorrow?** A phone in rural Nepal and a laptop in Berlin discovering each other automatically and collaborating on a shared learning task without either party provisioning infrastructure or trusting the other. **[F]**
 
 **What does the world look like in 10 years?** Decentralized P2P learning is a standard tool in the ML researcher's toolkit, with Neuron Wire or a descendant protocol serving as the common substrate, analogous to what TCP/IP did for internetworking. **[F]**
+
+**Is Neuron Wire a learning runtime or an experimental platform?** It is becoming the latter. The project's strongest long-term position is as a laboratory for decentralized systems research — a configurable, reproducible testbed where researchers can swap routing algorithms, gossip strategies, learning rules, trust models, and transport layers, run the same benchmark suite, and compare results without rebuilding the stack. **[F]**
 
 ---
 
@@ -338,6 +340,8 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 
 ## 8. Machine Learning
 
+> **⚠️ Weakest area.** This is the project's least developed capability. Routing is proven at scale; learning is not. No end-to-end benchmark (MNIST, distributed regression, or similar) has been run. This is the single biggest scientific gap and the highest-risk area for claims about the system.
+
 **Why Hebbian learning?** Hebbian STDP is the only well-understood local learning rule that requires no global state, no backpropagation, and no central coordinator — each synapse updates based purely on local pre- and post-synaptic activation timing. **[I]**
 
 **Why STDP?** STDP is the precise formulation of Hebb's rule (Δw depends on the temporal order and interval between pre- and post-synaptic spikes) and is the best-characterized biological learning mechanism in computational neuroscience. **[I]**
@@ -352,7 +356,7 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 
 **How is convergence measured?** The routing-side convergence is measured as the fraction of nodes that have discovered at least threshold = max(3 log₂(N), 30) peers; learning-side convergence is an open research question. **[S+F]**
 
-**What learning assumptions exist?** That locally computed Hebbian weight updates, when averaged over a sufficient number of gossip exchanges, produce a global gradient direction that reduces a shared loss function. **[T]**
+**What should the first learning benchmark be?** A distributed regression task where N nodes (3–100) collaboratively learn a linear or simple nonlinear mapping from streaming data, with convergence measured as mean squared error over a held-out test set, compared against a centralized SGD baseline. **[F]**
 
 **Can supervised learning work?** In theory — labeled inputs produce prediction error that drives STDP updates — but no supervised learning experiment has been conducted with the framework. **[F]**
 
@@ -373,6 +377,8 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 **Current real deployment size?** ~3–10 nodes on localhost UDP; OS socket/thread limits prevent larger real deployments without infrastructure changes. **[I]**
 
 **Current simulation size?** 1 B nodes (v4 hybrid model, 200 K active + virtual remainder), 15.6 s wall time, 99.5% convergence. **[S]**
+
+> **⚠️ Caveat — one billion simulated nodes ≠ one billion real devices.** The simulator models one billion virtual nodes using a hybrid approach where 200 K are active (real Node objects with routing tables, peer lists, and message processing) and the remainder are statistical abstractions that respond with random active peers in their PONG messages. This is not equivalent to operating one billion real networked computers. Real-device behavior would differ due to OS socket limits, kernel scheduling, NAT, jitter, loss, congestion, firewall policies, and protocol bottlenecks that the simulator does not model. Use the simulation number to evaluate the routing *algorithm's* theoretical upper bound, not to predict *operational* capacity.
 
 **Maximum tested scale?** 1 B nodes in the v4 hybrid simulator — every scale from 100 K to 1 B converges with ≥ 98.9% of nodes above threshold. **[S]**
 
@@ -730,6 +736,10 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 
 **What does Version 2.0 add?** Adaptive gossip fanout (self-tuning based on network size), Byzantine fault tolerance for consensus messages, WebRTC transport for browser-to-browser across machines, and Python bindings via PyO3. **[F]**
 
+**What is the project's strongest long-term position?** Not as a single learning runtime, but as an experimental platform for decentralized systems research where researchers can plug in different routing algorithms (Kademlia variants, Chord, Pastry), gossip strategies (random, cluster-biased, latency-weighted, SGA), learning rules (STDP, contrastive divergence, local SGD, BPTT approximations), trust models (reputation, economic, cryptographic), and transport layers (TCP, QUIC, WebRTC, LoRa), and compare them under reproducible conditions using the same measurement framework. **[F]**
+
+**What becomes possible when Neuron Wire is a platform?** A researcher can answer "which DHT variant converges fastest under 20% packet loss?" or "does STDP outperform local SGD on non-IID data?" by swapping one configuration parameter and running the same benchmark suite — without rebuilding the entire stack from scratch. **[F]**
+
 **What is Version 5.0?** A fully community-maintained open-source infrastructure layer with 5+ reference applications, formal verification of core protocol properties, and adoption by at least 3 independent research groups. **[F]**
 
 **What projects come after Neuron Wire?** Neuron Wire Labs (experimental protocols, formal verification research), Neuron Wire Next (v2 protocol design with lessons from WAN deployment), and domain-specific toolkits (edge AI, disaster response, decentralized LLM inference). **[F]**
@@ -750,10 +760,12 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 | Average peers saturates at k-bucket capacity | **[S]** | Verified | High | v3: ~59 peers (K=20 × ~3 non-empty buckets), v4: ~176 (MAX_PEERS=500 cap) |
 | Maintenance pings don't improve routing under stable conditions | **[S]** | Verified | High | SGA increased bandwidth 1.9–2.45×; fixed maintenance sufficient |
 | 1 B nodes simulate in < 20 s wall time | **[S]** | Verified | High | 15.6 s for complete 100 K–1 B sweep |
+| 1 B simulation is a routing algorithm bound, not an operational capacity claim | **[S]** | Caveat documented | High | Hybrid model (200 K active + virtual); real WAN behavior would differ — see §9 |
 | Hebbian STDP update rule is correct | **[I]** | Verified | High | 8 unit tests confirm Δw = η · pre · post produces correct sign and magnitude |
 | Neurogenesis triggers on sustained surprise | **[I]** | Verified | High | Leaky accumulator correctly filters vs. integrates |
 | Apoptosis prunes stale entries | **[I]** | Verified | High | 5 unit tests + death spiral guard validation |
 | UDP transport works on localhost | **[I]** | Verified | High | 10 unit tests + small cluster (3–5 nodes) |
+| **Learning subsystem produces useful results at any task** | **[F]** | **Not tested — biggest scientific gap** | **Low** | **No end-to-end benchmark exists (no MNIST, no regression, no classification). Individual subsystems pass unit tests but have never been evaluated as a pipeline — see §8.** |
 | Protocol works over real WAN links | **[F]** | Not tested | Low | All benchmarks are localhost; WAN deployment is D1 milestone |
 | Hebbian STDP converges over P2P gossip | **[F]** | Not tested | Low | Subsystems tested individually; end-to-end learning not demonstrated |
 | Protocol withstands > 10% packet loss | **[F]** | Not tested | Low | Retransmission cap = 3; degradation curve uncharacterized |

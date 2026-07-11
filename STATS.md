@@ -55,6 +55,8 @@
 
 *v4 uses a hybrid model: 200 K active (real Node objects) + statistical virtual nodes for the remainder. PONG responses recommend random active nodes. MAX_PEERS = 500 (k-bucket cap).*
 
+> **⚠️ Caveat — simulated ≠ real.** The 1 B result models 200 K real routing objects plus 999.8 M statistical abstractions. This evaluates the routing *algorithm's* theoretical bound, not operational capacity at that scale. Real-device behavior at 1 B would depend on OS networking limits, kernel scheduling, NAT, packet loss, congestion, and as-yet-unknown bottlenecks not captured in simulation. See `PROJECT_INTELLIGENCE.md` §9 for full discussion.
+
 ### Key Findings
 
 1. **Avg peers saturates** — ~59 for v3, ~176 for v4 (limited by MAX_PEERS=500, well above threshold)
