@@ -189,6 +189,15 @@ impl SecureChannel {
 
         // X25519 ECDH: both sides compute the same shared secret
         let shared = local_static.diffie_hellman(&peer_x_pk);
+        eprintln!(
+            "[DBG] handshake local_pk={:02x}{:02x}.. peer_mont={:02x}{:02x}.. shared={:02x}{:02x}..",
+            local_identity.public_key_bytes()[0],
+            local_identity.public_key_bytes()[1],
+            peer_x_pk.as_bytes()[0],
+            peer_x_pk.as_bytes()[1],
+            shared.as_bytes()[0],
+            shared.as_bytes()[1]
+        );
 
         // Derive symmetric key with domain separator
         let mut hasher = Sha256::new();
