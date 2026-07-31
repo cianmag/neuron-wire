@@ -43,10 +43,7 @@ use std::thread;
 pub fn spawn_health_server(
     bind: &str,
     stats: Arc<Mutex<EngineStats>>,
-) -> std::io::Result<(
-    thread::JoinHandle<()>,
-    Arc<AtomicBool>,
-)> {
+) -> std::io::Result<(thread::JoinHandle<()>, Arc<AtomicBool>)> {
     let listener = TcpListener::bind(bind)?;
     listener.set_nonblocking(true)?;
 
@@ -166,7 +163,10 @@ fn format_metrics(stats: &Arc<Mutex<EngineStats>>) -> String {
 
     out.push_str("# HELP nwp_reliable_queue_depth Current reliable queue depth\n");
     out.push_str("# TYPE nwp_reliable_queue_depth gauge\n");
-    out.push_str(&format!("nwp_reliable_queue_depth {}\n", s.reliable_queue_depth));
+    out.push_str(&format!(
+        "nwp_reliable_queue_depth {}\n",
+        s.reliable_queue_depth
+    ));
 
     out.push_str("# HELP nwp_idle_ratio Fraction of ticks with no packets\n");
     out.push_str("# TYPE nwp_idle_ratio gauge\n");
@@ -184,7 +184,10 @@ fn format_metrics(stats: &Arc<Mutex<EngineStats>>) -> String {
     // ── Security metrics ─────────────────────────────────────
     out.push_str("# HELP nwp_authenticated_packets Total packets with valid Ed25519 signatures\n");
     out.push_str("# TYPE nwp_authenticated_packets counter\n");
-    out.push_str(&format!("nwp_authenticated_packets {}\n", s.authenticated_packets));
+    out.push_str(&format!(
+        "nwp_authenticated_packets {}\n",
+        s.authenticated_packets
+    ));
 
     out.push_str("# HELP nwp_encrypted_packets Total AEAD-encrypted packets\n");
     out.push_str("# TYPE nwp_encrypted_packets counter\n");
@@ -200,7 +203,10 @@ fn format_metrics(stats: &Arc<Mutex<EngineStats>>) -> String {
 
     out.push_str("# HELP nwp_rate_limited_packets Total rate-limited packets dropped\n");
     out.push_str("# TYPE nwp_rate_limited_packets counter\n");
-    out.push_str(&format!("nwp_rate_limited_packets {}\n", s.rate_limited_packets));
+    out.push_str(&format!(
+        "nwp_rate_limited_packets {}\n",
+        s.rate_limited_packets
+    ));
 
     out.push_str("# HELP nwp_max_peers Maximum allowed peer connections\n");
     out.push_str("# TYPE nwp_max_peers gauge\n");
@@ -212,7 +218,10 @@ fn format_metrics(stats: &Arc<Mutex<EngineStats>>) -> String {
 
     out.push_str("# HELP nwp_peer_capacity_ratio Peer capacity utilization (0.0-1.0)\n");
     out.push_str("# TYPE nwp_peer_capacity_ratio gauge\n");
-    out.push_str(&format!("nwp_peer_capacity_ratio {:.4}\n", s.peer_capacity_ratio));
+    out.push_str(&format!(
+        "nwp_peer_capacity_ratio {:.4}\n",
+        s.peer_capacity_ratio
+    ));
 
     // ── DHT metrics ──────────────────────────────────────────
     out.push_str("# HELP nwp_dht_nodes DHT routing table size\n");
@@ -230,7 +239,10 @@ fn format_metrics(stats: &Arc<Mutex<EngineStats>>) -> String {
 
     out.push_str("# HELP nwp_trust_rate_limited Currently rate-limited peers\n");
     out.push_str("# TYPE nwp_trust_rate_limited gauge\n");
-    out.push_str(&format!("nwp_trust_rate_limited {}\n", s.trust_rate_limited_peers));
+    out.push_str(&format!(
+        "nwp_trust_rate_limited {}\n",
+        s.trust_rate_limited_peers
+    ));
 
     // ── Session metrics ──────────────────────────────────────
     out.push_str("# HELP nwp_sessions Active secure sessions\n");
@@ -239,7 +251,10 @@ fn format_metrics(stats: &Arc<Mutex<EngineStats>>) -> String {
 
     out.push_str("# HELP nwp_ephemeral_sessions Sessions with forward secrecy\n");
     out.push_str("# TYPE nwp_ephemeral_sessions gauge\n");
-    out.push_str(&format!("nwp_ephemeral_sessions {}\n", s.ephemeral_sessions));
+    out.push_str(&format!(
+        "nwp_ephemeral_sessions {}\n",
+        s.ephemeral_sessions
+    ));
 
     out
 }

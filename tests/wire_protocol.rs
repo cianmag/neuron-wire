@@ -4,8 +4,9 @@
 //! These tests exercise the protocol at the packet level without needing
 //! a running engine.
 
-use neuron_wire::header::{self, MessageHeader, HEADER_SIZE};
+use neuron_wire::header;
 use neuron_wire::identity::NodeIdentity;
+use neuron_wire::HEADER_SIZE;
 
 #[test]
 fn wire_ping_pong_roundtrip() {
@@ -80,11 +81,7 @@ fn wire_flags_preserved() {
     for &flags in &flags_to_test {
         let frame = header::build_frame(5, body.clone(), flags);
         let (h, _) = header::parse_frame(&frame[4..]).unwrap();
-        assert_eq!(
-            h.flags, flags,
-            "flags 0x{:04X} not preserved",
-            flags
-        );
+        assert_eq!(h.flags, flags, "flags 0x{:04X} not preserved", flags);
     }
 }
 
@@ -105,14 +102,16 @@ fn wire_signed_packet_roundtrip() {
 
     // Build frame
     let frame = header::build_frame(20, body.clone(), 0);
-    let (h, payload) = header::parse_frame(&frame[4..]).unwrap();
+    let (h, _payload) = header::parse_frame(&frame[4..]).unwrap();
     assert_eq!(h.msg_type, 20); // GRADIENT
 
     // Sign
     let seq = 1u64;
     let ts = 1_700_000_000u64;
-    let body_hash = neuron_wire::crc::crc32(payload);
-    let sig = alice.sign_packet(seq, ts, &body_hash.to_le_bytes());
+    // 32-byte body hash (fixed seed array for a deterministic test vector;
+    // a real node hashes the payload with SHA-256/BLAKE2 before signing)
+    let body_hash: [u8; 32] = [0x42; 32];
+    let sig = alice.sign_packet(seq, ts, &body_hash);
     let sig_bytes: [u8; 64] = sig.to_bytes();
 
     // Verify
@@ -120,7 +119,7 @@ fn wire_signed_packet_roundtrip() {
         &alice.public_key_bytes(),
         seq,
         ts,
-        &body_hash.to_le_bytes(),
+        &body_hash,
         &sig_bytes,
     );
     assert!(verify_result.is_ok(), "signature must verify");
@@ -131,7 +130,7 @@ fn wire_signed_packet_roundtrip() {
         &bob.public_key_bytes(),
         seq,
         ts,
-        &body_hash.to_le_bytes(),
+        &body_hash,
         &sig_bytes,
     );
     assert!(wrong_verify.is_err(), "wrong key must fail");
@@ -151,7 +150,7 @@ fn wire_authenticated_frame_with_signature() {
     let mut authed_body = Vec::with_capacity(96 + body.len());
     authed_body.extend_from_slice(&alice.public_key_bytes());
     authed_body.extend_from_slice(&sig_bytes);
-    authed_body.extend_from_slice(body);
+    authed_body.extend_from_slice(&body);
 
     let frame = header::build_frame(20, authed_body, header::FLAG_AUTHENTICATED);
     let (h, payload) = header::parse_frame(&frame[4..]).unwrap();
@@ -232,11 +231,7 @@ fn wire_encrypted_frame_roundtrip() {
 fn wire_disconnect_frame() {
     let reason = neuron_wire::header::disconnect_reason::TOO_MANY_PEERS;
     let body = vec![reason];
-    let frame = header::build_frame(
-        neuron_wire::header::msg_type::DISCONNECT,
-        body,
-        0,
-    );
+    let frame = header::build_frame(neuron_wire::header::msg_type::DISCONNECT, body, 0);
     let (h, b) = header::parse_frame(&frame[4..]).unwrap();
     assert_eq!(h.msg_type, neuron_wire::header::msg_type::DISCONNECT);
     assert_eq!(b[0], neuron_wire::header::disconnect_reason::TOO_MANY_PEERS);
@@ -244,11 +239,7 @@ fn wire_disconnect_frame() {
 
 #[test]
 fn wire_heartbeat_empty_payload() {
-    let frame = header::build_frame(
-        neuron_wire::header::msg_type::HEARTBEAT,
-        Vec::new(),
-        0,
-    );
+    let frame = header::build_frame(neuron_wire::header::msg_type::HEARTBEAT, Vec::new(), 0);
     let (h, body) = header::parse_frame(&frame[4..]).unwrap();
     assert_eq!(h.msg_type, neuron_wire::header::msg_type::HEARTBEAT);
     assert!(body.is_empty());

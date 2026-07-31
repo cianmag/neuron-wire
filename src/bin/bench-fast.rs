@@ -6,9 +6,9 @@
 //! Usage: cargo run --release --bin bench-fast [node_counts...] [trials]
 //!   Default: 100,1000,10000,50000,100000 3
 
+use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::collections::HashSet;
 use std::time::Instant;
 
 const MAX_TICKS: u64 = 120_000; // sim ticks per trial (120s simulated, ~0.1-10s real)
@@ -26,7 +26,15 @@ struct Node {
 
 impl Node {
     fn new(id: u64) -> Self {
-        Self { id, peers: HashSet::new(), pkts_out: 0, pkts_in: 0, bytes_out: 0, bytes_in: 0, converged: false }
+        Self {
+            id,
+            peers: HashSet::new(),
+            pkts_out: 0,
+            pkts_in: 0,
+            bytes_out: 0,
+            bytes_in: 0,
+            converged: false,
+        }
     }
 
     /// Generate messages for this tick.
@@ -63,7 +71,11 @@ impl Node {
             if count >= 5 {
                 for _ in 0..10 {
                     let ask_peer = v[(tick as usize + 7) % count];
-                    let mut target = (self.id.wrapping_add(tick as u64).wrapping_mul(6364136223846793005)) % all_count as u64;
+                    let mut target = (self
+                        .id
+                        .wrapping_add(tick as u64)
+                        .wrapping_mul(6364136223846793005))
+                        % all_count as u64;
                     for _ in 0..200 {
                         if target != self.id && !self.peers.contains(&target) {
                             msgq.push(Message::FindNode(self.id, ask_peer, target));
@@ -116,7 +128,9 @@ impl Node {
                 }
             }
             Message::NodeFound(to, found) if to == self.id => {
-                if found != self.id { self.peers.insert(found); }
+                if found != self.id {
+                    self.peers.insert(found);
+                }
             }
             _ => {}
         }
@@ -129,7 +143,7 @@ enum Message {
     Ping(u64, u64),          // from, to
     Pong(u64, u64, u64),     // from, to, rec_peer
     FindNode(u64, u64, u64), // from, to, target
-    NodeFound(u64, u64),    // to, found
+    NodeFound(u64, u64),     // to, found
 }
 
 impl Message {
@@ -202,17 +216,40 @@ fn run_trial(num_nodes: u32) -> TrialStats {
     // Stats
     let total_pkts: u64 = nodes.iter().map(|n| n.pkts_out).sum();
     let total_bytes: u64 = nodes.iter().map(|n| n.bytes_out).sum();
-    let avg_peers: f64 = nodes.iter().map(|n| n.peers.len() as f64).sum::<f64>() / nodes.len() as f64;
+    let avg_peers: f64 =
+        nodes.iter().map(|n| n.peers.len() as f64).sum::<f64>() / nodes.len() as f64;
     let max_peers = nodes.iter().map(|n| n.peers.len()).max().unwrap_or(0);
     let converged = converged_at.is_some();
     let ct = converged_at.map(|t| t as f64 / 1000.0).unwrap_or(0.0);
-    let bw = if MAX_TICKS > 0 { total_bytes as f64 / (MAX_TICKS as f64 / 1000.0) / 125.0 } else { 0.0 };
+    let bw = if MAX_TICKS > 0 {
+        total_bytes as f64 / (MAX_TICKS as f64 / 1000.0) / 125.0
+    } else {
+        0.0
+    };
 
-    TrialStats { node_count: num_nodes, trials: 1, converged, conv_rate: conv_count as f64 / num_nodes as f64 * 100.0, ct_mean: ct, ct_std: 0.0, ct_min: ct, ct_max: ct, bw_mean: bw, bw_min: bw, bw_max: bw, ap_mean: avg_peers, mp_mean: max_peers as f64, pkts_mean: total_pkts }
+    TrialStats {
+        node_count: num_nodes,
+        trials: 1,
+        converged,
+        conv_rate: conv_count as f64 / num_nodes as f64 * 100.0,
+        ct_mean: ct,
+        ct_std: 0.0,
+        ct_min: ct,
+        ct_max: ct,
+        bw_mean: bw,
+        bw_min: bw,
+        bw_max: bw,
+        ap_mean: avg_peers,
+        mp_mean: max_peers as f64,
+        pkts_mean: total_pkts,
+    }
 }
 
 // Safe transmute-style read without consuming
-unsafe fn ptr_read<T>(v: &[T], i: usize) -> T where T: Copy {
+unsafe fn ptr_read<T>(v: &[T], i: usize) -> T
+where
+    T: Copy,
+{
     std::ptr::read(v.as_ptr().add(i))
 }
 
@@ -220,15 +257,26 @@ unsafe fn ptr_read<T>(v: &[T], i: usize) -> T where T: Copy {
 #[derive(Clone)]
 #[allow(dead_code)]
 struct TrialStats {
-    node_count: u32, trials: u32, converged: bool, conv_rate: f64,
-    ct_mean: f64, ct_std: f64, ct_min: f64, ct_max: f64,
-    bw_mean: f64, bw_min: f64, bw_max: f64,
-    ap_mean: f64, mp_mean: f64, pkts_mean: u64,
+    node_count: u32,
+    trials: u32,
+    converged: bool,
+    conv_rate: f64,
+    ct_mean: f64,
+    ct_std: f64,
+    ct_min: f64,
+    ct_max: f64,
+    bw_mean: f64,
+    bw_min: f64,
+    bw_max: f64,
+    ap_mean: f64,
+    mp_mean: f64,
+    pkts_mean: u64,
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let node_counts: Vec<u32> = args.get(1)
+    let node_counts: Vec<u32> = args
+        .get(1)
         .map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect())
         .unwrap_or_else(|| vec![100, 1000, 10000, 50000, 100000]);
     let trials: u32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3);
@@ -241,7 +289,12 @@ fn main() {
     let total = node_counts.len() as u32 * trials;
     let start_all = Instant::now();
 
-    eprintln!("═══════ FAST DHT v3 ═══════ {} cfgs × {} trials = {} runs (scale-optimized)", node_counts.len(), trials, total);
+    eprintln!(
+        "═══════ FAST DHT v3 ═══════ {} cfgs × {} trials = {} runs (scale-optimized)",
+        node_counts.len(),
+        trials,
+        total
+    );
     eprintln!("No periodic peer heartbeats; gossip PEX + FIND_NODE every 500 ticks");
     eprintln!("Max {} sim-ticks per trial\n", MAX_TICKS);
 
@@ -252,18 +305,46 @@ fn main() {
             let stats = run_trial(nc);
             let elapsed = start.elapsed();
 
-            let line = format!("{},{},{},{:.1},{:.4},{},{:.4},{:.4},{}\n", nc, t, stats.converged, stats.conv_rate, stats.ct_mean, stats.mp_mean as u64, stats.ap_mean, stats.bw_mean, stats.pkts_mean);
-            let mut f = OpenOptions::new().append(true).create(true).open(&csv_path).unwrap();
+            let line = format!(
+                "{},{},{},{:.1},{:.4},{},{:.4},{:.4},{}\n",
+                nc,
+                t,
+                stats.converged,
+                stats.conv_rate,
+                stats.ct_mean,
+                stats.mp_mean as u64,
+                stats.ap_mean,
+                stats.bw_mean,
+                stats.pkts_mean
+            );
+            let mut f = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&csv_path)
+                .unwrap();
             f.write_all(line.as_bytes()).ok();
 
-            eprintln!("  [{:>2}/{}] {:>6}n t{} {} ct={:.2}s peers={:.1}/{} bw={:.0} pkt={} wall={:.2}s",
-                t+1, trials, nc, t,
+            eprintln!(
+                "  [{:>2}/{}] {:>6}n t{} {} ct={:.2}s peers={:.1}/{} bw={:.0} pkt={} wall={:.2}s",
+                t + 1,
+                trials,
+                nc,
+                t,
                 if stats.converged { "✅" } else { "❌" },
-                stats.ct_mean, stats.ap_mean, ((nc as f64).log2().ceil() * 3.0) as u64,
-                stats.bw_mean, stats.pkts_mean, elapsed.as_secs_f64());
+                stats.ct_mean,
+                stats.ap_mean,
+                ((nc as f64).log2().ceil() * 3.0) as u64,
+                stats.bw_mean,
+                stats.pkts_mean,
+                elapsed.as_secs_f64()
+            );
         }
     }
 
     let total_elapsed = start_all.elapsed();
-    eprintln!("\n═══════ DONE → {} ({}s)", csv_path.display(), total_elapsed.as_secs_f64() as u64);
+    eprintln!(
+        "\n═══════ DONE → {} ({}s)",
+        csv_path.display(),
+        total_elapsed.as_secs_f64() as u64
+    );
 }

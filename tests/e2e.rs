@@ -43,10 +43,18 @@ fn e2e_two_nodes_construct() {
     let config_b = make_config(9402);
 
     let result_a = EngineLoop::new(config_a);
-    assert!(result_a.is_ok(), "Node A should construct: {:?}", result_a.err());
+    assert!(
+        result_a.is_ok(),
+        "Node A should construct: {:?}",
+        result_a.err()
+    );
 
     let result_b = EngineLoop::new(config_b);
-    assert!(result_b.is_ok(), "Node B should construct: {:?}", result_b.err());
+    assert!(
+        result_b.is_ok(),
+        "Node B should construct: {:?}",
+        result_b.err()
+    );
 }
 
 // ─── Test: Node A can send a packet to Node B ──────────────────
@@ -60,7 +68,7 @@ fn e2e_send_packet_between_nodes() {
 
     // Construct Node B
     let config_b = make_config(9412);
-    let (mut engine_b, _outbound_tx_b, mut events_rx_b) =
+    let (mut engine_b, _outbound_tx_b, _events_rx_b) =
         EngineLoop::new(config_b).expect("Node B construct");
 
     // Run Node B in a background thread
@@ -111,7 +119,7 @@ fn e2e_unsigned_packet_exchange() {
     // Node B — no signing
     let mut config_b = make_config(9422);
     config_b.security_enabled = false;
-    let (mut engine_b, _outbound_tx_b, mut events_rx_b) =
+    let (mut engine_b, _outbound_tx_b, events_rx_b) =
         EngineLoop::new(config_b).expect("Node B construct");
 
     // Run Node B
@@ -195,8 +203,7 @@ fn e2e_connection_limit() {
     let mut config = make_config(9441);
     config.security_enabled = false;
     config.max_peers = 2;
-    let (mut engine, _outbound_tx, _events_rx) =
-        EngineLoop::new(config).expect("Node construct");
+    let (mut engine, _outbound_tx, _events_rx) = EngineLoop::new(config).expect("Node construct");
 
     let shutdown = engine.shutdown.clone();
     let handle = thread::spawn(move || {
@@ -228,7 +235,7 @@ fn e2e_trust_persistence() {
     use neuron_wire::trust::{TrustEvent, TrustSystem};
 
     let mut trust = TrustSystem::new();
-    let eid = [1u8; 32];
+    let eid = neuron_wire::components::EntityId::new([1u8; 32]);
 
     // Record some events
     trust.record_event(eid, TrustEvent::ValidSignature);

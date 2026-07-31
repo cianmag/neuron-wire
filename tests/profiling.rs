@@ -5,10 +5,9 @@
 //! These tests are designed to be run under perf, flamegraph, or Instruments
 //! to identify hot paths and optimize performance.
 
-use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
-use neuron_wire::header::{self, MessageHeader};
+use neuron_wire::header;
 
 // ── Benchmark: Header build/parse roundtrip ──────────────────
 
@@ -32,10 +31,7 @@ fn bench_header_roundtrip() {
         "📊 header_roundtrip: {} iterations in {:.2?} ({:.0} ops/sec)",
         iterations, elapsed, ops_per_sec
     );
-    eprintln!(
-        "   Per operation: {:.2?}",
-        elapsed / iterations
-    );
+    eprintln!("   Per operation: {:.2?}", elapsed / iterations);
 }
 
 // ── Benchmark: Large body serialization ──────────────────────
@@ -78,15 +74,11 @@ fn bench_udp_throughput() {
 
     let sock_a = UdpSocket::bind("127.0.0.1:0").unwrap();
     let sock_b = UdpSocket::bind("127.0.0.1:0").unwrap();
-    sock_a
-        .set_read_timeout(Some(Duration::from_millis(1)))
-        .ok();
-    sock_b
-        .set_read_timeout(Some(Duration::from_millis(1)))
-        .ok();
+    sock_a.set_read_timeout(Some(Duration::from_millis(1))).ok();
+    sock_b.set_read_timeout(Some(Duration::from_millis(1))).ok();
 
     let addr_b = sock_b.local_addr().unwrap();
-    let addr_a = sock_a.local_addr().unwrap();
+    let _addr_a = sock_a.local_addr().unwrap();
 
     let frame = header::build_frame(5, vec![0u8; 256], 0);
     let iterations = 100_000;
@@ -239,8 +231,5 @@ fn bench_hashmap_trust_pattern() {
         "📊 hashmap_trust: 1000 inserts in {:.2?}, {} lookups+updates in {:.2?}",
         insert_time, iterations, update_time
     );
-    eprintln!(
-        "   Per update: {:.2?}",
-        update_time / iterations
-    );
+    eprintln!("   Per update: {:.2?}", update_time / iterations);
 }

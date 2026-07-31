@@ -1,0 +1,39 @@
+name: Evidence
+
+# Runs the reproducible evidence pipeline on every push to grant-prep.
+# Archives results/ so every commit carries a fresh evidence trail.
+
+on:
+  push:
+    branches: [grant-prep, master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Deterministic simulation matrix (quick profile)
+        run: ./evidence/run_matrix.sh results/evidence quick
+
+      - name: Local multi-process cluster (5 nodes, 15s)
+        run: ./evidence/localhost_cluster.sh 5 15
+
+      - name: Archive evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-results
+          path: |
+            results/evidence/
+            results/localhost_cluster_5/
+          retention-days: 30
+
+      - name: Show aggregated table
+        run: cat results/evidence/evidence_table.md 2>/dev/null | head -40 || echo "(aggregation skipped)"

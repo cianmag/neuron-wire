@@ -170,7 +170,7 @@ proptest! {
 // ─── Secure channel property tests ──────────────────────────────
 
 proptest! {
-    /// Encrypt-then-decrypt is the identity: plaintext → encrypt → decrypt → plaintext
+    // Encrypt-then-decrypt is the identity: plaintext → encrypt → decrypt → plaintext
     #[test]
     fn prop_encrypt_decrypt_identity(
         plaintext in prop::collection::vec(any::<u8>(), 0..=4096),
@@ -228,42 +228,48 @@ proptest! {
         prop_assert_eq!(h.body_len as usize, body.len());
         prop_assert_eq!(parsed_body, &body[..]);
     }
+}
 
-    /// e. Encrypt empty plaintext should succeed
-    #[test]
-    fn prop_encrypt_empty() {
-        let key = SecureChannel::generate_key();
-        let plaintext: Vec<u8> = vec![];
-        let aad = b"test-aad";
-        let result = SecureChannel::encrypt_raw(&key, &plaintext, aad);
-        prop_assert!(result.is_some(), "encrypting empty plaintext should succeed");
-        // Verify roundtrip
-        let (nonce, ciphertext) = result.unwrap();
-        let decrypted = SecureChannel::decrypt_raw(&key, &nonce, &ciphertext, aad);
-        prop_assert!(decrypted.is_some(), "decrypting empty plaintext should succeed");
-        prop_assert_eq!(decrypted.unwrap(), plaintext);
-    }
+/// e. Encrypt empty plaintext should succeed
+#[test]
+fn prop_encrypt_empty() {
+    let key = SecureChannel::generate_key();
+    let plaintext: Vec<u8> = vec![];
+    let aad = b"test-aad";
+    let result = SecureChannel::encrypt_raw(&key, &plaintext, aad);
+    assert!(
+        result.is_some(),
+        "encrypting empty plaintext should succeed"
+    );
+    // Verify roundtrip
+    let (nonce, ciphertext) = result.unwrap();
+    let decrypted = SecureChannel::decrypt_raw(&key, &nonce, &ciphertext, aad);
+    assert!(
+        decrypted.is_some(),
+        "decrypting empty plaintext should succeed"
+    );
+    assert_eq!(decrypted.unwrap(), plaintext);
+}
 
-    /// f. Encrypt 1MB plaintext should succeed
-    #[test]
-    fn prop_encrypt_large() {
-        let key = SecureChannel::generate_key();
-        let plaintext = vec![0x42u8; 1_048_576]; // 1MB
-        let aad = b"test-aad";
-        let result = SecureChannel::encrypt_raw(&key, &plaintext, aad);
-        prop_assert!(result.is_some(), "encrypting 1MB should succeed");
-        // Verify roundtrip
-        let (nonce, ciphertext) = result.unwrap();
-        let decrypted = SecureChannel::decrypt_raw(&key, &nonce, &ciphertext, aad);
-        prop_assert!(decrypted.is_some(), "decrypting 1MB should succeed");
-        prop_assert_eq!(decrypted.unwrap(), plaintext);
-    }
+/// f. Encrypt 1MB plaintext should succeed
+#[test]
+fn prop_encrypt_large() {
+    let key = SecureChannel::generate_key();
+    let plaintext = vec![0x42u8; 1_048_576]; // 1MB
+    let aad = b"test-aad";
+    let result = SecureChannel::encrypt_raw(&key, &plaintext, aad);
+    assert!(result.is_some(), "encrypting 1MB should succeed");
+    // Verify roundtrip
+    let (nonce, ciphertext) = result.unwrap();
+    let decrypted = SecureChannel::decrypt_raw(&key, &nonce, &ciphertext, aad);
+    assert!(decrypted.is_some(), "decrypting 1MB should succeed");
+    assert_eq!(decrypted.unwrap(), plaintext);
 }
 
 // ─── Trust system property tests ────────────────────────────
 
 proptest! {
-    /// g. Trust score always stays in [0.0, 1.0] after any sequence of events
+    // g. Trust score always stays in [0.0, 1.0] after any sequence of events
     #[test]
     fn prop_trust_score_bounded(
         events in prop::collection::vec(any::<u8>(), 0..100),
@@ -292,24 +298,26 @@ proptest! {
         }
     }
 
-    /// h. 100 replay attacks should push score below SYBIL_THRESHOLD
-    #[test]
-    fn prop_trust_sybil_escalation() {
-        let mut ts = TrustSystem::new();
-        let mut eid_bytes = [0u8; 32];
-        eid_bytes[0..8].copy_from_slice(&1u64.to_le_bytes());
-        let peer = EntityId(eid_bytes);
+}
 
-        for _ in 0..100 {
-            ts.record_event(peer, TrustEvent::ReplayAttack);
-        }
-        let score = ts.trust_score(&peer);
-        prop_assert!(
-            score < SYBIL_THRESHOLD,
-            "100 replay attacks should push score {} below SYBIL_THRESHOLD {}",
-            score, SYBIL_THRESHOLD
-        );
+/// h. 100 replay attacks should push score below SYBIL_THRESHOLD
+#[test]
+fn prop_trust_sybil_escalation() {
+    let mut ts = TrustSystem::new();
+    let mut eid_bytes = [0u8; 32];
+    eid_bytes[0..8].copy_from_slice(&1u64.to_le_bytes());
+    let peer = EntityId(eid_bytes);
+
+    for _ in 0..100 {
+        ts.record_event(peer, TrustEvent::ReplayAttack);
     }
+    let score = ts.trust_score(&peer);
+    assert!(
+        score < SYBIL_THRESHOLD,
+        "100 replay attacks should push score {} below SYBIL_THRESHOLD {}",
+        score,
+        SYBIL_THRESHOLD
+    );
 }
 
 // ─── CRC32 property tests ──────────────────────────────────

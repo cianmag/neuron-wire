@@ -366,7 +366,10 @@ impl SecureChannel {
 
     /// Get the number of sessions with forward secrecy (ephemeral key exchange complete).
     pub fn ephemeral_count(&self) -> usize {
-        self.sessions.values().filter(|s| s.ephemeral_complete).count()
+        self.sessions
+            .values()
+            .filter(|s| s.ephemeral_complete)
+            .count()
     }
 
     /// Check if a session exists.

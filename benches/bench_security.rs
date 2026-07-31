@@ -24,7 +24,7 @@ fn bench_ed25519_sign(c: &mut Criterion) {
 }
 
 fn bench_ed25519_verify(c: &mut Criterion) {
-    use neuron_wire::identity::{NodeIdentity, entity_id_from_public_key, verify_signature};
+    use neuron_wire::identity::{entity_id_from_public_key, verify_signature, NodeIdentity};
     let identity = NodeIdentity::generate();
     let message = vec![0x42u8; 256];
     let signature = identity.sign(&message);
@@ -55,7 +55,7 @@ fn bench_ed25519_sign_sizes(c: &mut Criterion) {
 // ─── XChaCha20-Poly1305 AEAD ──────────────────────────────────
 
 fn bench_xchacha20_encrypt(c: &mut Criterion) {
-    use chacha20poly1305::{XChaCha20Poly1305, KeyInit, aead::Aead};
+    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
     use rand::RngCore;
     let key = chacha20poly1305::Key::<XChaCha20Poly1305>::generate(&mut rand::thread_rng());
     let cipher = XChaCha20Poly1305::new(&key);
@@ -69,7 +69,7 @@ fn bench_xchacha20_encrypt(c: &mut Criterion) {
 }
 
 fn bench_xchacha20_decrypt(c: &mut Criterion) {
-    use chacha20poly1305::{XChaCha20Poly1305, KeyInit, aead::Aead};
+    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
     use rand::RngCore;
     let key = chacha20poly1305::Key::<XChaCha20Poly1305>::generate(&mut rand::thread_rng());
     let cipher = XChaCha20Poly1305::new(&key);
@@ -84,7 +84,7 @@ fn bench_xchacha20_decrypt(c: &mut Criterion) {
 }
 
 fn bench_xchacha20_sizes(c: &mut Criterion) {
-    use chacha20poly1305::{XChaCha20Poly1305, KeyInit, aead::Aead};
+    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
     use rand::RngCore;
     let key = chacha20poly1305::Key::<XChaCha20Poly1305>::generate(&mut rand::thread_rng());
     let cipher = XChaCha20Poly1305::new(&key);
@@ -105,7 +105,7 @@ fn bench_xchacha20_sizes(c: &mut Criterion) {
 // ─── X25519 ECDH Key Agreement ─────────────────────────────────
 
 fn bench_x25519_ecdh(c: &mut Criterion) {
-    use x25519_dalek::{StaticSecret, PublicKey};
+    use x25519_dalek::{PublicKey, StaticSecret};
     let alice_secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
     let alice_public = PublicKey::from(&alice_secret);
     let bob_secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
@@ -116,7 +116,7 @@ fn bench_x25519_ecdh(c: &mut Criterion) {
 }
 
 fn bench_x25519_keygen(c: &mut Criterion) {
-    use x25519_dalek::{StaticSecret, PublicKey};
+    use x25519_dalek::{PublicKey, StaticSecret};
     c.bench_function("x25519_keygen", |b| {
         b.iter(|| {
             let secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
@@ -128,7 +128,7 @@ fn bench_x25519_keygen(c: &mut Criterion) {
 // ─── SHA-256 Hashing ───────────────────────────────────────────
 
 fn bench_sha256(c: &mut Criterion) {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     for &size in &[32usize, 64, 256, 1024] {
         let data = vec![0xABu8; size];
         let mut group = c.benchmark_group(format!("sha256_{}B", size));
@@ -147,8 +147,8 @@ fn bench_sha256(c: &mut Criterion) {
 // ─── Secure Channel Handshake ──────────────────────────────────
 
 fn bench_secure_channel_handshake(c: &mut Criterion) {
-    use neuron_wire::secure_channel::SecureChannel;
     use neuron_wire::identity::NodeIdentity;
+    use neuron_wire::secure_channel::SecureChannel;
     let alice_identity = NodeIdentity::generate();
     let bob_identity = NodeIdentity::generate();
     c.bench_function("secure_channel_handshake", |b| {
@@ -171,8 +171,8 @@ fn bench_secure_channel_handshake(c: &mut Criterion) {
 }
 
 fn bench_secure_channel_encrypt(c: &mut Criterion) {
-    use neuron_wire::secure_channel::SecureChannel;
     use neuron_wire::identity::NodeIdentity;
+    use neuron_wire::secure_channel::SecureChannel;
     let alice_identity = NodeIdentity::generate();
     let bob_identity = NodeIdentity::generate();
     let mut alice = SecureChannel::new();
@@ -183,13 +183,19 @@ fn bench_secure_channel_encrypt(c: &mut Criterion) {
     let session_b = bob.handshake(&bob_identity, alice_pub);
     let plaintext = vec![0x42u8; 256];
     c.bench_function("secure_channel_encrypt_256B", |b| {
-        b.iter(|| black_box(alice.encrypt(black_box(&session_a), black_box(&plaintext)).unwrap()))
+        b.iter(|| {
+            black_box(
+                alice
+                    .encrypt(black_box(&session_a), black_box(&plaintext))
+                    .unwrap(),
+            )
+        })
     });
 }
 
 fn bench_secure_channel_decrypt(c: &mut Criterion) {
-    use neuron_wire::secure_channel::SecureChannel;
     use neuron_wire::identity::NodeIdentity;
+    use neuron_wire::secure_channel::SecureChannel;
     let alice_identity = NodeIdentity::generate();
     let bob_identity = NodeIdentity::generate();
     let mut alice = SecureChannel::new();
@@ -201,14 +207,19 @@ fn bench_secure_channel_decrypt(c: &mut Criterion) {
     let plaintext = vec![0x42u8; 256];
     let ciphertext = alice.encrypt(&session_a, &plaintext).unwrap();
     c.bench_function("secure_channel_decrypt_256B", |b| {
-        b.iter(|| black_box(bob.decrypt(black_box(&session_b), black_box(&ciphertext)).unwrap()))
+        b.iter(|| {
+            black_box(
+                bob.decrypt(black_box(&session_b), black_box(&ciphertext))
+                    .unwrap(),
+            )
+        })
     });
 }
 
 // ─── Trust System ──────────────────────────────────────────────
 
 fn bench_trust_record_event(c: &mut Criterion) {
-    use neuron_wire::trust::{TrustSystem, TrustEvent};
+    use neuron_wire::trust::{TrustEvent, TrustSystem};
     use neuron_wire::types::EntityId;
     let mut ts = TrustSystem::new();
     let eid = EntityId([1u8; 32]);
@@ -238,7 +249,10 @@ fn bench_trust_cleanup(c: &mut Criterion) {
     for i in 0..1000 {
         let mut eid = [0u8; 32];
         eid[0..4].copy_from_slice(&(i as u32).to_le_bytes());
-        ts.record_event(EntityId(eid), neuron_wire::trust::TrustEvent::ValidSignature);
+        ts.record_event(
+            EntityId(eid),
+            neuron_wire::trust::TrustEvent::ValidSignature,
+        );
     }
     c.bench_function("trust_cleanup_1000_peers", |b| {
         b.iter_batched(

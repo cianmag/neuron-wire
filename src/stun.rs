@@ -111,7 +111,6 @@ impl From<std::io::Error> for StunError {
 ///
 /// Returns the packet bytes and the transaction ID for verification.
 fn build_binding_request() -> (Vec<u8>, [u8; TRANSACTION_ID_SIZE]) {
-
     let mut packet = Vec::with_capacity(STUN_HEADER_SIZE);
 
     // Message Type (2 bytes): Binding Request = 0x0001
@@ -240,7 +239,9 @@ fn parse_binding_response(
         pos += 4 + ((attr_length + 3) & !3);
     }
 
-    Err(StunError::InvalidResponse("no XOR-MAPPED-ADDRESS attribute"))
+    Err(StunError::InvalidResponse(
+        "no XOR-MAPPED-ADDRESS attribute",
+    ))
 }
 
 /// Discover the external (public) IP address and port via STUN.
@@ -289,7 +290,10 @@ pub fn discover_external_address(
     let mut buf = [0u8; 1024];
     let (received, responder) = match socket.recv_from(&mut buf) {
         Ok((n, addr)) => (n, addr),
-        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+        Err(ref e)
+            if e.kind() == std::io::ErrorKind::WouldBlock
+                || e.kind() == std::io::ErrorKind::TimedOut =>
+        {
             return Err(StunError::Timeout);
         }
         Err(e) => return Err(StunError::Transport(e)),
@@ -326,11 +330,7 @@ pub fn discover_external_address(
 ///
 /// Uses `stun.l.google.com:19302` with a 5-second timeout.
 pub fn discover_default() -> Result<Option<StunResult>, StunError> {
-    discover_external_address(
-        DEFAULT_STUN_SERVER,
-        "0.0.0.0:0",
-        DEFAULT_STUN_TIMEOUT,
-    )
+    discover_external_address(DEFAULT_STUN_SERVER, "0.0.0.0:0", DEFAULT_STUN_TIMEOUT)
 }
 
 // ─── Integration helpers for UdpTransport ──────────────────────

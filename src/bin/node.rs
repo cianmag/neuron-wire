@@ -16,12 +16,12 @@
 
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use neuron_wire::engine_loop::{EngineConfig, spawn_engine};
+use neuron_wire::engine_loop::{spawn_engine, EngineConfig};
 use neuron_wire::health::spawn_health_server;
 use neuron_wire::identity::{IdentityError, NodeIdentity};
 
@@ -44,22 +44,16 @@ fn parse_cli() -> Cli {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--config" => {
-                config = args
-                    .next()
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| {
-                        eprintln!("[NODE] WARN: --config flag followed by an empty argument");
-                        config
-                    });
+                config = args.next().map(PathBuf::from).unwrap_or_else(|| {
+                    eprintln!("[NODE] WARN: --config flag followed by an empty argument");
+                    config
+                });
             }
             "--identity" => {
-                identity = args
-                    .next()
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| {
-                        eprintln!("[NODE] WARN: --identity flag followed by an empty argument");
-                        identity
-                    });
+                identity = args.next().map(PathBuf::from).unwrap_or_else(|| {
+                    eprintln!("[NODE] WARN: --identity flag followed by an empty argument");
+                    identity
+                });
             }
             "--version" | "-v" => {
                 println!("{PKG_NAME} v{VERSION}");
@@ -117,7 +111,9 @@ struct NodeSection {
     per_ip_max_peers: usize,
 }
 
-fn default_per_ip_max_peers() -> usize { 10 }
+fn default_per_ip_max_peers() -> usize {
+    10
+}
 
 impl Default for NodeSection {
     fn default() -> Self {
@@ -367,9 +363,7 @@ fn load_or_create_identity(path: &PathBuf) -> Result<NodeIdentity, IdentityError
             Ok(id)
         }
         Err(e) => {
-            eprintln!(
-                "[NODE] WARN: could not load identity from {path:?}: {e} — using ephemeral"
-            );
+            eprintln!("[NODE] WARN: could not load identity from {path:?}: {e} — using ephemeral");
             Ok(NodeIdentity::new())
         }
     }
@@ -409,10 +403,7 @@ fn print_banner(cfg: &NodeConfig, identity: &NodeIdentity) {
     let fp = identity_fingerprint(identity);
 
     println!("╔══════════════════════════════════════════╗");
-    println!(
-        "║  {name:38} ║",
-        name = format!("{PKG_NAME}  v{VERSION}")
-    );
+    println!("║  {name:38} ║", name = format!("{PKG_NAME}  v{VERSION}"));
     println!("╠══════════════════════════════════════════╣");
     println!("║  Node:      {:36} ║", cfg.node.name);
     println!("║  Identity:  {:36} ║", fp);
@@ -518,9 +509,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // ── Spawn health HTTP server (background thread) ─────────
-    let health_bind = std::env::var("NWP_HEALTH_BIND")
-        .unwrap_or_else(|_| "127.0.0.1:9100".to_string());
-    let (_health_handle, _health_shutdown) = spawn_health_server(&health_bind, shared_stats.clone())?;
+    let health_bind =
+        std::env::var("NWP_HEALTH_BIND").unwrap_or_else(|_| "127.0.0.1:9100".to_string());
+    let (_health_handle, _health_shutdown) =
+        spawn_health_server(&health_bind, shared_stats.clone())?;
     eprintln!("[NODE] Health endpoint at http://{health_bind}");
 
     // ── Global shutdown signal ───────────────────────────────
@@ -528,16 +520,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── Spawn observability dashboard (charts + SSE) ─────────
     let dashboard_metrics = neuron_wire::observability::MetricsRegistry::new();
-    let dashboard_trace = Arc::new(Mutex::new(
-        neuron_wire::observability::TraceCollector::new(),
-    ));
-    let dashboard_bind = std::env::var("NWP_DASHBOARD_BIND")
-        .unwrap_or_else(|_| "0.0.0.0:9090".to_string());
+    let dashboard_trace = Arc::new(Mutex::new(neuron_wire::observability::TraceCollector::new()));
+    let dashboard_bind =
+        std::env::var("NWP_DASHBOARD_BIND").unwrap_or_else(|_| "0.0.0.0:9090".to_string());
     let dashboard_config = neuron_wire::observability::DashboardConfig {
         listen_addr: dashboard_bind.clone(),
         html_path: None,
     };
-    let dashboard_handle = neuron_wire::observability::spawn_dashboard(
+    let _dashboard_handle = neuron_wire::observability::spawn_dashboard(
         dashboard_config,
         dashboard_metrics.clone(),
         dashboard_trace.clone(),
@@ -551,22 +541,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let stats = shared_stats.clone();
         std::thread::Builder::new()
             .name("nwp-stats-bridge".to_string())
-            .spawn(move || {
-                loop {
-                    std::thread::sleep(Duration::from_secs(1));
-                    if shutdown.load(Ordering::Relaxed) { break; }
-                    if let Ok(s) = stats.lock() {
-                        metrics.set_peer_count(s.peer_count as u64);
-                        metrics.set_auth_failures(s.auth_failures);
-                        metrics.set_encrypted_packets(s.encrypted_packets);
-                        metrics.set_peer_capacity(s.peer_capacity_ratio);
-                        metrics.set_active_sessions(s.active_sessions as u64);
-                        metrics.set_ephemeral_sessions(s.ephemeral_sessions as u64);
-                        metrics.set_max_peers(s.max_peers as u64);
-                        metrics.set_rate_limited_peers(s.rate_limited_packets);
-                        metrics.set_dht_peers(s.dht_node_count as u64);
-                        metrics.set_session_count(s.active_sessions as u64);
-                    }
+            .spawn(move || loop {
+                std::thread::sleep(Duration::from_secs(1));
+                if shutdown.load(Ordering::Relaxed) {
+                    break;
+                }
+                if let Ok(s) = stats.lock() {
+                    metrics.set_peer_count(s.peer_count as u64);
+                    metrics.set_auth_failures(s.auth_failures);
+                    metrics.set_encrypted_packets(s.encrypted_packets);
+                    metrics.set_peer_capacity(s.peer_capacity_ratio);
+                    metrics.set_active_sessions(s.active_sessions as u64);
+                    metrics.set_ephemeral_sessions(s.ephemeral_sessions as u64);
+                    metrics.set_max_peers(s.max_peers as u64);
+                    metrics.set_rate_limited_peers(s.rate_limited_packets);
+                    metrics.set_dht_peers(s.dht_node_count as u64);
+                    metrics.set_session_count(s.active_sessions as u64);
                 }
             })
             .ok();
@@ -576,13 +566,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     print_banner(&config, &identity);
 
     // ── Spawn engine ─────────────────────────────────────────
-    let (_outbound_tx, _events_rx, handle) =
-        spawn_engine_with_graceful_shutdown(engine_config)?;
+    let (_outbound_tx, _events_rx, handle) = spawn_engine_with_graceful_shutdown(engine_config)?;
 
     eprintln!("[NODE] Engine running. Press Ctrl+C to shutdown.");
 
     // ── Wait for engine thread to finish ─────────────────────
-    handle.join().map_err(|e| format!("engine thread panicked: {e:?}"))?;
+    handle
+        .join()
+        .map_err(|e| format!("engine thread panicked: {e:?}"))?;
 
     eprintln!("[NODE] Shutdown complete. Goodbye.");
     Ok(())

@@ -134,11 +134,7 @@ fn integration_trust_event_roundtrip() {
 
     // ReplayAttack: -0.80 (should clamp to 0.0)
     let s4 = ts.record_event(peer, TrustEvent::ReplayAttack);
-    assert!(
-        s4 <= 0.02,
-        "after ReplayAttack expected ~0.0, got {}",
-        s4
-    );
+    assert!(s4 <= 0.02, "after ReplayAttack expected ~0.0, got {}", s4);
 
     // SuccessfulHandshake: +0.10
     let s5 = ts.record_event(peer, TrustEvent::SuccessfulHandshake);
@@ -150,11 +146,7 @@ fn integration_trust_event_roundtrip() {
 
     // PacketTimeout: -0.10
     let s6 = ts.record_event(peer, TrustEvent::PacketTimeout);
-    assert!(
-        s6 <= 0.02,
-        "after PacketTimeout expected ~0.0, got {}",
-        s6
-    );
+    assert!(s6 <= 0.02, "after PacketTimeout expected ~0.0, got {}", s6);
 
     // FailedHandshake: -0.20 (clamp at 0.0)
     let s7 = ts.record_event(peer, TrustEvent::FailedHandshake);
@@ -303,7 +295,8 @@ fn integration_header_stress() {
             .collect();
 
         let frame = header::build_frame(msg_type, body.clone(), flags);
-        let (h, b) = header::parse_frame(&frame[4..]).expect("parse_frame should never fail for valid frames");
+        let (h, b) = header::parse_frame(&frame[4..])
+            .expect("parse_frame should never fail for valid frames");
 
         assert_eq!(h.msg_type, msg_type, "msg_type mismatch");
         assert_eq!(h.flags, flags, "flags mismatch");
@@ -438,7 +431,10 @@ fn integration_audit_chain_growth() {
     }
 
     // Final integrity check
-    assert!(log.verify_integrity(), "final hash chain integrity check failed");
+    assert!(
+        log.verify_integrity(),
+        "final hash chain integrity check failed"
+    );
     assert_eq!(log.total_entries(), 1000);
 
     // Verify genesis hash is preserved
@@ -523,9 +519,7 @@ fn integration_frame_length_validation() {
             Err(HeaderError::ShortBuffer(n)) => assert_eq!(n, cut),
             other => panic!(
                 "expected ShortBuffer({}) for {}-byte buffer, got {:?}",
-                cut,
-                cut,
-                other
+                cut, cut, other
             ),
         }
     }
@@ -545,13 +539,10 @@ fn integration_frame_length_validation() {
 
     // Case 6: Header with body_len exceeding MAX_BODY_SIZE is rejected
     // even if the raw bytes are present
-    let oversized_header = neuron_wire::header::MessageHeader::new(
-        5,
-        neuron_wire::MAX_BODY_SIZE + 1,
-        0,
-    );
-    let err = neuron_wire::header::MessageHeader::from_bytes(&oversized_header.to_bytes())
-        .unwrap_err();
+    let oversized_header =
+        neuron_wire::header::MessageHeader::new(5, neuron_wire::MAX_BODY_SIZE + 1, 0);
+    let err =
+        neuron_wire::header::MessageHeader::from_bytes(&oversized_header.to_bytes()).unwrap_err();
     match err {
         HeaderError::BodyTooLarge(s) => assert!(s > neuron_wire::MAX_BODY_SIZE),
         other => panic!("expected BodyTooLarge, got {:?}", other),
@@ -567,9 +558,18 @@ fn integration_disconnect_reasons() {
     let reasons: &[(u8, &str)] = &[
         (header::disconnect_reason::SHUTDOWN, "node shutting down"),
         (header::disconnect_reason::RESTART, "restarting for update"),
-        (header::disconnect_reason::TOO_MANY_PEERS, "connection limit reached"),
-        (header::disconnect_reason::VERSION_MISMATCH, "protocol v3 not supported"),
-        (header::disconnect_reason::RATE_LIMITED, "burst traffic exceeded"),
+        (
+            header::disconnect_reason::TOO_MANY_PEERS,
+            "connection limit reached",
+        ),
+        (
+            header::disconnect_reason::VERSION_MISMATCH,
+            "protocol v3 not supported",
+        ),
+        (
+            header::disconnect_reason::RATE_LIMITED,
+            "burst traffic exceeded",
+        ),
         (header::disconnect_reason::ADMIN, "admin override"),
     ];
 
@@ -581,8 +581,8 @@ fn integration_disconnect_reasons() {
         body.extend_from_slice(msg.as_bytes());
 
         let frame = header::build_frame(header::msg_type::DISCONNECT, body, 0);
-        let (h, b) = header::parse_frame(&frame[4..])
-            .expect("disconnect frame should parse successfully");
+        let (h, b) =
+            header::parse_frame(&frame[4..]).expect("disconnect frame should parse successfully");
 
         assert_eq!(
             h.msg_type,
@@ -606,6 +606,9 @@ fn integration_disconnect_reasons() {
     let mut sorted_codes = codes.clone();
     sorted_codes.sort();
     sorted_codes.dedup();
-    assert_eq!(sorted_codes.len(), codes.len(), "all disconnect codes must be unique");
+    assert_eq!(
+        sorted_codes.len(),
+        codes.len(),
+        "all disconnect codes must be unique"
+    );
 }
-

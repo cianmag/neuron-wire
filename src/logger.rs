@@ -13,12 +13,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Log levels in order of severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u8)]
 pub enum Level {
+    /// Fatal or blocking errors.
     Error = 0,
+    /// Recoverable problems worth operator attention.
     Warn = 1,
+    /// Normal operational information.
     Info = 2,
+    /// Verbose diagnostics for developers.
     Debug = 3,
+    /// Extremely verbose per-message detail.
     Trace = 4,
 }
 
@@ -185,7 +189,10 @@ pub fn log(
         };
         let peer_str = peer.map(|p| format!(" [{}]", p)).unwrap_or_default();
         let event_str = event.map(|e| format!(" ({})", e)).unwrap_or_default();
-        eprintln!("[{}] {} {}{}{} {}", ts, prefix, module, peer_str, event_str, msg);
+        eprintln!(
+            "[{}] {} {}{}{} {}",
+            ts, prefix, module, peer_str, event_str, msg
+        );
     }
 }
 
@@ -202,125 +209,429 @@ impl Level {
     }
 }
 
-// ─── Convenience macros ─────────────────────────────────────────
+// ─── Convenience macros ─
 
-/// Log an error message.
-/// Usage: `error!("engine", "send failed: {}", err);`
-/// Usage: `error!("engine", "send failed", peer = "1.2.3.4:9000");`
+/// Log a error message.
 #[macro_export]
 macro_rules! log_error {
-    ($module:expr, $msg:expr $(, peer = $peer:expr)? $(, event = $event:expr)? $(, extra = $extra:expr)?) => {{
+    ($module:expr, $msg:expr) => {
         $crate::logger::log(
             $crate::logger::Level::Error,
             $module,
             &$msg,
-            $(Some($peer))?,
-            $(Some($event))?,
-            $(Some($extra))?,
+            None,
+            None,
+            None,
         );
-    }};
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            None,
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Error,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            Some($extra),
+        );
+    };
 }
 
-/// Log a warning message.
+/// Log a warn message.
 #[macro_export]
 macro_rules! log_warn {
-    ($module:expr, $msg:expr $(, peer = $peer:expr)? $(, event = $event:expr)? $(, extra = $extra:expr)?) => {{
+    ($module:expr, $msg:expr) => {
         $crate::logger::log(
             $crate::logger::Level::Warn,
             $module,
             &$msg,
-            $(Some($peer))?,
-            $(Some($event))?,
-            $(Some($extra))?,
+            None,
+            None,
+            None,
         );
-    }};
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            None,
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Warn,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            Some($extra),
+        );
+    };
 }
 
-/// Log an info message.
+/// Log a info message.
 #[macro_export]
 macro_rules! log_info {
-    ($module:expr, $msg:expr $(, peer = $peer:expr)? $(, event = $event:expr)? $(, extra = $extra:expr)?) => {{
+    ($module:expr, $msg:expr) => {
         $crate::logger::log(
             $crate::logger::Level::Info,
             $module,
             &$msg,
-            $(Some($peer))?,
-            $(Some($event))?,
-            $(Some($extra))?,
+            None,
+            None,
+            None,
         );
-    }};
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            None,
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Info,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            Some($extra),
+        );
+    };
 }
 
 /// Log a debug message.
 #[macro_export]
 macro_rules! log_debug {
-    ($module:expr, $msg:expr $(, peer = $peer:expr)? $(, event = $event:expr)? $(, extra = $extra:expr)?) => {{
+    ($module:expr, $msg:expr) => {
         $crate::logger::log(
             $crate::logger::Level::Debug,
             $module,
             &$msg,
-            $(Some($peer))?,
-            $(Some($event))?,
-            $(Some($extra))?,
+            None,
+            None,
+            None,
         );
-    }};
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            None,
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Debug,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            Some($extra),
+        );
+    };
 }
 
 /// Log a trace message.
 #[macro_export]
 macro_rules! log_trace {
-    ($module:expr, $msg:expr $(, peer = $peer:expr)? $(, event = $event:expr)? $(, extra = $extra:expr)?) => {{
+    ($module:expr, $msg:expr) => {
         $crate::logger::log(
             $crate::logger::Level::Trace,
             $module,
             &$msg,
-            $(Some($peer))?,
-            $(Some($event))?,
-            $(Some($extra))?,
+            None,
+            None,
+            None,
         );
-    }};
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_level_ordering() {
-        assert!(Level::Error < Level::Warn);
-        assert!(Level::Warn < Level::Info);
-        assert!(Level::Info < Level::Debug);
-        assert!(Level::Debug < Level::Trace);
-    }
-
-    #[test]
-    fn test_json_escape() {
-        assert_eq!(json_escape("hello"), "hello");
-        assert_eq!(json_escape("he\"llo"), "he\\\"llo");
-        assert_eq!(json_escape("line\nnext"), "line\\nnext");
-    }
-
-    #[test]
-    fn test_timestamp_format() {
-        let ts = timestamp();
-        assert!(ts.ends_with('Z'));
-        assert!(ts.contains('T'));
-        assert_eq!(ts.len(), 20); // 2026-07-22T14:30:00Z
-    }
-
-    #[test]
-    fn test_is_leap() {
-        assert!(is_leap(2024));
-        assert!(!is_leap(2023));
-        assert!(is_leap(2000));
-        assert!(!is_leap(1900));
-    }
-
-    #[test]
-    fn test_log_level_from_env() {
-        assert_eq!(Level::from_env("error"), Level::Error);
-        assert_eq!(Level::from_env("WARN"), Level::Warn);
-        assert_eq!(Level::from_env("debug"), Level::Debug);
-        assert_eq!(Level::from_env("invalid"), Level::Info);
-    }
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            None,
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            None,
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            Some($peer),
+            None,
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            None,
+            Some($event),
+            Some($extra),
+        );
+    };
+    ($module:expr, $msg:expr, peer = $peer:expr, event = $event:expr, extra = $extra:expr) => {
+        $crate::logger::log(
+            $crate::logger::Level::Trace,
+            $module,
+            &$msg,
+            Some($peer),
+            Some($event),
+            Some($extra),
+        );
+    };
 }

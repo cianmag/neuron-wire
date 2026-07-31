@@ -279,10 +279,7 @@ fn stress_rapid_fire_ingress() {
         total_recv
     );
     // All packets should be received on loopback
-    assert!(
-        total_recv > 0,
-        "No packets received from rapid fire"
-    );
+    assert!(total_recv > 0, "No packets received from rapid fire");
 }
 
 // ── Stress test: connection churn ──────────────────────────────
@@ -361,7 +358,7 @@ fn stress_rate_limit_storm() {
 /// Send heartbeat messages rapidly. Verifies they're handled without issues.
 #[test]
 fn stress_heartbeat_flood() {
-    let mut node = StressNode::bind(0);
+    let node = StressNode::bind(0);
     let target = node.addr;
 
     // Send 500 heartbeat-type messages (msg_type=30)
@@ -423,7 +420,8 @@ fn stress_trust_convergence() {
     assert!(
         good_score > bad_score,
         "Good peer ({}) should have higher trust than bad peer ({})",
-        good_score, bad_score
+        good_score,
+        bad_score
     );
     assert!(
         stats.total_peers >= 2,
@@ -445,7 +443,7 @@ fn stress_dht_bootstrap_storm() {
     let handles: Vec<_> = nodes
         .into_iter()
         .enumerate()
-        .map(|(i, mut node)| {
+        .map(|(i, node)| {
             let addrs_clone = addrs.clone();
             thread::spawn(move || {
                 for j in 0..addrs_clone.len() {

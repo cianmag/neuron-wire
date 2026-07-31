@@ -21,12 +21,12 @@
 //! [32-95]  signature:  [u8; 64]    = Ed25519 over (seq || timestamp || body_hash)
 //! ```
 
+use base64::Engine;
 use ed25519_dalek::{
     Signature, SignatureError, Signer, SigningKey, VerifyingKey, SECRET_KEY_LENGTH,
 };
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
-use base64::Engine;
 use std::fmt;
 use std::path::Path;
 
@@ -212,9 +212,8 @@ impl NodeIdentity {
     pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<(), IdentityError> {
         let seed = self.secret_key_bytes();
         let b64 = base64::engine::general_purpose::STANDARD.encode(seed);
-        let pem = format!(
-            "-----BEGIN EDDSA PRIVATE KEY-----\n{b64}\n-----END EDDSA PRIVATE KEY-----\n",
-        );
+        let pem =
+            format!("-----BEGIN EDDSA PRIVATE KEY-----\n{b64}\n-----END EDDSA PRIVATE KEY-----\n",);
         std::fs::write(path.as_ref(), pem.as_bytes())?;
         Ok(())
     }
@@ -231,16 +230,11 @@ impl NodeIdentity {
     pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, IdentityError> {
         let pem_str = std::fs::read_to_string(path.as_ref())?;
         // Strip PEM headers
-        let b64: String = pem_str
-            .lines()
-            .filter(|l| !l.starts_with("---"))
-            .collect();
+        let b64: String = pem_str.lines().filter(|l| !l.starts_with("---")).collect();
         let decoded = base64::engine::general_purpose::STANDARD
             .decode(b64.trim())
             .map_err(IdentityError::Decode)?;
-        let seed: [u8; 32] = decoded
-            .try_into()
-            .map_err(|_| IdentityError::InvalidSeed)?;
+        let seed: [u8; 32] = decoded.try_into().map_err(|_| IdentityError::InvalidSeed)?;
         Ok(NodeIdentity::from_seed(&seed))
     }
 
@@ -262,9 +256,7 @@ impl NodeIdentity {
     /// fewer than 32 bytes.
     pub fn load_binary(path: impl AsRef<Path>) -> Result<Self, IdentityError> {
         let data = std::fs::read(path.as_ref())?;
-        let seed: [u8; 32] = data
-            .try_into()
-            .map_err(|_| IdentityError::InvalidSeed)?;
+        let seed: [u8; 32] = data.try_into().map_err(|_| IdentityError::InvalidSeed)?;
         Ok(NodeIdentity::from_seed(&seed))
     }
 }

@@ -63,14 +63,14 @@ use std::time::{Duration, Instant};
 use crate::apoptosis::ApoptosisSystem;
 use crate::components::{ActivationMap, EntityId, SynapseMap};
 use crate::dht::{DhtHandler, FreshnessConfig, NodeId, NodeType};
+use crate::error::{NwpError, TransportError};
 use crate::forward_pass::ForwardPassSystem;
+use crate::header;
 use crate::hebbian::HebbianLearningSystem;
 use crate::ml::MLSystem;
 use crate::neurogenesis::NeurogenesisSystem;
-use crate::error::{NwpError, TransportError};
-use crate::{log_debug, log_error, log_info, log_warn};
 use crate::transport::{TransportHeader, UdpTransport};
-use crate::header;
+use crate::{log_debug, log_error, log_info, log_warn};
 
 // ── Security imports (optional, gate via cfg) ──────────────────
 use crate::audit::{AuditEventType, AuditLog};
@@ -405,7 +405,7 @@ pub struct EngineLoop {
 impl EngineLoop {
     /// Test-only helper: insert a peer with a given RTT and age (ms ago).
     pub fn insert_peer_for_test(&mut self, addr: SocketAddr, rtt: f32, age_ms: u64) {
-        let now_ms = self.transport.now_ms();
+        let now_ms = u64::from(self.transport.now_ms());
         self.peer_rtt.insert(
             addr,
             PeerInfo {
@@ -517,7 +517,10 @@ impl EngineLoop {
             .socket
             .set_read_timeout(Some(Duration::from_millis(self.config.tick_interval_ms)))
         {
-            log_warn!("engine", format!("[ENGINE] Could not set read timeout: {}", e));
+            log_warn!(
+                "engine",
+                format!("[ENGINE] Could not set read timeout: {}", e)
+            );
         }
 
         // Pre-allocated receive buffer lives on the struct (avoid per-packet allocation)
@@ -541,10 +544,13 @@ impl EngineLoop {
 
             // ── SHUTDOWN CHECK ─────────────────────────────────
             if self.shutdown.load(Ordering::Relaxed) {
-                log_info!("engine", format!(
-                    "[ENGINE] Shutdown signal received at tick {}. Exiting.",
-                    self.tick
-                ));
+                log_info!(
+                    "engine",
+                    format!(
+                        "[ENGINE] Shutdown signal received at tick {}. Exiting.",
+                        self.tick
+                    )
+                );
                 return;
             }
 
@@ -560,7 +566,11 @@ impl EngineLoop {
                         self.stats.packets_recv += 1;
                         self.stats.bytes_recv += len as u64;
 
-                        if let Err(e) = self.handle_ingress(&self.recv_buf[..len], src) {
+                        // Copy the received bytes out of the shared buffer so the
+                        // mutable borrow in handle_ingress does not conflict with
+                        // the buffer borrow. Allocation is packet-sized only.
+                        let packet = self.recv_buf[..len].to_vec();
+                        if let Err(e) = self.handle_ingress(&packet, src) {
                             log_error!("engine", format!("[ENGINE] Ingress error: {}", e));
                         }
                     }
@@ -660,13 +670,16 @@ impl EngineLoop {
 
                 // Log notable brain events every tick
                 if fp_report.neurons_spawned > 0 {
-                    log_info!("brain", format!(
-                        "[ENGINE] tick={} spawned={} surprise={:.4} orphans={}",
-                        self.tick,
-                        fp_report.neurons_spawned,
-                        fp_report.total_surprise,
-                        fp_report.orphans_cleaned,
-                    ));
+                    log_info!(
+                        "brain",
+                        format!(
+                            "[ENGINE] tick={} spawned={} surprise={:.4} orphans={}",
+                            self.tick,
+                            fp_report.neurons_spawned,
+                            fp_report.total_surprise,
+                            fp_report.orphans_cleaned,
+                        )
+                    );
                 }
 
                 // Step 3: ML system — adaptive LR, meta-learning, curiosity,
@@ -712,11 +725,15 @@ impl EngineLoop {
                     self.peer_rtt.retain(|addr, info| {
                         let age = now.saturating_sub(info.last_seen_ms);
                         if age > peer_ttl_ms {
-                            log_info!("engine", format!(
-                                "[ENGINE] Evicting stale peer {} (no activity for {}s)",
-                                addr,
-                                age / 1000,
-                            ), peer = &addr.to_string());
+                            log_info!(
+                                "engine",
+                                format!(
+                                    "[ENGINE] Evicting stale peer {} (no activity for {}s)",
+                                    addr,
+                                    age / 1000,
+                                ),
+                                peer = &addr.to_string()
+                            );
                             evicted_addrs.push(addr.ip());
                             false
                         } else {
@@ -747,19 +764,25 @@ impl EngineLoop {
 
                     // Death spiral guardrail
                     if self.apoptosis_system.is_death_spiral(&report) {
-                        log_warn!("engine", format!(
-                            "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
+                        log_warn!(
+                            "engine",
+                            format!(
+                                "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
                              Network partition or seed node failure.",
-                            report.total_deaths, self.tick,
-                        ));
+                                report.total_deaths, self.tick,
+                            )
+                        );
                     } else if report.total_deaths > 0 {
-                        log_warn!("apoptosis", format!(
-                            "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{} frames:{})",
-                            report.total_deaths,
-                            report.dht_nodes_evicted,
-                            report.pending_pings_expired,
-                            report.data_frames_purged,
-                        ));
+                        log_warn!(
+                            "apoptosis",
+                            format!(
+                                "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{} frames:{})",
+                                report.total_deaths,
+                                report.dht_nodes_evicted,
+                                report.pending_pings_expired,
+                                report.data_frames_purged,
+                            )
+                        );
                     }
 
                     // DHT periodic maintenance (ping stale, save peers)
@@ -768,8 +791,7 @@ impl EngineLoop {
 
                 // ── Heartbeat keepalive ────────────────────────
                 if self.config.heartbeat_interval_ticks > 0
-                    && self.tick - self.last_heartbeat_tick
-                        >= self.config.heartbeat_interval_ticks
+                    && self.tick - self.last_heartbeat_tick >= self.config.heartbeat_interval_ticks
                 {
                     self.last_heartbeat_tick = self.tick;
                     self.send_heartbeats();
@@ -830,7 +852,11 @@ impl EngineLoop {
                 &format!("rate-limited packet from {}", src),
                 Some(peer_id),
             );
-            log_warn!("security", format!("[ENGINE] Rate-limited packet from {}", src), peer = &src.to_string());
+            log_warn!(
+                "security",
+                format!("[ENGINE] Rate-limited packet from {}", src),
+                peer = &src.to_string()
+            );
             return Ok(()); // silently drop, but log
         }
 
@@ -862,7 +888,14 @@ impl EngineLoop {
             && !self.peer_rtt.contains_key(&src)
             && self.peer_rtt.len() >= self.config.max_peers
         {
-            log_warn!("security", format!("[ENGINE] Connection limit reached, sending TOO_MANY_PEERS to {}", src), peer = &src.to_string());
+            log_warn!(
+                "security",
+                format!(
+                    "[ENGINE] Connection limit reached, sending TOO_MANY_PEERS to {}",
+                    src
+                ),
+                peer = &src.to_string()
+            );
             self.send_disconnect(
                 src,
                 header::disconnect_reason::TOO_MANY_PEERS,
@@ -874,7 +907,14 @@ impl EngineLoop {
         if self.config.per_ip_max_peers > 0 && !self.peer_rtt.contains_key(&src) {
             let ip_count = self.peer_ip_count.entry(src.ip()).or_insert(0);
             if *ip_count >= self.config.per_ip_max_peers {
-                log_warn!("security", format!("[ENGINE] Per-IP limit reached for {}, sending TOO_MANY_PEERS", src.ip()), peer = &src.to_string());
+                log_warn!(
+                    "security",
+                    format!(
+                        "[ENGINE] Per-IP limit reached for {}, sending TOO_MANY_PEERS",
+                        src.ip()
+                    ),
+                    peer = &src.to_string()
+                );
                 self.send_disconnect(
                     src,
                     header::disconnect_reason::TOO_MANY_PEERS,
@@ -951,18 +991,32 @@ impl EngineLoop {
         let mb_recv = self.stats.bytes_recv as f64 / 1_000_000.0;
         let mb_sent = self.stats.bytes_sent as f64 / 1_000_000.0;
 
-        let tick_rate = if elapsed > 0.0 { self.tick as f64 / elapsed } else { 0.0 };
-        let idle_pct = if self.tick > 0 { self.stats.idle_ticks as f64 / self.tick as f64 * 100.0 } else { 0.0 };
-        log_debug!("engine", format!(
-            "[ENGINE] tick={} rate={:.0}Hz rx={} pkts ({:.2}MB) tx={} pkts ({:.2}MB) \
+        let tick_rate = if elapsed > 0.0 {
+            self.tick as f64 / elapsed
+        } else {
+            0.0
+        };
+        let idle_pct = if self.tick > 0 {
+            self.stats.idle_ticks as f64 / self.tick as f64 * 100.0
+        } else {
+            0.0
+        };
+        log_debug!(
+            "engine",
+            format!(
+                "[ENGINE] tick={} rate={:.0}Hz rx={} pkts ({:.2}MB) tx={} pkts ({:.2}MB) \
              idle={:.1}% reliable_q={} peers={}",
-            self.tick, tick_rate,
-            self.stats.packets_recv, mb_recv,
-            self.stats.packets_sent, mb_sent,
-            idle_pct,
-            self.stats.reliable_queue_depth,
-            self.peer_rtt.len(),
-        ));
+                self.tick,
+                tick_rate,
+                self.stats.packets_recv,
+                mb_recv,
+                self.stats.packets_sent,
+                mb_sent,
+                idle_pct,
+                self.stats.reliable_queue_depth,
+                self.peer_rtt.len(),
+            )
+        );
     }
 
     /// Get the engine stats
@@ -1008,7 +1062,11 @@ impl EngineLoop {
 
     /// Send a HEARTBEAT message to all known peers.
     fn send_heartbeats(&self) {
-        let flags = if self.config.security_enabled { header::FLAG_AUTHENTICATED } else { 0 };
+        let flags = if self.config.security_enabled {
+            header::FLAG_AUTHENTICATED
+        } else {
+            0
+        };
         let frame = header::build_frame(header::msg_type::HEARTBEAT, Vec::new(), flags);
         for (addr, _) in &self.peer_rtt {
             let _ = self.transport.socket.send_to(&frame, *addr);
@@ -1017,7 +1075,11 @@ impl EngineLoop {
 
     /// Handle an incoming Heartbeat message.
     fn handle_heartbeat(&mut self, src: SocketAddr) {
-        log_debug!("engine", format!("[ENGINE] Heartbeat from {}", src), peer = &src.to_string());
+        log_debug!(
+            "engine",
+            format!("[ENGINE] Heartbeat from {}", src),
+            peer = &src.to_string()
+        );
     }
 
     // ─── Disconnect Protocol ──────────────────────────────────
@@ -1026,13 +1088,22 @@ impl EngineLoop {
     fn send_disconnect(&self, dst: SocketAddr, reason: u8, message: &str) {
         let mut body = vec![reason];
         body.extend_from_slice(message.as_bytes());
-        let flags = if self.config.security_enabled { header::FLAG_AUTHENTICATED } else { 0 };
+        let flags = if self.config.security_enabled {
+            header::FLAG_AUTHENTICATED
+        } else {
+            0
+        };
         let frame = header::build_frame(header::msg_type::DISCONNECT, body, flags);
         let _ = self.transport.socket.send_to(&frame, dst);
-        log_info!("engine", format!("[ENGINE] Sent DISCONNECT(reason={}) to {}", reason, dst), peer = &dst.to_string());
+        log_info!(
+            "engine",
+            format!("[ENGINE] Sent DISCONNECT(reason={}) to {}", reason, dst),
+            peer = &dst.to_string()
+        );
     }
 
     /// Broadcast disconnect to all known peers (shutdown procedure).
+    #[allow(dead_code)] // reserved for graceful shutdown broadcasts
     fn broadcast_disconnect(&self, reason: u8, message: &str) {
         for (addr, _) in &self.peer_rtt {
             self.send_disconnect(*addr, reason, message);
@@ -1042,7 +1113,11 @@ impl EngineLoop {
     /// Handle an incoming Disconnect message.
     fn handle_disconnect(&mut self, src: SocketAddr, body: &[u8]) {
         if body.is_empty() {
-            log_info!("engine", format!("[ENGINE] Disconnect from {} (no reason)", src), peer = &src.to_string());
+            log_info!(
+                "engine",
+                format!("[ENGINE] Disconnect from {} (no reason)", src),
+                peer = &src.to_string()
+            );
             return;
         }
         let reason = body[0];
@@ -1051,7 +1126,14 @@ impl EngineLoop {
         } else {
             String::new()
         };
-        log_info!("engine", format!("[ENGINE] Disconnect from {} reason={}: {}", src, reason, detail), peer = &src.to_string());
+        log_info!(
+            "engine",
+            format!(
+                "[ENGINE] Disconnect from {} reason={}: {}",
+                src, reason, detail
+            ),
+            peer = &src.to_string()
+        );
         self.peer_rtt.remove(&src);
     }
 }
@@ -1142,10 +1224,15 @@ pub fn spawn_engine(
                 if fconfig.enabled {
                     if let Some(ref mut dht) = engine.dht_handler {
                         dht.enable_sga(*fconfig);
-                        log_info!("engine", format!(
-                            "[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
-                            fconfig.half_life_ms, fconfig.stretch_factor, fconfig.base_interval_ms
-                        ));
+                        log_info!(
+                            "engine",
+                            format!(
+                                "[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
+                                fconfig.half_life_ms,
+                                fconfig.stretch_factor,
+                                fconfig.base_interval_ms
+                            )
+                        );
                     }
                 }
             }
@@ -1159,10 +1246,13 @@ pub fn spawn_engine(
                     dht.ping_node(*peer_addr);
                 }
                 dht.bootstrap();
-                log_info!("engine", format!(
-                    "[ENGINE] Bootstrapped {} local peers",
-                    engine.config.local_peers.len()
-                ));
+                log_info!(
+                    "engine",
+                    format!(
+                        "[ENGINE] Bootstrapped {} local peers",
+                        engine.config.local_peers.len()
+                    )
+                );
             }
 
             // Set 1ms read timeout
@@ -1178,10 +1268,13 @@ pub fn spawn_engine(
 
                 // ── SHUTDOWN CHECK ─────────────────────────────
                 if engine.shutdown.load(Ordering::Relaxed) {
-                    log_info!("engine", format!(
-                        "[ENGINE] Shutdown signal. Exiting after {} ticks.",
-                        engine.tick
-                    ));
+                    log_info!(
+                        "engine",
+                        format!(
+                            "[ENGINE] Shutdown signal. Exiting after {} ticks.",
+                            engine.tick
+                        )
+                    );
                     return;
                 }
 
@@ -1268,10 +1361,13 @@ pub fn spawn_engine(
                                 .apoptosis_system
                                 .tick(engine.tick, dht, &mut engine.transport);
                         if engine.apoptosis_system.is_death_spiral(&report) {
-                            log_warn!("engine", format!(
-                                "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}.",
-                                report.total_deaths, engine.tick,
-                            ));
+                            log_warn!(
+                                "engine",
+                                format!(
+                                    "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}.",
+                                    report.total_deaths, engine.tick,
+                                )
+                            );
                         } else if report.total_deaths > 0 {
                             eprintln!(
                                 "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{})",
@@ -1364,31 +1460,51 @@ mod tests {
         engine.insert_peer_for_test("10.0.0.3:9000".parse().unwrap(), 70.0, 310_000); // 310s old
 
         // Recent peers: age < 300_000 ms — should remain
-        engine.insert_peer_for_test("10.0.0.4:9000".parse().unwrap(), 80.0, 10_000);  // 10s old
-        engine.insert_peer_for_test("10.0.0.5:9000".parse().unwrap(), 90.0, 60_000);  // 60s old
+        engine.insert_peer_for_test("10.0.0.4:9000".parse().unwrap(), 80.0, 10_000); // 10s old
+        engine.insert_peer_for_test("10.0.0.5:9000".parse().unwrap(), 90.0, 60_000); // 60s old
         engine.insert_peer_for_test("10.0.0.6:9000".parse().unwrap(), 100.0, 200_000); // 200s old
 
-        assert_eq!(engine.peer_count_for_test(), 6, "should have 6 peers before eviction");
+        assert_eq!(
+            engine.peer_count_for_test(),
+            6,
+            "should have 6 peers before eviction"
+        );
 
         // Run the eviction logic (same code as in the cleanup phase)
-        let now = engine.transport.now_ms();
+        let now = u64::from(engine.transport.now_ms());
         let peer_ttl_ms: u64 = 300_000;
         engine.peer_rtt.retain(|_addr, info| {
             let age = now.saturating_sub(info.last_seen_ms);
             age <= peer_ttl_ms
         });
 
-        assert_eq!(engine.peer_count_for_test(), 3, "only 3 recent peers should remain");
+        assert_eq!(
+            engine.peer_count_for_test(),
+            3,
+            "only 3 recent peers should remain"
+        );
 
         // Verify the correct peers survived
-        assert!(engine.peer_rtt.contains_key(&"10.0.0.4:9000".parse().unwrap()));
-        assert!(engine.peer_rtt.contains_key(&"10.0.0.5:9000".parse().unwrap()));
-        assert!(engine.peer_rtt.contains_key(&"10.0.0.6:9000".parse().unwrap()));
+        assert!(engine
+            .peer_rtt
+            .contains_key(&"10.0.0.4:9000".parse().unwrap()));
+        assert!(engine
+            .peer_rtt
+            .contains_key(&"10.0.0.5:9000".parse().unwrap()));
+        assert!(engine
+            .peer_rtt
+            .contains_key(&"10.0.0.6:9000".parse().unwrap()));
 
         // Verify old peers were evicted
-        assert!(!engine.peer_rtt.contains_key(&"10.0.0.1:9000".parse().unwrap()));
-        assert!(!engine.peer_rtt.contains_key(&"10.0.0.2:9000".parse().unwrap()));
-        assert!(!engine.peer_rtt.contains_key(&"10.0.0.3:9000".parse().unwrap()));
+        assert!(!engine
+            .peer_rtt
+            .contains_key(&"10.0.0.1:9000".parse().unwrap()));
+        assert!(!engine
+            .peer_rtt
+            .contains_key(&"10.0.0.2:9000".parse().unwrap()));
+        assert!(!engine
+            .peer_rtt
+            .contains_key(&"10.0.0.3:9000".parse().unwrap()));
     }
 
     #[test]
@@ -1407,7 +1523,10 @@ mod tests {
         let limit_reached = engine.config.max_peers > 0
             && !engine.peer_rtt.contains_key(&new_src)
             && engine.peer_rtt.len() >= engine.config.max_peers;
-        assert!(limit_reached, "new peer should be rejected when at capacity");
+        assert!(
+            limit_reached,
+            "new peer should be rejected when at capacity"
+        );
 
         // An already-known peer should NOT be rejected
         let known_src: SocketAddr = "10.0.0.1:9000".parse().unwrap();
@@ -1435,8 +1554,14 @@ mod tests {
         assert_eq!(cfg.heartbeat_interval_ticks, 30_000);
 
         // Security defaults
-        assert!(cfg.security_enabled, "security_enabled should default to true");
-        assert!(!cfg.encrypt_payloads, "encrypt_payloads should default to false");
+        assert!(
+            cfg.security_enabled,
+            "security_enabled should default to true"
+        );
+        assert!(
+            !cfg.encrypt_payloads,
+            "encrypt_payloads should default to false"
+        );
         assert!(!cfg.stun_enabled, "stun_enabled should default to false");
         assert_eq!(cfg.stun_server, "stun.l.google.com:19302");
 

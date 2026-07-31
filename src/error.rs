@@ -12,7 +12,13 @@ use std::fmt;
 #[derive(Debug)]
 pub enum TransportError {
     /// Received packet is too short to contain a transport header.
-    PacketTooShort { actual: usize, expected: usize },
+    /// Packet ended before the header could be fully read.
+    PacketTooShort {
+        /// Bytes actually available.
+        actual: usize,
+        /// Bytes required by the protocol.
+        expected: usize,
+    },
     /// Sequence number is invalid or out of window.
     InvalidSequence(u32),
     /// Socket bind or send/recv failure.
@@ -395,16 +401,10 @@ mod tests {
             ErrorSeverity::Critical
         );
         assert_eq!(
-            NwpError::AuthenticationFailed {
-                reason: "x".into()
-            }
-            .severity(),
+            NwpError::AuthenticationFailed { reason: "x".into() }.severity(),
             ErrorSeverity::Critical
         );
-        assert_eq!(
-            NwpError::RateLimited.severity(),
-            ErrorSeverity::Warning
-        );
+        assert_eq!(NwpError::RateLimited.severity(), ErrorSeverity::Warning);
         assert_eq!(
             NwpError::TooManyPeers { max: 1 }.severity(),
             ErrorSeverity::Warning

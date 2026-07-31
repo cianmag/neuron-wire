@@ -32,7 +32,8 @@ fn header_roundtrip(c: &mut Criterion) {
                 ));
                 // Skip 4-byte length prefix, parse header + body
                 let msg = &frame[4..];
-                let (header, parsed_body) = black_box(neuron_wire::header::parse_frame(black_box(msg))).unwrap();
+                let (header, parsed_body) =
+                    black_box(neuron_wire::header::parse_frame(black_box(msg))).unwrap();
                 black_box((header.msg_type, parsed_body.len()));
             })
         });
@@ -112,7 +113,17 @@ fn crypto_bench(c: &mut Criterion) {
         group.bench_function("encrypt", |b| {
             b.iter_batched(
                 || plaintext.clone(),
-                |pt| black_box(alice_channel.encrypt(black_box(&session_a), black_box(&pt), black_box(associated_data)).unwrap()),
+                |pt| {
+                    black_box(
+                        alice_channel
+                            .encrypt(
+                                black_box(&session_a),
+                                black_box(&pt),
+                                black_box(associated_data),
+                            )
+                            .unwrap(),
+                    )
+                },
                 BatchSize::SmallInput,
             )
         });
@@ -120,7 +131,18 @@ fn crypto_bench(c: &mut Criterion) {
         group.bench_function("decrypt", |b| {
             b.iter_batched(
                 || (nonce, ciphertext.clone()),
-                |(n, ct)| black_box(bob_channel.decrypt(black_box(&session_b), black_box(&n), black_box(&ct), black_box(associated_data)).unwrap()),
+                |(n, ct)| {
+                    black_box(
+                        bob_channel
+                            .decrypt(
+                                black_box(&session_b),
+                                black_box(&n),
+                                black_box(&ct),
+                                black_box(associated_data),
+                            )
+                            .unwrap(),
+                    )
+                },
                 BatchSize::SmallInput,
             )
         });
@@ -188,7 +210,9 @@ fn crc32_bench(c: &mut Criterion) {
 
 fn throughput_bench(c: &mut Criterion) {
     use neuron_wire::header;
-    use neuron_wire::identity::{verify_signature, NodeIdentity, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+    use neuron_wire::identity::{
+        verify_signature, NodeIdentity, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
+    };
     use neuron_wire::secure_channel::SecureChannel;
     use neuron_wire::transport::TransportHeader;
 
@@ -213,7 +237,8 @@ fn throughput_bench(c: &mut Criterion) {
                 || body.clone(),
                 |pt| {
                     // 1. Build NWP frame
-                    let frame = header::build_frame(black_box(20), black_box(pt.clone()), black_box(0));
+                    let frame =
+                        header::build_frame(black_box(20), black_box(pt.clone()), black_box(0));
 
                     // 2. Sign the frame body
                     let signature = alice_id.sign(black_box(&frame));
@@ -229,7 +254,11 @@ fn throughput_bench(c: &mut Criterion) {
                     let t_bytes = t_header.to_bytes();
                     // Simulate wire packet: [transport_header][pubkey][signature][nonce][ciphertext]
                     let mut wire = Vec::with_capacity(
-                        TransportHeader::SIZE + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 16 + ciphertext.len(),
+                        TransportHeader::SIZE
+                            + PUBLIC_KEY_LENGTH
+                            + SIGNATURE_LENGTH
+                            + 16
+                            + ciphertext.len(),
                     );
                     wire.extend_from_slice(&t_bytes);
                     wire.extend_from_slice(&alice_pub);
@@ -240,13 +269,24 @@ fn throughput_bench(c: &mut Criterion) {
                     // 5. Parse: extract transport header
                     let parsed_t = unsafe { TransportHeader::from_bytes(black_box(&wire)) };
                     let offset = TransportHeader::SIZE;
-                    let recv_pub: &[u8; PUBLIC_KEY_LENGTH] = &wire[offset..offset + PUBLIC_KEY_LENGTH].try_into().unwrap();
-                    let recv_sig: &[u8; SIGNATURE_LENGTH] = wire[offset + PUBLIC_KEY_LENGTH..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH].try_into().unwrap();
-                    let recv_nonce: &[u8; 16] = wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 16].try_into().unwrap();
+                    let recv_pub: &[u8; PUBLIC_KEY_LENGTH] =
+                        &wire[offset..offset + PUBLIC_KEY_LENGTH].try_into().unwrap();
+                    let recv_sig: &[u8; SIGNATURE_LENGTH] = wire
+                        [offset + PUBLIC_KEY_LENGTH..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH]
+                        .try_into()
+                        .unwrap();
+                    let recv_nonce: &[u8; 16] = wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH
+                        ..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 16]
+                        .try_into()
+                        .unwrap();
                     let recv_ct = &wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 16..];
 
                     // 6. Verify signature
-                    let _ = black_box(verify_signature(black_box(recv_pub), black_box(&frame), black_box(recv_sig)));
+                    let _ = black_box(verify_signature(
+                        black_box(recv_pub),
+                        black_box(&frame),
+                        black_box(recv_sig),
+                    ));
 
                     // 7. Decrypt
                     let _ = black_box(bob_channel.decrypt(

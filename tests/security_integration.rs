@@ -217,7 +217,8 @@ mod tests {
 
         // Wrong key fails
         assert!(
-            neuron_wire::identity::verify_signature(&bob.public_key_bytes(), inner_body, &sig).is_err(),
+            neuron_wire::identity::verify_signature(&bob.public_key_bytes(), inner_body, &sig)
+                .is_err(),
             "Bob's key must not verify Alice's signature"
         );
 
@@ -233,13 +234,15 @@ mod tests {
 
         // EntityId derivation matches
         let eid = neuron_wire::identity::entity_id_from_public_key(&pk);
-        assert_eq!(eid, alice.entity_id(), "EntityId must match from restored pubkey");
+        assert_eq!(
+            eid,
+            alice.entity_id(),
+            "EntityId must match from restored pubkey"
+        );
     }
 
     #[test]
     fn test_concurrent_channel_encryption() {
-        use std::thread;
-
         let alice = NodeIdentity::new();
         let bob = NodeIdentity::new();
 
@@ -289,7 +292,8 @@ mod tests {
         assert!(
             after_attack < high_score,
             "replay attack must reduce trust: {} < {}",
-            after_attack, high_score
+            after_attack,
+            high_score
         );
 
         // Multiple bad events should push toward zero
@@ -331,11 +335,7 @@ mod tests {
     fn test_audit_hash_chain_tamper_detection() {
         let mut audit = AuditLog::new();
 
-        audit.append(
-            AuditEventType::NodeStartup,
-            "entry 1",
-            Some(test_eid(1)),
-        );
+        audit.append(AuditEventType::NodeStartup, "entry 1", Some(test_eid(1)));
         audit.append(
             AuditEventType::HandshakeSuccess,
             "entry 2",
@@ -408,7 +408,10 @@ mod tests {
         let decrypted = bob_chan
             .decrypt(&bob_sid, &recv_nonce, recv_ct, &[])
             .expect("Bob must decrypt Alice's packet");
-        assert!(decrypted.len() >= 96, "decrypted payload must include auth prefix");
+        assert!(
+            decrypted.len() >= 96,
+            "decrypted payload must include auth prefix"
+        );
 
         // Verify signature on decrypted data
         let recv_pk: [u8; 32] = decrypted[..32].try_into().unwrap();
@@ -419,10 +422,13 @@ mod tests {
             neuron_wire::identity::verify_signature(&recv_pk, recv_body, &recv_sig).is_ok(),
             "signature must verify after decrypt"
         );
-        assert_eq!(recv_pk, alice.public_key_bytes(), "restored pubkey must match Alice");
         assert_eq!(
-            recv_body,
-            b"encrypted gradient data",
+            recv_pk,
+            alice.public_key_bytes(),
+            "restored pubkey must match Alice"
+        );
+        assert_eq!(
+            recv_body, b"encrypted gradient data",
             "plaintext body must survive encrypt→decrypt cycle"
         );
     }
