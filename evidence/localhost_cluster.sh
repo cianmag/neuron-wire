@@ -34,7 +34,8 @@ echo "════════════════════════�
 
 if [ ! -x "$BIN" ]; then
   echo "[cluster] building $BIN (release)..."
-  cargo build --release --bin node
+  CARGO_BIN="${CARGO:-cargo}"
+  "$CARGO_BIN" build --release --bin node
 fi
 
 PIDS=()
