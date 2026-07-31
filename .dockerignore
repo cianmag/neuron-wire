@@ -7,7 +7,7 @@ target/
 node_modules/
 *.md
 *.key
-*.toml
+node-config.toml
 *.pem
 *.csv
 *.mp4

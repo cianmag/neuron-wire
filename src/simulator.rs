@@ -667,6 +667,12 @@ impl Simulator {
                 encrypt_payloads: false,
                 stun_enabled: false,
                 stun_server: "stun.l.google.com:19302".to_string(),
+                heartbeat_interval_ticks: 30_000,
+                max_peers: 500,
+                per_ip_max_peers: 10,
+                peer_cache_path: None,
+                trust_cache_path: None,
+                seed_domain: String::new(),
             };
 
             // Create shared packet filter for partition injection

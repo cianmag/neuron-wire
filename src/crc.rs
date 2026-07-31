@@ -6,7 +6,6 @@ use crc32fast::Hasher;
 /// Uses the `crc32fast` crate for a hardware-accelerated implementation.
 /// Returns the CRC-32 checksum (ISO-HDLC / PKZIP variant).
 #[inline]
-#[inline]
 pub fn crc32(data: &[u8]) -> u32 {
     let mut h = Hasher::new();
     h.update(data);

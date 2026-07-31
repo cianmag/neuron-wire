@@ -31,6 +31,7 @@ fn make_config(port: u16) -> EngineConfig {
         seed_domain: String::new(),
         max_peers: 100,
         heartbeat_interval_ticks: 0, // disabled for test speed
+        per_ip_max_peers: 10,
     }
 }
 

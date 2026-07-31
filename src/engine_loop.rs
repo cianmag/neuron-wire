@@ -68,6 +68,7 @@ use crate::hebbian::HebbianLearningSystem;
 use crate::ml::MLSystem;
 use crate::neurogenesis::NeurogenesisSystem;
 use crate::error::{NwpError, TransportError};
+use crate::{log_debug, log_error, log_info, log_warn};
 use crate::transport::{TransportHeader, UdpTransport};
 use crate::header;
 
@@ -453,6 +454,7 @@ impl EngineLoop {
             tick: 0,
             last_retransmit_tick: 0,
             last_cleanup_tick: 0,
+            last_heartbeat_tick: 0,
             last_stats_time: Instant::now(),
             stats: EngineStats::default(),
             peer_rtt: HashMap::with_capacity(512),
@@ -703,7 +705,7 @@ impl EngineLoop {
                 // ── Peer RTT eviction ─────────────────────────
                 // Remove peers we haven't heard from in 5 minutes.
                 {
-                    let now = self.transport.now_ms();
+                    let now = u64::from(self.transport.now_ms());
                     let peer_ttl_ms: u64 = 300_000; // 5 minutes
                     let before_count = self.peer_rtt.len();
                     let mut evicted_addrs = Vec::new();
@@ -884,11 +886,11 @@ impl EngineLoop {
         }
         self.peer_rtt.entry(src).or_insert(PeerInfo {
             rtt_ms: 100.0,
-            last_seen_ms: self.transport.now_ms(),
+            last_seen_ms: u64::from(self.transport.now_ms()),
         });
         // Update last-seen for existing peers too
         if let Some(info) = self.peer_rtt.get_mut(&src) {
-            info.last_seen_ms = self.transport.now_ms();
+            info.last_seen_ms = u64::from(self.transport.now_ms());
         }
 
         // ── Handle Heartbeat/Disconnect messages inline ─────
@@ -983,7 +985,7 @@ impl EngineLoop {
                 };
                 // DHT metrics
                 if let Some(ref dht) = self.dht_handler {
-                    s.dht_node_count = dht.node_count();
+                    s.dht_node_count = dht.routing_table.node_count();
                     s.dht_pending_pings = dht.pending_ping_count();
                 }
                 // Trust metrics
