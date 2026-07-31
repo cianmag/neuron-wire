@@ -6,7 +6,7 @@ use neuron_wire::header::{self, HeaderError, MessageHeader};
 #[test]
 fn integration_ping_roundtrip() {
     let ping = header::build_ping();
-    assert!(ping.len() > 4 + 16);
+    assert!(ping.len() >= 4 + 16); // 4B length prefix + 16B header + body
     let (h, b) = header::parse_frame(&ping[4..]).unwrap();
     assert_eq!(h.msg_type, 0); // Ping
     assert_eq!(h.body_len, 0);
@@ -378,7 +378,7 @@ fn integration_channel_multi_peer() {
             i
         );
         let (nonce, ciphertext) = result.unwrap();
-        assert_eq!(nonce.len(), 16, "nonce should be 16 bytes");
+        assert_eq!(nonce.len(), 24, "nonce should be 24 bytes (XChaCha20)");
         assert!(
             !ciphertext.is_empty(),
             "ciphertext should be non-empty for session {}",
