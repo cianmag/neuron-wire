@@ -1,17 +1,15 @@
-[experiment]
-name = "figure-8-multi-trial-stats"
-description = "Multi-trial statistical analysis (Figure 8)"
-paper_mode = true
-seed = 42
-trials = 10
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-8-multi-trial-stats.toml --output-dir results/figure-8-multi-trial-stats
 
-[simulation]
+description = "figure-8-multi-trial-stats"
 node_count = 10
 duration_secs = 30
-stale_ping_secs = 10
-tick_interval_us = 1000
+seed = 42
+paper_mode = true
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "fixed"
 
-[output]
-directory = "results/figure-8"
-include_raw_logs = false
-snapshot_interval_ticks = 100

@@ -1,22 +1,20 @@
-[experiment]
-name = "figure-6-node-churn-recovery"
-description = "Node churn and recovery behavior (Figure 6)"
-paper_mode = true
-seed = 42
-trials = 3
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-6-node-churn-recovery.toml --output-dir results/figure-6-node-churn-recovery
 
-[simulation]
+description = "figure-6-node-churn-recovery"
 node_count = 10
 duration_secs = 60
-stale_ping_secs = 10
-tick_interval_us = 1000
+seed = 42
+paper_mode = true
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "fixed"
 
 [failure]
 mode = "node-death"
-at_secs = 15
+trigger_at_sec = 15
 percent = 0.3
 
-[output]
-directory = "results/figure-6"
-include_raw_logs = true
-snapshot_interval_ticks = 100

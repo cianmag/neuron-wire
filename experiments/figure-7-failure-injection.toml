@@ -1,22 +1,20 @@
-[experiment]
-name = "figure-7-failure-injection"
-description = "Adversarial failure injection benchmarks (Figure 7)"
-paper_mode = true
-seed = 42
-trials = 5
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-7-failure-injection.toml --output-dir results/figure-7-failure-injection
 
-[simulation]
+description = "figure-7-failure-injection"
 node_count = 10
 duration_secs = 45
-stale_ping_secs = 10
-tick_interval_us = 1000
+seed = 42
+paper_mode = true
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "fixed"
 
 [failure]
-mode = "packet-loss"
-at_secs = 10
+mode = "malicious"
+trigger_at_sec = 10
 percent = 0.2
 
-[output]
-directory = "results/figure-7"
-include_raw_logs = true
-snapshot_interval_ticks = 100

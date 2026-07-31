@@ -1,17 +1,15 @@
-[experiment]
-name = "figure-1-dht-convergence-3node"
-description = "Three-node DHT convergence baseline (Figure 1)"
-paper_mode = true
-seed = 42
-trials = 1
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-1-dht-convergence-3node.toml --output-dir results/figure-1-dht-convergence-3node
 
-[simulation]
+description = "figure-1-dht-convergence-3node"
 node_count = 3
 duration_secs = 10
-stale_ping_secs = 10
-tick_interval_us = 1000
+seed = 42
+paper_mode = true
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "fixed"
 
-[output]
-directory = "results/figure-1"
-include_raw_logs = true
-snapshot_interval_ticks = 100
