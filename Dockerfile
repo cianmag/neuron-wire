@@ -26,6 +26,7 @@ RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY Cargo.toml Cargo.lock* ./
 COPY demo/Cargo.toml demo/
+COPY benches ./benches
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release --bin node 2>/dev/null || true
 RUN rm -rf src
@@ -33,6 +34,7 @@ RUN rm -rf src
 # Real source
 COPY src ./src
 COPY demo ./demo
+COPY benches ./benches
 
 # Touch main.rs to force rebuild of the binary (cached deps stay fresh)
 RUN touch src/bin/node.rs && \
