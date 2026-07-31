@@ -32,6 +32,14 @@ fn make_config(port: u16) -> EngineConfig {
         max_peers: 100,
         heartbeat_interval_ticks: 0, // disabled for test speed
         per_ip_max_peers: 10,
+        trust_enabled: true,
+        aging_enabled: true,
+        apoptosis_enabled: true,
+        neurogenesis_enabled: true,
+        random_discovery: false,
+        static_topology: false,
+        packet_loss_rate: 0.0,
+        sim_seed: 0,
     }
 }
 

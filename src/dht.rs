@@ -736,6 +736,9 @@ pub struct DhtHandler {
     bootstrapped: bool,
     /// Sparse Gradient Aging maintenance tracker (None = standard fixed-interval maintenance).
     pub freshness_tracker: Option<FreshnessTracker>,
+    /// Baseline toggle: respond to FIND_NODE with random peers instead of
+    /// XOR-closest (random peer discovery, default false = Kademlia).
+    pub random_discovery: bool,
 }
 
 impl DhtHandler {
@@ -761,6 +764,7 @@ impl DhtHandler {
             seed_domain,
             bootstrapped: false,
             freshness_tracker: None,
+            random_discovery: false,
         }
     }
 
@@ -914,7 +918,20 @@ impl DhtHandler {
         let target = NodeId(tid);
 
         // Clone results to avoid borrow conflict
-        let nearest: Vec<(NodeId, SocketAddr, NodeType, f32)> = {
+        let nearest: Vec<(NodeId, SocketAddr, NodeType, f32)> = if self.random_discovery {
+            // Baseline: random peer discovery — respond with K entries that are
+            // NOT distance-ordered (deterministic rotation seeded by target ID).
+            let mut all: Vec<(NodeId, SocketAddr, NodeType, f32)> = self
+                .routing_table
+                .all_nodes()
+                .iter()
+                .map(|e| (e.id, e.addr, e.node_type, e.latency_ms))
+                .collect();
+            let start = (target.0[0] as usize) % all.len().max(1);
+            all.rotate_left(start);
+            all.truncate(K);
+            all
+        } else {
             self.routing_table
                 .nearest_nodes(&target, K)
                 .iter()

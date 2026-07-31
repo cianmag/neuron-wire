@@ -42,6 +42,40 @@ run_e1() {
   done
 }
 
+# ── E4: Packet loss (deterministic in-sim impairment) ────────────────
+run_e4() {
+  echo "── E4: packet loss ──"
+  for L in 0.02 0.05 0.10; do
+    echo "  E4 loss=$L (100 nodes, 90s)"
+    $CARGO run --release --example simulate -- \
+      --nodes 100 --duration 90 --seed 42 --paper-mode \
+      --packet-loss "$L" \
+      --output-dir "$OUT/E4_loss_${L}" 2>/dev/null
+  done
+}
+
+# ── E9: Baseline ablations (feature toggles, 50 nodes) ───────────────
+run_e9() {
+  echo "── E9: baseline ablations ──"
+  run_e9_one "control"            ""
+  run_e9_one "no-trust"           "--disable-trust"
+  run_e9_one "no-aging"           "--disable-aging"
+  run_e9_one "no-apoptosis"       "--disable-apoptosis"
+  run_e9_one "no-neurogenesis"    "--disable-neurogenesis"
+  run_e9_one "random-discovery"   "--random-discovery"
+  run_e9_one "static-topology"    "--static-topology"
+}
+
+run_e9_one() {
+  local NAME="$1" FLAGS="$2"
+  echo "  E9 ${NAME} (50 nodes, 60s)"
+  # shellcheck disable=SC2086
+  $CARGO run --release --example simulate -- \
+    --nodes 50 --duration 60 --seed 42 --paper-mode \
+    $FLAGS \
+    --output-dir "$OUT/E9_${NAME}" 2>/dev/null
+}
+
 # ── E2: Node churn (death at t=30s; measure recovery) ───────────────
 run_e2() {
   echo "── E2: node churn ──"
@@ -76,8 +110,10 @@ run_e6() {
 run_e1
 if [ "$PROFILE" = "full" ]; then
   run_e2
+  run_e4
   run_e5
   run_e6
+  run_e9
 fi
 
 # ── Aggregate into a master evidence table ──────────────────────────

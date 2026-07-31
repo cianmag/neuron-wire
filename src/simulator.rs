@@ -140,6 +140,34 @@ pub struct SimulationConfig {
     /// Maintenance mode: "fixed" (default) or "sparse-aging"
     #[serde(default)]
     pub maintenance_mode: String,
+    /// Deterministic in-sim packet loss rate in [0,1] (E4; default 0.0).
+    #[serde(default)]
+    pub packet_loss_rate: f32,
+    /// Churn rate in [0,1] — fraction of nodes that die mid-run (E7; default 0.0).
+    #[serde(default)]
+    pub churn_rate: f64,
+    /// Baseline: disable trust scoring & rate limiting (E9; default true).
+    #[serde(default = "default_true")]
+    pub trust_enabled: bool,
+    /// Baseline: disable gradient aging (E9; default true).
+    #[serde(default = "default_true")]
+    pub aging_enabled: bool,
+    /// Baseline: disable apoptosis (E9; default true).
+    #[serde(default = "default_true")]
+    pub apoptosis_enabled: bool,
+    /// Baseline: disable neurogenesis (E9; default true).
+    #[serde(default = "default_true")]
+    pub neurogenesis_enabled: bool,
+    /// Baseline: random peer discovery (E9; default false).
+    #[serde(default)]
+    pub random_discovery: bool,
+    /// Baseline: static topology, no DHT maintenance (E9; default false).
+    #[serde(default)]
+    pub static_topology: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for SimulationConfig {
@@ -160,6 +188,14 @@ impl Default for SimulationConfig {
             adversary: AdversaryConfig::default(),
             trace_path: String::new(),
             maintenance_mode: "fixed".to_string(),
+            packet_loss_rate: 0.0,
+            churn_rate: 0.0,
+            trust_enabled: true,
+            aging_enabled: true,
+            apoptosis_enabled: true,
+            neurogenesis_enabled: true,
+            random_discovery: false,
+            static_topology: false,
         }
     }
 }
@@ -673,6 +709,14 @@ impl Simulator {
                 peer_cache_path: None,
                 trust_cache_path: None,
                 seed_domain: String::new(),
+                trust_enabled: self.config.trust_enabled,
+                aging_enabled: self.config.aging_enabled,
+                apoptosis_enabled: self.config.apoptosis_enabled,
+                neurogenesis_enabled: self.config.neurogenesis_enabled,
+                random_discovery: self.config.random_discovery,
+                static_topology: self.config.static_topology,
+                packet_loss_rate: self.config.packet_loss_rate,
+                sim_seed: self.config.seed,
             };
 
             // Create shared packet filter for partition injection
@@ -1369,6 +1413,33 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
                     .parse()
                     .map_err(|_| "invalid --adversary-node index")?;
             }
+            "--packet-loss" => {
+                i += 1;
+                let loss: f32 = args
+                    .get(i)
+                    .ok_or("--packet-loss requires a value in [0,1]")?
+                    .parse()
+                    .map_err(|_| "invalid --packet-loss value")?;
+                config.packet_loss_rate = loss.clamp(0.0, 0.9);
+            }
+            "--churn-rate" => {
+                i += 1;
+                let rate: f64 = args
+                    .get(i)
+                    .ok_or("--churn-rate requires a value in [0,1]")?
+                    .parse()
+                    .map_err(|_| "invalid --churn-rate value")?;
+                config.churn_rate = rate.clamp(0.0, 0.9);
+                // Churn = node death without recovery within the run window.
+                config.failure.mode = FailureMode::NodeDeath;
+                config.failure.percent = config.churn_rate;
+            }
+            "--disable-trust" => config.trust_enabled = false,
+            "--disable-aging" => config.aging_enabled = false,
+            "--disable-apoptosis" => config.apoptosis_enabled = false,
+            "--disable-neurogenesis" => config.neurogenesis_enabled = false,
+            "--random-discovery" => config.random_discovery = true,
+            "--static-topology" => config.static_topology = true,
             "--config" => {
                 i += 1;
                 let path = args.get(i).ok_or("--config requires a path")?;

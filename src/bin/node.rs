@@ -506,6 +506,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         max_peers: config.node.max_peers,
         heartbeat_interval_ticks: 30_000, // 30 seconds default
         per_ip_max_peers: config.node.per_ip_max_peers,
+        trust_enabled: true,
+        aging_enabled: true,
+        apoptosis_enabled: true,
+        neurogenesis_enabled: true,
+        random_discovery: false,
+        static_topology: false,
+        packet_loss_rate: 0.0,
+        sim_seed: 0,
     };
 
     // ── Spawn health HTTP server (background thread) ─────────

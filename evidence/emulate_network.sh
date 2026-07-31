@@ -55,8 +55,63 @@ run_scenario mobile 80 2
 run_scenario weak 150 5
 run_scenario severe 300 10
 
+# ── Partition: split the cluster into two groups for 30s ──────────
+run_partition() {
+  echo "── scenario: partition (30s network split) ──"
+  reset_qdisc
+  ./evidence/localhost_cluster.sh "$COUNT" 35 > "$DIR/partition.log" 2>&1 &
+  local cluster_pid=$!
+  sleep 4  # let the cluster boot and converge
+  local HALF=$((COUNT / 2))
+  local g0s=9000 g0e=$((9000 + HALF - 1))
+  local g1s=$((9000 + HALF)) g1e=$((9000 + COUNT - 1))
+  echo "  blocking group [$g0s-$g0e] <-> [$g1s-$g1e] for 30s"
+  iptables -A OUTPUT -p udp -m multiport --sports "$g0s:$g0e" -m multiport --dports "$g1s:$g1e" -j DROP 2>/dev/null || true
+  iptables -A OUTPUT -p udp -m multiport --sports "$g1s:$g1e" -m multiport --dports "$g0s:$g0e" -j DROP 2>/dev/null || true
+  sleep 30
+  iptables -D OUTPUT -p udp -m multiport --sports "$g0s:$g0e" -m multiport --dports "$g1s:$g1e" -j DROP 2>/dev/null || true
+  iptables -D OUTPUT -p udp -m multiport --sports "$g1s:$g1e" -m multiport --dports "$g0s:$g0e" -j DROP 2>/dev/null || true
+  echo "  split lifted — waiting for re-convergence (5s)"
+  sleep 5
+  wait "$cluster_pid" || true
+  cp -r "results/localhost_cluster_${COUNT}" "$DIR/partition" 2>/dev/null || true
+  echo "  done → $DIR/partition.log"
+}
+
+# ── Attack: one peer floods node-0 with garbage for 15s ───────────
+flood() {
+  python3 - "$1" "$2" "$3" <<'PYEOF'
+import socket, sys, time
+port, seconds, pps = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+payload = b"FLOOD" * 100
+end = time.time() + seconds
+while time.time() < end:
+    for _ in range(pps):
+        s.sendto(payload, ("127.0.0.1", port))
+    time.sleep(1)
+PYEOF
+}
+
+run_attack() {
+  echo "── scenario: attack (peer floods node-0, 15s) ──"
+  reset_qdisc
+  ./evidence/localhost_cluster.sh "$COUNT" 25 > "$DIR/attack.log" 2>&1 &
+  local cluster_pid=$!
+  sleep 4
+  flood 9000 15 200 &
+  local flood_pid=$!
+  wait "$flood_pid" || true
+  echo "  flood done — node-0 must still answer health checks"
+  wait "$cluster_pid" || true
+  cp -r "results/localhost_cluster_${COUNT}" "$DIR/attack" 2>/dev/null || true
+  echo "  done → $DIR/attack.log"
+}
+
+run_partition
+run_attack
+
 echo "───────────────────────────────────────────────────────────────"
 echo " EMULATION COMPLETE → $DIR/"
-echo " NOTE: partition/churn/attack scenarios require Toxiproxy or"
-echo " iptables-based splits — see evidence/README.md for the roadmap."
-echo "───────────────────────────────────────────────────────────────"
+echo " scenarios: normal/mobile/weak/severe/partition/attack"
+echo "───────────────────────────────────────────────────────────────" 

@@ -164,6 +164,22 @@ pub struct EngineConfig {
     /// source from consuming all peer slots. 0 = no per-IP limit.
     /// Default: 10.
     pub per_ip_max_peers: usize,
+    /// Enable trust scoring & rate limiting (baseline toggle, default true).
+    pub trust_enabled: bool,
+    /// Enable gradient aging (half-life decay) (baseline toggle, default true).
+    pub aging_enabled: bool,
+    /// Enable the apoptosis sweep (baseline toggle, default true).
+    pub apoptosis_enabled: bool,
+    /// Enable neurogenesis (baseline toggle, default true).
+    pub neurogenesis_enabled: bool,
+    /// Baseline: use random peer discovery instead of XOR-closest (default false).
+    pub random_discovery: bool,
+    /// Baseline: static topology — no DHT maintenance beyond initial peers (default false).
+    pub static_topology: bool,
+    /// Deterministic in-sim packet loss rate in [0,1] (default 0.0).
+    pub packet_loss_rate: f32,
+    /// Seed for the deterministic impairment RNG (default 0).
+    pub sim_seed: u64,
 }
 
 impl Default for EngineConfig {
@@ -190,6 +206,14 @@ impl Default for EngineConfig {
             max_peers: 500,
             heartbeat_interval_ticks: 30_000, // 30 seconds
             per_ip_max_peers: 10,
+            trust_enabled: true,
+            aging_enabled: true,
+            apoptosis_enabled: true,
+            neurogenesis_enabled: true,
+            random_discovery: false,
+            static_topology: false,
+            packet_loss_rate: 0.0,
+            sim_seed: 0,
         }
     }
 }
@@ -399,6 +423,8 @@ pub struct EngineLoop {
     /// When `None`, all packets are accepted (normal operation).
     /// Uses Arc<Mutex<>> so the simulator thread can inject filters post-spawn.
     pub packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>>,
+    /// Xorshift state for deterministic in-sim packet loss.
+    loss_rng: u64,
 }
 
 #[cfg(test)]
@@ -438,6 +464,11 @@ impl EngineLoop {
         };
         let audit_log = AuditLog::new();
 
+        // Deterministic impairment RNG seed: sim_seed mixed with the bind address.
+        let mut loss_hasher = std::collections::hash_map::DefaultHasher::new();
+        config.bind_addr.hash(&mut loss_hasher);
+        let loss_rng = config.sim_seed ^ loss_hasher.finish() ^ 0x9E37_79B9_7F4A_7C15;
+
         let engine = EngineLoop {
             config,
             transport,
@@ -446,6 +477,7 @@ impl EngineLoop {
             dht_handler: None,
             apoptosis_system: ApoptosisSystem::new(),
             shutdown: Arc::new(AtomicBool::new(false)),
+            loss_rng,
             // Security subsystem
             node_identity,
             secure_channel: SecureChannel::new(),
@@ -608,11 +640,17 @@ impl EngineLoop {
                 match self.outbound_rx.try_recv() {
                     Ok(packet) => {
                         let result = if packet.mode.is_reliable() {
+                            // Baseline toggle: aging disabled => effectively infinite half-life.
+                            let half_life = if self.config.aging_enabled {
+                                self.config.gradient_half_life_ms
+                            } else {
+                                f32::MAX
+                            };
                             self.transport.send_reliable(
                                 &packet.payload,
                                 &packet.dst,
                                 packet.mode.max_retries(),
-                                self.config.gradient_half_life_ms,
+                                half_life,
                             )
                         } else {
                             self.transport
@@ -651,10 +689,17 @@ impl EngineLoop {
                     std::collections::HashMap::new();
 
                 // Step 1: Forward pass (borrows activation_map + synapse_map + neurogenesis)
+                // Baseline toggle: neurogenesis disabled => use a throwaway system.
+                let mut no_neurogenesis = NeurogenesisSystem::default();
+                let neuro_ref = if self.config.neurogenesis_enabled {
+                    &mut self.neurogenesis
+                } else {
+                    &mut no_neurogenesis
+                };
                 let fp_report = self.forward_pass.tick(
                     &mut self.activation_map,
                     &mut self.synapse_map,
-                    &mut self.neurogenesis,
+                    neuro_ref,
                     self.tick,
                     &observations,
                 );
@@ -758,36 +803,42 @@ impl EngineLoop {
 
                 // Apoptosis sweep: evict dead DHT nodes, expired pings,
                 // orphaned transport frames. Reports total deaths this sweep.
+                // Baseline toggle: apoptosis disabled => skip the sweep.
                 if let Some(ref mut dht) = self.dht_handler {
-                    let report = self
-                        .apoptosis_system
-                        .tick(self.tick, dht, &mut self.transport);
+                    if self.config.apoptosis_enabled {
+                        let report =
+                            self.apoptosis_system
+                                .tick(self.tick, dht, &mut self.transport);
 
-                    // Death spiral guardrail
-                    if self.apoptosis_system.is_death_spiral(&report) {
-                        log_warn!(
-                            "engine",
-                            format!(
-                                "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
-                             Network partition or seed node failure.",
-                                report.total_deaths, self.tick,
-                            )
-                        );
-                    } else if report.total_deaths > 0 {
-                        log_warn!(
-                            "apoptosis",
-                            format!(
-                                "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{} frames:{})",
-                                report.total_deaths,
-                                report.dht_nodes_evicted,
-                                report.pending_pings_expired,
-                                report.data_frames_purged,
-                            )
-                        );
+                        // Death spiral guardrail
+                        if self.apoptosis_system.is_death_spiral(&report) {
+                            log_warn!(
+                                "engine",
+                                format!(
+                                    "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
+                                 Network partition or seed node failure.",
+                                    report.total_deaths, self.tick,
+                                )
+                            );
+                        } else if report.total_deaths > 0 {
+                            log_warn!(
+                                "apoptosis",
+                                format!(
+                                    "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{} frames:{})",
+                                    report.total_deaths,
+                                    report.dht_nodes_evicted,
+                                    report.pending_pings_expired,
+                                    report.data_frames_purged,
+                                )
+                            );
+                        }
                     }
 
-                    // DHT periodic maintenance (ping stale, save peers)
-                    dht.periodic_maintenance();
+                    // DHT periodic maintenance (ping stale, save peers).
+                    // Baseline toggle: static topology => no discovery beyond initial peers.
+                    if !self.config.static_topology {
+                        dht.periodic_maintenance();
+                    }
                 }
 
                 // ── Heartbeat keepalive ────────────────────────
@@ -836,6 +887,17 @@ impl EngineLoop {
             }
         }
 
+        // Deterministic in-sim packet loss (seeded xorshift — reproducible runs).
+        if self.config.packet_loss_rate > 0.0 {
+            self.loss_rng ^= self.loss_rng << 13;
+            self.loss_rng ^= self.loss_rng >> 7;
+            self.loss_rng ^= self.loss_rng << 17;
+            let r = (self.loss_rng % 10_000) as f32 / 10_000.0;
+            if r < self.config.packet_loss_rate {
+                return Ok(()); // simulated loss — silently drop
+            }
+        }
+
         // data = full UDP datagram: [16-byte transport header][NWP frame]
         // NWP frame layout: [4-byte frame_len][16-byte MessageHeader][body]
         if data.len() < TransportHeader::SIZE + 4 {
@@ -847,7 +909,8 @@ impl EngineLoop {
 
         // ── Security: trust-based rate limiting ────────────────
         let peer_id = entity_id_from_addr(&src);
-        if self.trust_system.check_rate_limit(&peer_id) {
+        // Baseline toggle: trust disabled => no rate limiting.
+        if self.config.trust_enabled && self.trust_system.check_rate_limit(&peer_id) {
             self.audit_log.append(
                 AuditEventType::RateLimitTriggered,
                 &format!("rate-limited packet from {}", src),
@@ -1162,6 +1225,11 @@ pub fn spawn_engine(
 
     let outbound_tx_for_return = outbound_tx.clone();
 
+    // Deterministic impairment RNG seed: sim_seed mixed with the bind address.
+    let mut loss_hasher = std::collections::hash_map::DefaultHasher::new();
+    config.bind_addr.hash(&mut loss_hasher);
+    let loss_rng = config.sim_seed ^ loss_hasher.finish() ^ 0x9E37_79B9_7F4A_7C15;
+
     let handle = std::thread::Builder::new()
         .name("nwp-engine".to_string())
         .spawn(move || {
@@ -1198,6 +1266,7 @@ pub fn spawn_engine(
                 brain_attached: false,
                 packet_filter_allowed: packet_filter_allowed
                     .unwrap_or_else(|| Arc::new(Mutex::new(None))),
+                loss_rng,
             };
 
             // Auto-create DHT handler if local peers configured but no handler given
@@ -1205,7 +1274,7 @@ pub fn spawn_engine(
                 use rand::Rng;
                 let mut local_id = [0u8; 32];
                 rand::thread_rng().fill(&mut local_id);
-                let dht = DhtHandler::new(
+                let mut dht = DhtHandler::new(
                     NodeId::new(local_id),
                     engine
                         .config
@@ -1217,6 +1286,7 @@ pub fn spawn_engine(
                     None,
                     "local".to_string(),
                 );
+                dht.random_discovery = engine.config.random_discovery;
                 engine.dht_handler = Some(dht);
             }
 
