@@ -182,9 +182,10 @@ impl SecureChannel {
         };
         let peer_x_pk = XPublicKey::from(peer_vk.to_montgomery().to_bytes());
 
-        // Local Ed25519 signing key seed → X25519 static secret
-        let local_sk_bytes = local_identity.secret_key_bytes();
-        let local_static = XStaticSecret::from(local_sk_bytes);
+        // Local Ed25519 identity → X25519 static secret. IMPORTANT: the
+        // expanded signing scalar must be used (not the seed), otherwise the
+        // two sides derive different keys and every decrypt fails.
+        let local_static = XStaticSecret::from(local_identity.x25519_secret());
 
         // X25519 ECDH: both sides compute the same shared secret
         let shared = local_static.diffie_hellman(&peer_x_pk);
@@ -318,8 +319,9 @@ impl SecureChannel {
     ) -> Option<Vec<u8>> {
         let session = self.sessions.get_mut(session_id)?;
 
-        // Replay protection: extract counter from nonce
-        let counter = u64::from_be_bytes([nonce[12], nonce[13], nonce[14], nonce[15], 0, 0, 0, 0]);
+        // Replay protection: extract counter from nonce (last 4 bytes in the
+        // 24-byte layout: key[..20] || counter[20..24])
+        let counter = u64::from_be_bytes([nonce[20], nonce[21], nonce[22], nonce[23], 0, 0, 0, 0]);
 
         // Reject if counter is less than max seen (or within drift window)
         if counter <= session.max_received_nonce {

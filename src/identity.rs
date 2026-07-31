@@ -154,6 +154,15 @@ impl NodeIdentity {
         self.signing_key.to_bytes()
     }
 
+    /// Get the X25519 static secret derived from this Ed25519 identity.
+    ///
+    /// Uses the *expanded* signing scalar (`SHA-512(seed)` clamped), not the raw
+    /// seed — the scalar is what the public key was derived from, so X25519 ECDH
+    /// between two such identities commutes (both sides agree on the same key).
+    pub fn x25519_secret(&self) -> [u8; SECRET_KEY_LENGTH] {
+        self.signing_key.to_scalar().to_bytes()
+    }
+
     /// Sign a message with this identity's signing key.
     ///
     /// Returns a 64-byte Ed25519 signature.
