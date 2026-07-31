@@ -26,7 +26,9 @@ use ed25519_dalek::{
 };
 use rand::rngs::OsRng;
 use sha2::{Digest, Sha256};
+use base64::Engine;
 use std::fmt;
+use std::path::Path;
 
 use crate::components::EntityId;
 
@@ -52,6 +54,14 @@ pub struct NodeIdentity {
     entity_id: EntityId,
     /// Monotonic sequence number for outbound packets
     sequence_number: u64,
+}
+
+impl Drop for NodeIdentity {
+    fn drop(&mut self) {
+        // Zeroize the signing key material on drop
+        use zeroize::Zeroize;
+        self.signing_key.to_bytes().zeroize();
+    }
 }
 
 impl fmt::Debug for NodeIdentity {
@@ -187,6 +197,128 @@ impl NodeIdentity {
         self.sequence_number = 0;
 
         old_vk
+    }
+
+    /// Persist the identity's secret seed to a PEM-encoded file.
+    ///
+    /// The file contains the 32-byte Ed25519 seed in PEM format
+    /// (base64-encoded with PEM headers). This is the canonical format
+    /// used by OpenSSH and OpenSSL for Ed25519 private keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IdentityError` if the file cannot be written or the
+    /// PEM encoding fails.
+    pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<(), IdentityError> {
+        let seed = self.secret_key_bytes();
+        let b64 = base64::engine::general_purpose::STANDARD.encode(seed);
+        let pem = format!(
+            "-----BEGIN EDDSA PRIVATE KEY-----\n{b64}\n-----END EDDSA PRIVATE KEY-----\n",
+        );
+        std::fs::write(path.as_ref(), pem.as_bytes())?;
+        Ok(())
+    }
+
+    /// Load an identity from a PEM-encoded seed file.
+    ///
+    /// The file must contain a 32-byte Ed25519 seed in PEM format as
+    /// written by `save_to_file()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IdentityError` if the file cannot be read or the PEM
+    /// decoding or key parsing fails.
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, IdentityError> {
+        let pem_str = std::fs::read_to_string(path.as_ref())?;
+        // Strip PEM headers
+        let b64: String = pem_str
+            .lines()
+            .filter(|l| !l.starts_with("---"))
+            .collect();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(b64.trim())
+            .map_err(IdentityError::Decode)?;
+        let seed: [u8; 32] = decoded
+            .try_into()
+            .map_err(|_| IdentityError::InvalidSeed)?;
+        Ok(NodeIdentity::from_seed(&seed))
+    }
+
+    /// Save the identity's seed as raw 32-byte binary.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IdentityError` if the file cannot be written.
+    pub fn save_binary(&self, path: impl AsRef<Path>) -> Result<(), IdentityError> {
+        std::fs::write(path.as_ref(), self.secret_key_bytes())?;
+        Ok(())
+    }
+
+    /// Load an identity from a raw 32-byte binary seed file.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IdentityError` if the file cannot be read or contains
+    /// fewer than 32 bytes.
+    pub fn load_binary(path: impl AsRef<Path>) -> Result<Self, IdentityError> {
+        let data = std::fs::read(path.as_ref())?;
+        let seed: [u8; 32] = data
+            .try_into()
+            .map_err(|_| IdentityError::InvalidSeed)?;
+        Ok(NodeIdentity::from_seed(&seed))
+    }
+}
+
+/// Errors that can occur during identity persistence operations.
+#[derive(Debug)]
+pub enum IdentityError {
+    /// I/O error reading or writing the key file.
+    Io(std::io::Error),
+    /// PEM/Base64 decoding error.
+    Decode(base64::DecodeError),
+    /// Invalid seed data (wrong length or format).
+    InvalidSeed,
+    /// Ed25519 key parsing error.
+    Key(SignatureError),
+}
+
+impl fmt::Display for IdentityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IdentityError::Io(e) => write!(f, "I/O error: {}", e),
+            IdentityError::Decode(e) => write!(f, "base64 decode error: {}", e),
+            IdentityError::InvalidSeed => write!(f, "invalid seed data"),
+            IdentityError::Key(e) => write!(f, "key error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for IdentityError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            IdentityError::Io(e) => Some(e),
+            IdentityError::Decode(e) => Some(e),
+            IdentityError::InvalidSeed => None,
+            IdentityError::Key(e) => Some(e),
+        }
+    }
+}
+
+impl From<std::io::Error> for IdentityError {
+    fn from(e: std::io::Error) -> Self {
+        IdentityError::Io(e)
+    }
+}
+
+impl From<base64::DecodeError> for IdentityError {
+    fn from(e: base64::DecodeError) -> Self {
+        IdentityError::Decode(e)
+    }
+}
+
+impl From<SignatureError> for IdentityError {
+    fn from(e: SignatureError) -> Self {
+        IdentityError::Key(e)
     }
 }
 

@@ -155,6 +155,9 @@ impl<'a> BodyReader<'a> {
             return None;
         }
         let len = read_u32(self.buf, relative) as usize;
+        // SAFETY: The data region was written by BodyBuilder::push_data() which only accepts
+        // valid UTF-8 strings via &str. The offset and length were stored as a u32 length
+        // prefix followed by the exact bytes, so the slice bounds are correct.
         Some(unsafe { core::str::from_utf8_unchecked(&self.buf[relative + 4..relative + 4 + len]) })
     }
 

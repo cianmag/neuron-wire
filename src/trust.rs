@@ -171,6 +171,28 @@ impl TrustSystem {
     /// Record a trust event for a peer and return the updated score.
     ///
     /// Applies the trust delta, clamps to [0.0, 1.0], and returns the score.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuron_wire::trust::{TrustSystem, TrustEvent};
+    /// use neuron_wire::components::EntityId;
+    ///
+    /// let mut trust = TrustSystem::new();
+    /// let peer = EntityId::new([1u8; 32]);
+    ///
+    /// // New peers start at 0.5
+    /// let score = trust.trust_score(&peer);
+    /// assert!((0.4..=0.6).contains(&score));
+    ///
+    /// // Positive events increase trust
+    /// let score = trust.record_event(peer, TrustEvent::ValidSignature);
+    /// assert!(score > 0.5);
+    ///
+    /// // Negative events decrease trust
+    /// let score = trust.record_event(peer, TrustEvent::ReplayAttack);
+    /// assert!(score < 0.5);
+    /// ```
     pub fn record_event(&mut self, peer: EntityId, event: TrustEvent) -> f32 {
         // Apply time-based decay first
         self.apply_decay(peer);
@@ -221,6 +243,29 @@ impl TrustSystem {
     /// Check if a packet from this peer should be rate-limited.
     ///
     /// Returns `true` if the packet should be dropped (rate limit exceeded).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuron_wire::trust::{TrustSystem, TrustEvent};
+    /// use neuron_wire::components::EntityId;
+    ///
+    /// let mut trust = TrustSystem::new();
+    /// let peer = EntityId::new([1u8; 32]);
+    ///
+    /// // First few packets pass
+    /// assert!(!trust.check_rate_limit(&peer));
+    ///
+    /// // After burst limit exceeded, packets are dropped
+    /// let mut limited = false;
+    /// for _ in 0..20 {
+    ///     if trust.check_rate_limit(&peer) {
+    ///         limited = true;
+    ///         break;
+    ///     }
+    /// }
+    /// assert!(limited, "rate limiting should eventually trigger");
+    /// ```
     pub fn check_rate_limit(&mut self, peer: &EntityId) -> bool {
         let now = now_millis();
         let state = self.peers.entry(*peer).or_default();
@@ -325,6 +370,80 @@ impl TrustSystem {
     /// Get the number of tracked peers.
     pub fn peer_count(&self) -> usize {
         self.peers.len()
+    }
+
+    // ─── Persistence ───────────────────────────────────────────
+
+    /// Save trust scores to a binary file.
+    /// Format: [u32 count] for each peer: [32B entity_id][f32 score][u64 total_events]
+    /// Transient fields (rate_limit state, window counters) are NOT saved —
+    /// they reset on restart, which is correct: rate limits should not persist.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use neuron_wire::trust::{TrustSystem, TrustEvent};
+    /// use neuron_wire::components::EntityId;
+    ///
+    /// let mut trust = TrustSystem::new();
+    /// let peer = EntityId::new([1u8; 32]);
+    /// trust.record_event(peer, TrustEvent::ValidSignature);
+    ///
+    /// // Save to disk
+    /// let saved = trust.save_to_file("trust.dat").unwrap();
+    /// assert_eq!(saved, 1);
+    ///
+    /// // Load into a new instance
+    /// let mut trust2 = TrustSystem::new();
+    /// trust2.load_from_file("trust.dat").unwrap();
+    /// assert_eq!(trust2.trust_score(&peer), trust.trust_score(&peer));
+    /// ```
+    pub fn save_to_file(&self, path: &str) -> std::io::Result<usize> {
+        use std::io::Write;
+        let mut file = std::fs::File::create(path)?;
+        let count = self.peers.len() as u32;
+        file.write_all(&count.to_le_bytes())?;
+        let mut saved = 0;
+        for (eid, state) in &self.peers {
+            file.write_all(&eid.0)?;
+            file.write_all(&state.score.to_le_bytes())?;
+            file.write_all(&state.total_events.to_le_bytes())?;
+            saved += 1;
+        }
+        file.flush()?;
+        Ok(saved)
+    }
+
+    /// Load trust scores from a binary file.
+    /// Peers not in the file start at INITIAL_TRUST.
+    /// Returns the number of peers loaded.
+    pub fn load_from_file(&mut self, path: &str) -> std::io::Result<usize> {
+        use std::io::Read;
+        let mut file = std::fs::File::open(path)?;
+        let mut buf = [0u8; 4];
+        file.read_exact(&mut buf)?;
+        let count = u32::from_le_bytes(buf) as usize;
+
+        let mut loaded = 0;
+        for _ in 0..count {
+            let mut eid_bytes = [0u8; 32];
+            file.read_exact(&mut eid_bytes)?;
+            let mut score_buf = [0u8; 4];
+            file.read_exact(&mut score_buf)?;
+            let mut events_buf = [0u8; 8];
+            file.read_exact(&mut events_buf)?;
+
+            let score = f32::from_le_bytes(score_buf);
+            let total_events = u64::from_le_bytes(events_buf);
+
+            let eid = EntityId(eid_bytes);
+            let state = self.peers.entry(eid).or_default();
+            state.score = score.clamp(0.0, 1.0);
+            state.total_events = total_events;
+            state.last_active_ms = now_millis(); // Mark as recently active
+            loaded += 1;
+        }
+        Ok(loaded)
     }
 }
 

@@ -1,0 +1,180 @@
+# Neuron Wire Prometheus Alerting Rules
+# Based on metrics defined in src/health.rs
+# Runbook: https://github.com/your-org/neuron-wire/tree/main/runbooks
+
+groups:
+  - name: neuron_wire_alerts
+    rules:
+
+      # ── Infrastructure ───────────────────────────────────────────
+
+      - alert: NodeDown
+        expr: up{job="neuron-wire"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Node {{ $labels.instance }} health endpoint unreachable"
+          description: >-
+            The neuron-wire node at {{ $labels.instance }} has been
+            unreachable for more than 60 seconds. The health endpoint
+            (/health) is not responding to Prometheus scrape requests.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/NodeDown.md"
+
+      # ── Security ─────────────────────────────────────────────────
+
+      - alert: HighErrorRate
+        expr: rate(nwp_auth_failures[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High auth failure rate on {{ $labels.instance }}"
+          description: >-
+            Signature verification failures are occurring at
+            {{ $value | printf "%.1f" }}/sec (threshold: 10/sec) on
+            {{ $labels.instance }} for the past 5 minutes. This may
+            indicate brute-force key guessing, misconfigured peers, or
+            a key rotation in progress.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/HighErrorRate.md"
+
+      - alert: RateLimitTriggered
+        expr: rate(nwp_rate_limited_packets[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Excessive rate limiting on {{ $labels.instance }}"
+          description: >-
+            Rate-limited packets are being dropped at
+            {{ $value | printf "%.1f" }}/sec (threshold: 50/sec) on
+            {{ $labels.instance }}. The trust system is actively
+            throttling peers. Check nwp_trust_rate_limited for the
+            number of affected peers.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/RateLimitTriggered.md"
+
+      # ── Capacity ─────────────────────────────────────────────────
+
+      - alert: PeerCapacityHigh
+        expr: nwp_peer_capacity_ratio > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: capacity
+        annotations:
+          summary: "Peer capacity near exhaustion on {{ $labels.instance }}"
+          description: >-
+            Peer capacity ratio is {{ $value | printf "%.2f" }}
+            (threshold: 0.9) on {{ $labels.instance }} for over 5
+            minutes. Active peers: {{ with query "nwp_active_peers{job='neuron-wire'}" }}{{ . | first | value }}{{ end }},
+            Max peers: {{ with query "nwp_max_peers{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}.
+            Consider scaling horizontally or raising max_peers.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/PeerCapacityHigh.md"
+
+      - alert: SessionCapacityFull
+        expr: nwp_sessions >= nwp_max_peers
+        for: 5m
+        labels:
+          severity: critical
+          component: capacity
+        annotations:
+          summary: "Session capacity at maximum on {{ $labels.instance }}"
+          description: >-
+            Active secure sessions ({{ with query "nwp_sessions{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}) have
+            reached the maximum peer limit ({{ with query "nwp_max_peers{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}) on
+            {{ $labels.instance }} for over 5 minutes. New connections
+            will be refused until sessions are released or limits are
+            raised.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/SessionCapacityFull.md"
+
+      # ── DHT ──────────────────────────────────────────────────────
+
+      - alert: DHTNodeCountLow
+        expr: nwp_dht_nodes < 3
+        for: 10m
+        labels:
+          severity: warning
+          component: dht
+        annotations:
+          summary: "DHT routing table critically small on {{ $labels.instance }}"
+          description: >-
+            DHT node count is {{ $value | printf "%.0f" }}
+            (threshold: minimum 3) on {{ $labels.instance }} for over
+            10 minutes. A small DHT table reduces routing efficiency
+            and may cause peer discovery failures. Pending pings:
+            {{ with query "nwp_dht_pending_pings{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/DHTNodeCountLow.md"
+
+      # ── Network ──────────────────────────────────────────────────
+
+      - alert: HighRetransmitRate
+        expr: rate(nwp_retransmissions[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Excessive retransmissions on {{ $labels.instance }}"
+          description: >-
+            Retransmission rate is {{ $value | printf "%.1f" }}/sec
+            (threshold: 100/sec) on {{ $labels.instance }} for over 5
+            minutes. This indicates packet loss, network congestion,
+            or unreliable connections. Reliable queue depth:
+            {{ with query "nwp_reliable_queue_depth{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/HighRetransmitRate.md"
+
+      # ── Trust ────────────────────────────────────────────────────
+
+      - alert: TrustScoreLow
+        expr: >
+          (nwp_trust_peers - nwp_trust_rate_limited) / nwp_trust_peers < 0.3
+        for: 5m
+        labels:
+          severity: warning
+          component: trust
+        annotations:
+          summary: "Average trust score critically low on {{ $labels.instance }}"
+          description: >-
+            The proportion of healthy (non-rate-limited) peers has
+            dropped below 0.3 ({{ $value | printf "%.2f" }}) on
+            {{ $labels.instance }} for over 5 minutes. Trusted peers:
+            {{ with query "nwp_trust_peers{job='neuron-wire'}" }}{{ . | first | value }}{{ end }},
+            Rate-limited: {{ with query "nwp_trust_rate_limited{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}.
+            Investigate peer behaviour and potential abuse.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/TrustScoreLow.md"
+
+      # ── Performance ──────────────────────────────────────────────
+
+      - alert: MemoryHigh
+        expr: process_resident_memory_bytes{job="neuron-wire"} > 400e6
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Memory usage exceeds 400 MB on {{ $labels.instance }}"
+          description: >-
+            Process RSS memory is {{ $value | humanize1024 }}B
+            (threshold: 400 MB) on {{ $labels.instance }} for over 5
+            minutes. Check for memory leaks, increase available RAM,
+            or reduce peer/session limits.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/MemoryHigh.md"
+
+      - alert: TickRateLow
+        expr: nwp_tick_rate_hz < 100
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Tick rate below target on {{ $labels.instance }}"
+          description: >-
+            Engine tick rate is {{ $value | printf "%.0f" }} Hz
+            (threshold: 100 Hz) on {{ $labels.instance }} for over 5
+            minutes. Idle ratio: {{ with query "nwp_idle_ratio{job='neuron-wire'}" }}{{ . | first | value }}{{ end }}.
+            A low tick rate may indicate CPU saturation, excessive
+            lock contention, or an overloaded engine loop.
+          runbook_url: "https://github.com/your-org/neuron-wire/blob/main/runbooks/TickRateLow.md"

@@ -1077,6 +1077,19 @@ impl DhtHandler {
             self.pending_pings.len()
         );
     }
+
+    /// Save the routing table to a file at the given path.
+    /// Returns the number of peers saved.
+    pub fn save_peers_to(&self, path: &str) -> std::io::Result<usize> {
+        let count = self.routing_table.node_count();
+        save_peers(&self.routing_table, path)?;
+        Ok(count)
+    }
+
+    /// Get the number of pending pings (awaiting PONG response).
+    pub fn pending_ping_count(&self) -> usize {
+        self.pending_pings.len()
+    }
 }
 
 // ─── Free Functions ────────────────────────────────────────────

@@ -1,0 +1,218 @@
+# ─── Provision a VPS for neuron-wire cluster ─────────────────────
+# Usage:
+#   ansible-playbook -i inventory.yml playbook.yml
+#
+# Prerequisites:
+#   - Ansible installed locally (pip install ansible)
+#   - SSH key access to the VPS (ssh root@<vps-ip>)
+#   - inventory.yml with your VPS host
+#
+# This playbook:
+#   1. Installs Docker + Docker Compose
+#   2. Creates /opt/nwp with proper permissions
+#   3. Copies docker-compose.yml and configs
+#   4. Starts the NWP node cluster
+#   5. Configures prometheus-node-exporter for system metrics
+#   6. Sets up log rotation and firewall
+
+- name: Provision Neuron Wire Node
+  hosts: nwp_nodes
+  become: yes
+  vars:
+    nwp_dir: /opt/nwp
+    nwp_user: nwp
+    docker_compose_version: "v2.29.0"
+    # Default wireguard mesh network for inter-node communication
+    wg_network: "10.200.0.0/24"
+
+  tasks:
+
+    # ── 1. System Dependencies ─────────────────────────────────
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install system dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - ufw
+          - prometheus-node-exporter
+          - rsync
+          - htop
+          - iotop
+        state: present
+
+    # ── 2. Docker Installation ─────────────────────────────────
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+        state: present
+
+    - name: Install Docker Compose plugin
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    # ── 3. NWP User & Directories ──────────────────────────────
+    - name: Create nwp system user
+      user:
+        name: "{{ nwp_user }}"
+        system: yes
+        home: "{{ nwp_dir }}"
+        shell: /usr/sbin/nologin
+        groups: docker
+        create_home: no
+
+    - name: Create NWP directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ nwp_user }}"
+        group: "{{ nwp_user }}"
+        mode: '0750'
+      loop:
+        - "{{ nwp_dir }}"
+        - "{{ nwp_dir }}/config"
+        - "{{ nwp_dir }}/data"
+
+    # ── 4. Firewall ────────────────────────────────────────────
+    - name: Configure UFW defaults
+      ufw:
+        direction: "{{ item.dir }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { dir: incoming, policy: deny }
+        - { dir: outgoing, policy: allow }
+
+    - name: Allow SSH
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+
+    - name: Allow NWP node UDP
+      ufw:
+        rule: allow
+        port: '9000'
+        proto: udp
+
+    - name: Allow health HTTP
+      ufw:
+        rule: allow
+        port: '9100'
+        proto: tcp
+
+    - name: Allow node-exporter
+      ufw:
+        rule: allow
+        port: '9101'
+        proto: tcp
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+
+    # ── 5. Docker Compose Deployment ───────────────────────────
+    - name: Copy docker-compose.yml
+      copy:
+        src: docker-compose.yml
+        dest: "{{ nwp_dir }}/docker-compose.yml"
+        owner: "{{ nwp_user }}"
+        group: "{{ nwp_user }}"
+        mode: '0644'
+
+    - name: Create node config for this host
+      template:
+        src: node-config.j2
+        dest: "{{ nwp_dir }}/config/node-config.toml"
+        owner: "{{ nwp_user }}"
+        group: "{{ nwp_user }}"
+        mode: '0640'
+      vars:
+        node_name: "{{ inventory_hostname }}"
+        node_bind: "0.0.0.0:9000"
+        stun_enabled: true
+        stun_server: "stun.l.google.com:19302"
+        bootstrap_peers: "{{ groups['nwp_peers'] | default([]) }}"
+
+    - name: Pull Docker images
+      docker_compose:
+        project_src: "{{ nwp_dir }}"
+        pull: yes
+
+    - name: Start NWP cluster
+      docker_compose:
+        project_src: "{{ nwp_dir }}"
+        build: yes
+        state: present
+        restarted: yes
+
+    # ── 6. Health Check ────────────────────────────────────────
+    - name: Wait for health endpoint
+      uri:
+        url: http://127.0.0.1:9100/health
+        status_code: 200
+      register: health_result
+      retries: 10
+      delay: 3
+      until: health_result.status == 200
+
+    - name: Print health status
+      debug:
+        msg: "✅ {{ inventory_hostname }} health check passed"
+
+    # ── 7. Log Rotation ────────────────────────────────────────
+    - name: Configure Docker log rotation
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            }
+          }
+        mode: '0644'
+      notify: Restart Docker
+
+    # ── 8. Monitoring (Prometheus node-exporter) ───────────────
+    - name: Enable node-exporter
+      systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart Docker
+      systemd:
+        name: docker
+        state: restarted

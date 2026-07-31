@@ -1,31 +1,86 @@
-[advisories]
-vulnerability = "deny"
-unmaintained = "warn"
-notice = "warn"
-unsound = "deny"
+# ──────────────────────────────────────────────────────────
+# cargo-deny configuration for neuron-wire
+# Enforces security advisories, license compliance,
+# unsafe crate bans, and source integrity.
+# ──────────────────────────────────────────────────────────
 
+# ── Advisories ──────────────────────────────────────────
+# Block on any known RUSTSEC advisory; warn on unmaintained/unsound.
+[advisories]
+vulnerability  = "deny"
+unmaintained   = "warn"
+yanked         = "deny"
+notice         = "warn"
+unsound        = "deny"
+ignore = []
+
+# ── Bans ────────────────────────────────────────────────
 [bans]
 multiple-versions = "deny"
-wildcards = "deny"
-highlight = "all"
+wildcards         = "deny"
+highlight         = "all"
 
-[sources]
-unknown-registry = "deny"
-unknown-git = "deny"
-allow-git = []
+# Ban crates that use or expose unsafe Rust abstractions.
+# This catches crates that depend on `unsafe_code` lints or
+# known-unsafe wrapper crates.
+deny = [
+    # Crates known to contain or promote unsafe code patterns
+    { name = "unsafe_any", wrappers = [] },
+    { name = "unsafe_block", wrappers = [] },
+]
 
+# Skip: allow self-dependency across workspace crates
+skip = [
+    # { name = "some-crate", version = "1.x" },
+]
+
+skip-tree = [
+    # { name = "some-large-tree", version = "1.x", depth = 3 },
+]
+
+# ── Allowed Licenses ────────────────────────────────────
+# Permissive + weak-copyleft only. GPL/AGPL/SSPL are banned.
 [licenses]
-default = "deny"
-unlicensed = "deny"
+default       = "deny"
+unlicensed    = "deny"
+confidence-threshold = 0.8
 allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "OpenSSL",
     "Unlicense",
     "0BSD",
     "Zlib",
 ]
+
+# Skip license detection for crates where we trust the author
 skip = []
 skip-tree = []
+
+# ── Sources ─────────────────────────────────────────────
+[sources]
+unknown-registry = "deny"
+unknown-git      = "deny"
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+]
+allow-git = []
+
+# ── Banned crate versions (known-buggy / vulnerable) ───
+# These are specific version ranges known to have critical bugs.
+# Update this list as new advisories are published.
+[bans.versions]
+# Example: block specific versions with known RUSTSEC advisories
+# { id = "RUSTSEC-2024-0001", version = "<1.2.3", reason = "CVE-2024-XXXX" }
+
+# ── Workspace configuration ────────────────────────────
+[workspace]
+# If the project is a workspace, these settings apply across members.
+# members = ["crates/*"]

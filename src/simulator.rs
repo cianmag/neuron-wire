@@ -663,6 +663,10 @@ impl Simulator {
                     None
                 },
                 identity_seed: None,
+                security_enabled: true,
+                encrypt_payloads: false,
+                stun_enabled: false,
+                stun_server: "stun.l.google.com:19302".to_string(),
             };
 
             // Create shared packet filter for partition injection

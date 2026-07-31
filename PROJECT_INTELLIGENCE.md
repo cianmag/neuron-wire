@@ -620,29 +620,31 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 
 ## 15. Security
 
-**Threat model:** An attacker who can send UDP packets to any node on the network and can observe, inject, modify, or drop any message in transit, but does not control the majority of routing table entries for any honest node. **[F]**
+**Threat model:** An attacker who can send UDP packets to any node on the network and can observe, inject, modify, or drop any message in transit, but does not control the majority of routing table entries for any honest node. **[I]**
 
-**Sybil resistance:** Not implemented — an attacker can generate arbitrarily many NodeIds at zero cost and dominate k-buckets of honest nodes, partitioning the routing graph. **[F]**
+**Sybil resistance:** Basic — each peer is scored by a trust system (initial trust 0.5, decays over time, boosted by valid signatures/decryption). Peers below SYBIL_THRESHOLD (0.2) are subject to rate limiting. No proof-of-work or stake mechanism. An attacker with many IP addresses can still generate many identities, but each new identity starts untrusted and is rate-limited. **[I part, F part]**
 
-**Eclipse attacks:** Possible — an attacker who generates enough NodeIds to fill all 20 slots of a target's nearest k-bucket can isolate the target from the honest network. **[F]**
+**Eclipse attacks:** Partially mitigated — each peer is identified by its Ed25519 public key (not just NodeId), so an attacker must generate distinct keypairs to fill k-buckets. No formal eclipse resistance beyond the trust system. **[I part, F part]**
 
-**Replay attacks:** Possible — sequence numbers exist in the transport header but are not verified for freshness or monotonic ordering on the receiver side. **[I part, F part]**
+**Replay attacks:** Prevented — each encrypted packet carries a monotonic nonce counter verified by the receiver. Duplicates beyond a 1024-entry window are rejected. Unencrypted (signed-only) packets rely on sequence numbers; the transport header ACK tracker provides additional ordering. **[I]**
 
-**Spoofing:** Possible — source IP addresses in UDP datagrams can be forged, and there is no cryptographic verification of message origin. **[F]**
+**Spoofing:** Prevented — every outbound packet is Ed25519-signed with the sender's private key. The receiver extracts the public key from the 32-byte auth prefix and verifies the 64-byte signature over the body. A forger cannot spoof a packet without the sender's private key. **[I]**
 
-**Identity:** Ed25519 key pairs are generated for each node (identity.rs) but signatures are not verified on incoming messages — the identity subsystem exists but is not wired into the transport layer. **[I part, F part]**
+**Identity:** Ed25519 keypairs generated per node (OsRng). EntityId = SHA-256(public_key). Signatures are verified on every incoming packet when `security_enabled=true` (default). Key rotation via `rotate()` creates fresh identity with cert chain support. **[I]**
 
-**Encryption:** None — the wire format is plain FlatBuffer; any peer on the network can read all messages. **[F]**
+**Encryption:** XChaCha20-Poly1305 AEAD available per-packet. Key derivation uses a Noise-like XX handshake (simplified: SHA-256(local_pk || peer_pk || ephemeral) — real X25519 ECDH not yet implemented). Session keys are per-peer with monotonic nonce counters for replay protection. Enabled via `encrypt_payloads` config flag. **[I part, F part]**
 
-**Authentication:** None — any process can generate a NodeId and connect. **[F]**
+**Authentication:** Every outbound packet carries a 96-byte auth prefix (32B public key + 64B Ed25519 signature over body). Receivers verify signatures before processing; invalid signatures are dropped, logged, and reduce the sender's trust score. **[I]**
 
-**Authorization:** None — all peers have equal access to all resources. **[F]**
+**Authorization:** All peers have equal access to all resources — no role-based access control. **[F]**
 
-**Integrity:** CRC32 checksums detect accidental corruption but not malicious tampering — an attacker can recompute valid CRC32 for modified payloads. **[I]**
+**Integrity:** Ed25519 signatures provide cryptographic integrity on every packet. Tampered packets are rejected at the signature verification stage. CRC32 remains for accidental corruption detection. **[I]**
 
-**Availability:** No rate limiting or DoS protection — a malicious node can flood the network with PING or FIND_NODE messages. **[F]**
+**Availability:** Rate limiting via the trust system (max N packets per time window for low-trust peers). No DoS-specific protection beyond trust-based throttling. **[I part, F part]**
 
-**Confidentiality:** None — all state is local, but all communication is in plaintext. **[F]**
+**Confidentiality:** Optional AEAD encryption (XChaCha20-Poly1305) per packet when `encrypt_payloads=true`. Without encryption, the body is signed but in plaintext. **[I part, F part]**
+
+**Audit:** Hash-chain audit log records all security events (NodeStartup, PeerDiscovered, HandshakeSuccess, InvalidSignature, RateLimitTriggered, ReplayDetected, etc.). Each entry's hash chains to the previous, making tampering detectable. Bootstrap proofs enable log verification. **[I]**
 
 ---
 
@@ -785,7 +787,11 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 | Protocol converges under high churn | **[F]** | Not tested | Low | Crash-recovery tested in simulation; real churn unmeasured |
 | Single-threaded engine scales to 10⁴+ neurons | **[T]** | Theoretically bounded | Medium | O(n) per tick; budget may exceed 1 ms at high density |
 | Hybrid virtual model accurately represents real DHT behavior | **[T+S]** | Partially validated | Medium | v4 matches v3 convergence trends; fidelity to real UDP behavior unknown |
-| Ed25519 identity system is cryptographically sound | **[I+T]** | Verified | High | Standard Ed25519 implementation; signatures not yet verified on wire |
+| Ed25519 identity system is cryptographically sound | **[I+T]** | Verified | High | Standard Ed25519 implementation; signatures verified on every inbound packet (engine_loop `open_inbound`) |
+| Packet authentication (sign/verify) wired into engine loop | **[I]** | Verified | High | `seal_outbound()` signs every outbound packet; `open_inbound()` verifies every inbound. All 4 security modules integrated (identity, channel, trust, audit) |
+| AEAD encryption round-trip (XChaCha20-Poly1305) | **[I]** | Verified | High | `SecureChannel::encrypt/decrypt` with monotonic nonce + replay protection. Two integration tests: auth prefix roundtrip and full encrypt-then-sign |
+| Trust scoring with rate limiting | **[I]** | Verified | High | `TrustSystem` tracks 6 event types, decays over time, enforces rate limit (10 pkts/window per peer) |
+| Audit hash chain with bootstrap proofs | **[I]** | Verified | High | `AuditLog` maintains hash chain, supports checkpoint, produce/verify bootstrap proof |
 | Formal model bounds are mathematically correct | **[T]** | Peer review pending | Medium | 1,760-line model with theorems/lemmas/proofs; not yet externally reviewed |
 
 ---

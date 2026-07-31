@@ -83,6 +83,12 @@ struct GaugeSet {
     trust_score_avg: f64,
     sybil_peers: u64,
     rate_limited_peers: u64,
+    auth_failures: u64,
+    encrypted_packets: u64,
+    peer_capacity_ratio: f64,
+    active_sessions: u64,
+    ephemeral_sessions: u64,
+    max_peers: u64,
 }
 
 impl Default for GaugeSet {
@@ -98,6 +104,12 @@ impl Default for GaugeSet {
             trust_score_avg: 0.0,
             sybil_peers: 0,
             rate_limited_peers: 0,
+            auth_failures: 0,
+            encrypted_packets: 0,
+            peer_capacity_ratio: 0.0,
+            active_sessions: 0,
+            ephemeral_sessions: 0,
+            max_peers: 0,
         }
     }
 }
@@ -162,6 +174,14 @@ pub struct MetricsSnapshot {
     pub trust_score_avg: f64,
     pub sybil_peers: u64,
     pub rate_limited_peers: u64,
+    // ── Security (from EngineStats) ─────────────────────────
+    pub auth_failures: u64,
+    pub encrypted_packets: u64,
+    // ── Capacity (from EngineStats) ─────────────────────────
+    pub peer_capacity_ratio: f64,
+    pub active_sessions: u64,
+    pub ephemeral_sessions: u64,
+    pub max_peers: u64,
     // ── Throughput (delta from previous snapshot) ─────────────
     pub pps_in: f64,
     pub pps_out: f64,
@@ -373,6 +393,36 @@ impl MetricsRegistry {
             g.rate_limited_peers = v;
         }
     }
+    pub fn set_auth_failures(&self, v: u64) {
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.auth_failures = v;
+        }
+    }
+    pub fn set_encrypted_packets(&self, v: u64) {
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.encrypted_packets = v;
+        }
+    }
+    pub fn set_peer_capacity(&self, ratio: f64) {
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.peer_capacity_ratio = ratio;
+        }
+    }
+    pub fn set_active_sessions(&self, v: u64) {
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.active_sessions = v;
+        }
+    }
+    pub fn set_ephemeral_sessions(&self, v: u64) {
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.ephemeral_sessions = v;
+        }
+    }
+    pub fn set_max_peers(&self, v: u64) {
+        if let Ok(mut g) = self.inner.gauges.write() {
+            g.max_peers = v;
+        }
+    }
 
     // ── ML metrics ─────────────────────────────────────────────
 
@@ -463,6 +513,13 @@ impl MetricsRegistry {
                 trust_score_avg: g.trust_score_avg,
                 sybil_peers: g.sybil_peers,
                 rate_limited_peers: g.rate_limited_peers,
+                // Security & capacity (from EngineStats via shared pointer)
+                auth_failures: g.auth_failures,
+                encrypted_packets: g.encrypted_packets,
+                peer_capacity_ratio: g.peer_capacity_ratio,
+                active_sessions: g.active_sessions,
+                ephemeral_sessions: g.ephemeral_sessions,
+                max_peers: g.max_peers,
             })
             .unwrap_or_default();
         let ml = self
@@ -533,6 +590,12 @@ impl MetricsRegistry {
             trust_score_avg: gauges.trust_score_avg,
             sybil_peers: gauges.sybil_peers,
             rate_limited_peers: gauges.rate_limited_peers,
+            auth_failures: gauges.auth_failures,
+            encrypted_packets: gauges.encrypted_packets,
+            peer_capacity_ratio: gauges.peer_capacity_ratio,
+            active_sessions: gauges.active_sessions,
+            ephemeral_sessions: gauges.ephemeral_sessions,
+            max_peers: gauges.max_peers,
             pps_in: (p_recv - prev.packets_recv) as f64 / dt_secs.max(0.001),
             pps_out: (p_sent - prev.packets_sent) as f64 / dt_secs.max(0.001),
             bps_in: (b_recv - prev.bytes_recv) as f64 / dt_secs.max(0.001),
@@ -713,6 +776,12 @@ impl Default for MetricsSnapshot {
             trust_score_avg: 0.0,
             sybil_peers: 0,
             rate_limited_peers: 0,
+            auth_failures: 0,
+            encrypted_packets: 0,
+            peer_capacity_ratio: 0.0,
+            active_sessions: 0,
+            ephemeral_sessions: 0,
+            max_peers: 0,
             pps_in: 0.0,
             pps_out: 0.0,
             bps_in: 0.0,

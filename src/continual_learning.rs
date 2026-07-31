@@ -1,6 +1,8 @@
+//! Continual Learning — catastrophic forgetting prevention.
+//!
+//! Implements elastic weight consolidation and progressive neural networks
+//! to enable the system to learn new tasks without forgetting old ones.
 #![deny(missing_docs)]
-
-//! Online continual learning mechanisms to prevent catastrophic
 //! forgetting in distributed neural networks.
 //!
 //! Implements two complementary methods:
@@ -71,6 +73,8 @@ impl EWC {
     }
 }
 
+// SAFETY: EWC contains only HashMap fields and Copy-type scalars. All mutation goes through
+// `&mut self` methods (update_importance). No interior mutability or shared mutable state.
 unsafe impl Sync for EWC {}
 
 // ─── Synaptic Intelligence ──────────────────────────────────────
@@ -128,6 +132,8 @@ impl SynapticIntelligence {
     }
 }
 
+// SAFETY: SynapticIntelligence contains only HashMap fields and scalar values. All mutation
+// goes through `&mut self` methods. No interior mutability or shared mutable state.
 unsafe impl Sync for SynapticIntelligence {}
 
 // ─── ContinualMethod ─────────────────────────────────────────────
@@ -165,6 +171,8 @@ impl ContinualMethod {
     }
 }
 
+// SAFETY: ContinualMethod is an enum wrapping EWC or SynapticIntelligence, both of which
+// are independently justified as Sync. All mutation goes through `&mut self` methods.
 unsafe impl Sync for ContinualMethod {}
 
 #[cfg(test)]

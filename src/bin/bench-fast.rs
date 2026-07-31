@@ -38,7 +38,7 @@ impl Node {
                 let rnd = seed.wrapping_add((i as u64).wrapping_mul(1442695040888963407));
                 let other = rnd % all_count as u64;
                 if other != self.id {
-                    msgq.push(Message::Ping(self.id, other, tick));
+                    msgq.push(Message::Ping(self.id, other));
                     self.pkts_out += 1;
                     self.bytes_out += 24;
                 }
@@ -54,7 +54,7 @@ impl Node {
             // PING 15 random peers (PONG gives 3 recs each)
             for pi in 0..15.min(count) {
                 let peer = v[(pi * 73 + tick as usize) % count];
-                msgq.push(Message::Ping(self.id, peer, tick));
+                msgq.push(Message::Ping(self.id, peer));
                 self.pkts_out += 1;
                 self.bytes_out += 24;
             }
@@ -66,7 +66,7 @@ impl Node {
                     let mut target = (self.id.wrapping_add(tick as u64).wrapping_mul(6364136223846793005)) % all_count as u64;
                     for _ in 0..200 {
                         if target != self.id && !self.peers.contains(&target) {
-                            msgq.push(Message::FindNode(self.id, ask_peer, target, tick));
+                            msgq.push(Message::FindNode(self.id, ask_peer, target));
                             self.pkts_out += 1;
                             self.bytes_out += 32;
                             break;
@@ -78,11 +78,11 @@ impl Node {
         }
     }
 
-    fn recv(&mut self, msg: &Message, msgq: &mut Vec<Message>, tick: u64, all_count: u32) {
+    fn recv(&mut self, msg: &Message, msgq: &mut Vec<Message>, tick: u64, _all_count: u32) {
         self.pkts_in += 1;
         self.bytes_in += msg.wire_size() as u64;
         match *msg {
-            Message::Ping(from, to, _) if to == self.id => {
+            Message::Ping(from, to) if to == self.id => {
                 self.peers.insert(from);
                 // PONG back with 3 random peer recommendations (offset by tick for variety)
                 let v: Vec<u64> = self.peers.iter().copied().collect();
@@ -91,36 +91,32 @@ impl Node {
                     let idx = ((tick as usize).wrapping_mul(3).wrapping_add(r)) % len.max(1);
                     let rec = v[idx];
                     if rec != self.id {
-                        msgq.push(Message::Pong(self.id, from, rec, tick));
+                        msgq.push(Message::Pong(self.id, from, rec));
                         self.pkts_out += 1;
                         self.bytes_out += 28;
                     }
                 }
             }
-            Message::Pong(from, to, rec, _) if to == self.id => {
+            Message::Pong(from, to, rec) if to == self.id => {
                 self.peers.insert(from);
                 if rec != self.id && rec != 0 {
                     self.peers.insert(rec);
                 }
             }
-            Message::FindNode(from, to, target, _) if to == self.id => {
+            Message::FindNode(from, to, target) if to == self.id => {
                 self.peers.insert(from);
                 if self.peers.contains(&target) || target == self.id {
-                    msgq.push(Message::NodeFound(self.id, from, target, tick));
+                    msgq.push(Message::NodeFound(from, target));
                     self.pkts_out += 1;
                     self.bytes_out += 28;
                 } else if let Some(&closer) = self.peers.iter().next() {
-                    msgq.push(Message::FindNode(from, closer, target, tick));
+                    msgq.push(Message::FindNode(from, closer, target));
                     self.pkts_out += 1;
                     self.bytes_out += 32;
                 }
             }
-            Message::NodeFound(_, to, found, _) if to == self.id => {
+            Message::NodeFound(to, found) if to == self.id => {
                 if found != self.id { self.peers.insert(found); }
-            }
-            Message::Gossip(from, to, ref_node, _) if to == self.id => {
-                self.peers.insert(from);
-                if ref_node != self.id { self.peers.insert(ref_node); }
             }
             _ => {}
         }
@@ -130,11 +126,10 @@ impl Node {
 // ── Message ──
 #[derive(Copy, Clone)]
 enum Message {
-    Ping(u64, u64, u64),          // from, to, tick
-    Pong(u64, u64, u64, u64),     // from, to, rec_peer, tick
-    FindNode(u64, u64, u64, u64), // from, to, target, tick
-    NodeFound(u64, u64, u64, u64),// from, to, found, tick
-    Gossip(u64, u64, u64, u64),   // from, to, ref_peer, tick
+    Ping(u64, u64),          // from, to
+    Pong(u64, u64, u64),     // from, to, rec_peer
+    FindNode(u64, u64, u64), // from, to, target
+    NodeFound(u64, u64),    // to, found
 }
 
 impl Message {
@@ -144,17 +139,15 @@ impl Message {
             Message::Pong(..) => 28,
             Message::FindNode(..) => 32,
             Message::NodeFound(..) => 28,
-            Message::Gossip(..) => 28,
         }
     }
 
     fn to(&self) -> u64 {
         match *self {
-            Message::Ping(_, to, _) => to,
-            Message::Pong(_, to, _, _) => to,
-            Message::FindNode(_, to, _, _) => to,
-            Message::NodeFound(_, to, _, _) => to,
-            Message::Gossip(_, to, _, _) => to,
+            Message::Ping(_, to) => to,
+            Message::Pong(_, to, _) => to,
+            Message::FindNode(_, to, _) => to,
+            Message::NodeFound(to, _) => to,
         }
     }
 }
@@ -223,7 +216,9 @@ unsafe fn ptr_read<T>(v: &[T], i: usize) -> T where T: Copy {
     std::ptr::read(v.as_ptr().add(i))
 }
 
+/// Trial statistics for CSV output.
 #[derive(Clone)]
+#[allow(dead_code)]
 struct TrialStats {
     node_count: u32, trials: u32, converged: bool, conv_rate: f64,
     ct_mean: f64, ct_std: f64, ct_min: f64, ct_max: f64,
@@ -250,11 +245,9 @@ fn main() {
     eprintln!("No periodic peer heartbeats; gossip PEX + FIND_NODE every 500 ticks");
     eprintln!("Max {} sim-ticks per trial\n", MAX_TICKS);
 
-    let mut run = 0u32;
     for &nc in &node_counts {
         eprintln!("─── {}n × {}t ───", nc, trials);
         for t in 0..trials {
-            run += 1;
             let start = Instant::now();
             let stats = run_trial(nc);
             let elapsed = start.elapsed();

@@ -1,0 +1,28 @@
+# ─── Minimal Docker image from a pre-built binary ─────────────────
+# Use this when you build the binary outside Docker (e.g. cross-compile).
+#
+# Usage:
+#   cargo build --release --bin node --target x86_64-unknown-linux-musl
+#   docker build -f Dockerfile.scratch . -t neuron-wire-node
+#   docker run -it --rm ... (same as Dockerfile)
+
+FROM alpine:3.20 AS runtime
+
+RUN apk add --no-cache ca-certificates tzdata wget && \
+    addgroup -S nwp && adduser -S nwp -G nwp
+
+COPY target/x86_64-unknown-linux-musl/release/node /usr/local/bin/nwp-node
+
+RUN mkdir -p /etc/nwp && chown nwp:nwp /etc/nwp
+
+USER nwp
+WORKDIR /etc/nwp
+
+EXPOSE 9000/udp
+EXPOSE 9100/tcp
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
+    CMD wget -qO- http://localhost:9100/health || exit 1
+
+ENTRYPOINT ["nwp-node"]
+CMD ["--config", "./node-config.toml", "--identity", "./identity.key"]

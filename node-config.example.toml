@@ -1,0 +1,83 @@
+# Neuron Wire Protocol — Node Configuration
+#
+# Copy this file to node-config.toml and edit to your needs.
+# Any omitted section or field falls back to the default.
+
+[node]
+# Human-friendly name shown in the startup banner
+name = "nwp-node-1"
+
+# UDP bind address: IP and port for incoming peer connections
+# Use "0.0.0.0:9000" for all interfaces, or a specific IP for security
+bind_addr = "0.0.0.0:9000"
+
+# Path to the Ed25519 identity key file.
+# If unset, falls back to the --identity CLI flag (default: ./identity.key).
+# If the file doesn't exist, a new keypair is generated and saved automatically.
+identity_file = "identity.key"
+
+# Engine tick interval in milliseconds.
+# 1ms = ~1000 ticks/sec. Lower = more responsive, higher = less CPU.
+tick_interval_ms = 1
+
+# Maximum number of tracked peers.
+# When exceeded, new connections get a TOO_MANY_PEERS disconnect.
+# Prevents memory exhaustion from Sybil floods. Set 0 for unlimited.
+# max_peers = 500
+
+[stun]
+# Enable STUN NAT traversal to discover your public IP:port.
+# Recommended for nodes behind residential / office NAT.
+enabled = false
+
+# STUN server address (RFC 5389).
+# Google's public server is the default — low latency, no registration.
+server = "stun.l.google.com:19302"
+
+[dht]
+# Enable Kademlia DHT for peer discovery and routing.
+enabled = true
+
+# Bootstrap peers: hardcoded entry points into the NWP network.
+# Each entry is a "host:port" string (DNS names supported).
+# For a fresh network, leave empty and manually connect the first nodes.
+bootstrap_peers = [
+    # "node1.example.com:9000",
+    # "203.0.113.42:9000",
+]
+
+# DHT listen port override. 0 = same as node.bind_addr port.
+# Only set if the DHT needs a different port than the main socket.
+# listen_port = 0
+
+# Peer cache persistence: save/load the DHT routing table across restarts.
+# Without this, every restart loses all discovered peers and re-bootstraps.
+# peer_cache_path = "/var/lib/nwp/peers.bin"
+
+# Trust score persistence: save/load trust scores across restarts.
+# Without this, Sybil attackers get a fresh start on every restart.
+# trust_cache_path = "/var/lib/nwp/trust.bin"
+
+# DNS seed domain for automatic peer discovery.
+# Resolves _dht.seeds.<domain>:9000 on bootstrap.
+# seed_domain = "neuron-wire.io"
+
+[transport]
+# Exponential decay half-life for gradient weights (milliseconds).
+# Older gradients contribute less to updates. 100ms is a sensible default.
+half_life_ms = 100.0
+
+# Interval between retransmit scans (milliseconds).
+# Reliable packets are retried on each scan until ACKed or maxed out.
+retransmit_interval_ms = 10
+
+[security]
+# Sign every outbound packet with the node's Ed25519 key.
+# When on, inbound packets with missing or invalid signatures are dropped.
+# STRONGLY RECOMMENDED for production.
+sign_packets = true
+
+# Encrypt packet payloads with XChaCha20-Poly1305.
+# Requires an established session key (via first handshake).
+# Off by default because it adds CPU overhead per packet.
+encrypt_payloads = false

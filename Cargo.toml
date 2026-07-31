@@ -24,14 +24,19 @@ toml = "0.7"
 csv = "1"
 
 # ── Security / Crypto ─────────────────────────────────
-ed25519-dalek = { version = "2", features = ["pem", "rand_core"] }
+ed25519-dalek = { version = "2", features = ["pem", "rand_core", "zeroize"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
 rand_core = "0.6"
 blake2 = "0.10"
 chacha20poly1305 = "0.10"
-zeroize = { version = "1", features = ["zeroize_derive"] }
+zeroize = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
+
+# ── Platform / Signal Handling ──────────────────────────
+[target.'cfg(unix)'.dependencies]
+ctrlc = "3"
 
 [lib]
 name = "neuron_wire"
@@ -47,6 +52,16 @@ required-features = ["bench"]
 
 [[bench]]
 name = "bench_ml"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "bench_security"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "protocol_bench"
 harness = false
 required-features = ["bench"]
 

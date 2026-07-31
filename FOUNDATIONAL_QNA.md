@@ -270,7 +270,7 @@
 
 **Can nodes leave dynamically?** Yes — leaving nodes are detected via stale timeout (600 s) or failed ping threshold (3 misses) and removed from routing tables.
 
-**Can malicious nodes attack it?** Yes — there is no authentication, encryption, Sybil resistance, rate limiting, or replay protection in the current prototype.
+**Can malicious nodes attack it?** Yes — the current v0.3.0 prototype adds Ed25519 packet authentication, trust-based rate limiting, and optional AEAD encryption, but lacks formal Sybil resistance, BFT consensus, and DoS amplification protection.
 
 **Can it run on Raspberry Pi?** In theory — the single-threaded engine targets 512 MB RAM and compiles to ARM — but this has not been tested.
 
@@ -310,25 +310,25 @@
 
 ## 11. Security
 
-**Does it encrypt traffic?** No — the wire format has no transport-layer security, and all messages are sent in plaintext.
+**Does it encrypt traffic?** Not by default — `encrypt_payloads=false` in the standard config. When enabled, each packet is encrypted with XChaCha20-Poly1305 AEAD (session key via simplified Noise-like handshake).
 
-**How are identities verified?** Each node has an Ed25519 key pair, but signatures are not verified on incoming messages in the current prototype.
+**How are identities verified?** Every packet carries a 32-byte Ed25519 public key + 64-byte signature in its auth prefix; the receiver verifies the signature against the public key before processing the body.
 
-**How are nodes authenticated?** They are not — any process can generate a NodeId and join the network without proof of identity.
+**How are nodes authenticated?** Every node is identified by its Ed25519 public key; the identity subsystem (identity.rs) generates keypairs and signs every outbound packet. There is no certificate authority or PKI — identities are self-signed.
 
-**Can Sybil attacks happen?** Yes — a single attacker can generate arbitrarily many NodeIds and dominate the routing table with no computational cost.
+**Can Sybil attacks happen?** Partially mitigated — each peer is scored by a trust system (initial 0.5, boosted by valid signatures, decayed for failures). Peers below SYBIL_THRESHOLD (0.2) are rate-limited to 10 packets/s. However, an attacker with many IP addresses can still generate many Ed25519 keypairs at low cost.
 
-**Can Eclipse attacks happen?** Yes — an attacker controlling enough NodeIds can surround a target node and isolate it from honest peers.
+**Can Eclipse attacks happen?** Yes — an attacker controlling enough NodeIds can surround a target node and isolate it from honest peers. Each node is identified by its Ed25519 public key, mitigating keyless NodeId spoofing.
 
-**Can replay attacks happen?** Yes — captured packets can be replayed because there is no sequence number verification or nonce tracking.
+**Can replay attacks happen?** Encrypted sessions use monotonic nonce counters verified against a ring buffer; signed-only packets use transport sequence numbers without strict verification.
 
-**Can packets be forged?** Yes — there is no message authentication code (MAC) or digital signature verification on received messages.
+**Can packets be forged?** No — every packet carries a 96-byte auth prefix (32B public key + 64B Ed25519 signature) verified on receipt. A forger cannot produce a valid signature without the sender's private key.
 
-**What trust model is used?** Simple reputation scoring (trust.rs) where nodes accumulate positive or negative interactions, but the scores are not yet used for routing decisions.
+**What trust model is used?** Reputation scoring (trust.rs) with 6 event types, configurable decay, and per-peer rate limiting at 10 packets/window for untrusted peers.
 
-**How is integrity verified?** A CRC32 checksum on each NWP frame detects accidental corruption but not malicious tampering.
+**How is integrity verified?** Every packet carries an Ed25519 signature over its body, providing cryptographic integrity. A CRC32 checksum on each NWP frame provides an additional accidental-corruption check.
 
-**How is replay prevented?** It is not — sequence numbers exist in the transport header but are not verified for freshness or monotonic ordering.
+**How is replay prevented?** Encrypted packets use monotonic nonce counters verified against a 1024-entry ring buffer; replayed nonces are rejected. Signed-only (unencrypted) packets fall back to transport header sequence numbers without strict replay verification.
 
 ---
 

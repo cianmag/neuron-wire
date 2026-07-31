@@ -1,6 +1,9 @@
+//! Meta-Learning — learning to learn.
+//!
+//! Implements MAML-inspired gradient-based meta-learning to quickly
+//! adapt to new tasks with minimal data. Optimizes the learning rate
+//! and initialization parameters.
 #![deny(missing_docs)]
-
-//! Meta-learning module — learned optimizers and hypernetworks.
 //!
 //! Provides [`LearnedOptimizer`] for per-synapse learning rates, [`HyperNet`]
 //! for dynamic weight generation, and the [`MetaMethod`] enum unifying both
@@ -222,6 +225,9 @@ impl HyperNet {
     }
 }
 
+// SAFETY: HyperNet contains only a Vec<f32> params and scalar config values. All mutation
+// goes through `&mut self` in forward() (which only reads params) and construction methods.
+// No interior mutability or shared mutable state exists.
 unsafe impl Sync for HyperNet {}
 
 // ─── MetaMethod ─────────────────────────────────────────────────
@@ -287,6 +293,8 @@ impl Default for MetaMethod {
     }
 }
 
+// SAFETY: MetaMethod is an enum wrapping HyperNet or LearnedOptimizer, both of which are
+// independently justified as Sync. All mutation goes through `&mut self` methods.
 unsafe impl Sync for MetaMethod {}
 
 // ─── Tests ──────────────────────────────────────────────────────

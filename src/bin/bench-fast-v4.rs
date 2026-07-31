@@ -67,7 +67,7 @@ impl Node {
         }
     }
 
-    fn bootstrap(&self, total_nodes: u64, tick_seed: u64, active: u32, buf: &mut Vec<Msg>) {
+    fn bootstrap(&self, total_nodes: u64, _tick_seed: u64, active: u32, buf: &mut Vec<Msg>) {
         let seed = (self.id as u64).wrapping_mul(6364136223846793005);
         // Half to active range (ensures we hit real nodes), half to full range
         let is_hybrid = total_nodes > active as u64;
@@ -130,7 +130,6 @@ fn run_trial(total_nodes: u64) -> TrialStats {
 
     let mut out: Vec<Msg> = Vec::with_capacity(500_000);
     let mut converged_at: Option<u64> = None;
-    let mut stabilized = false;
 
     let start = Instant::now();
     let mut last_report = 0u64;
@@ -264,7 +263,6 @@ fn run_trial(total_nodes: u64) -> TrialStats {
 
         if let Some(ct) = converged_at {
             if tick - ct > 2000 {
-                stabilized = true;
                 break;
             }
         }
@@ -316,6 +314,7 @@ fn run_trial(total_nodes: u64) -> TrialStats {
 
 #[derive(Clone)]
 struct TrialStats {
+    #[allow(dead_code)]
     node_count: u32,
     converged: bool,
     conv_rate: f64,
