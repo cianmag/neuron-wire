@@ -360,7 +360,18 @@ impl SecureChannel {
             aad: associated_data,
         };
 
-        cipher.decrypt(xnonce, payload).ok()
+        let decrypted = cipher.decrypt(xnonce, payload);
+        if decrypted.is_err() {
+            eprintln!(
+                "[DBG] AEAD decrypt failed: {:?} (session_id={:02x}{:02x}{:02x}{:02x}..)",
+                decrypted.as_ref().err().unwrap(),
+                session_id[0],
+                session_id[1],
+                session_id[2],
+                session_id[3]
+            );
+        }
+        decrypted.ok()
     }
 
     /// Get the number of active sessions.

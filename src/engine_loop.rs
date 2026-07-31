@@ -1450,8 +1450,11 @@ mod tests {
 
     #[test]
     fn test_peer_rtt_eviction() {
-        // Create engine with default config (cleanup_interval_ticks=1000)
-        let cfg = EngineConfig::default();
+        // Create engine with an ephemeral port (parallel tests share 0.0.0.0:9000)
+        let cfg = EngineConfig {
+            bind_addr: "127.0.0.1:0".to_string(),
+            ..Default::default()
+        };
         let (mut engine, _tx, _rx) = EngineLoop::new(cfg).unwrap();
 
         // Use a synthetic clock so we can represent peers older than the
