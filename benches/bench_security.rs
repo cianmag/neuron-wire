@@ -16,7 +16,7 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion
 
 fn bench_ed25519_sign(c: &mut Criterion) {
     use neuron_wire::identity::NodeIdentity;
-    let identity = NodeIdentity::generate();
+    let identity = NodeIdentity::new();
     let message = vec![0x42u8; 256]; // typical gradient payload
     c.bench_function("ed25519_sign_256B", |b| {
         b.iter(|| black_box(identity.sign(black_box(&message))))
@@ -25,7 +25,7 @@ fn bench_ed25519_sign(c: &mut Criterion) {
 
 fn bench_ed25519_verify(c: &mut Criterion) {
     use neuron_wire::identity::{entity_id_from_public_key, verify_signature, NodeIdentity};
-    let identity = NodeIdentity::generate();
+    let identity = NodeIdentity::new();
     let message = vec![0x42u8; 256];
     let signature = identity.sign(&message);
     let sig_bytes = signature.to_bytes();
@@ -43,7 +43,7 @@ fn bench_ed25519_verify(c: &mut Criterion) {
 
 fn bench_ed25519_sign_sizes(c: &mut Criterion) {
     use neuron_wire::identity::NodeIdentity;
-    let identity = NodeIdentity::generate();
+    let identity = NodeIdentity::new();
     for &size in &[64usize, 256, 1024, 4096] {
         let message = vec![0x42u8; size];
         c.bench_function(format!("ed25519_sign_{}B", size), |b| {
@@ -57,7 +57,7 @@ fn bench_ed25519_sign_sizes(c: &mut Criterion) {
 fn bench_xchacha20_encrypt(c: &mut Criterion) {
     use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
     use rand::RngCore;
-    let key = chacha20poly1305::Key::<XChaCha20Poly1305>::generate(&mut rand::thread_rng());
+    let key = SecureChannel::generate_key();
     let cipher = XChaCha20Poly1305::new(&key);
     let mut nonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
@@ -71,7 +71,7 @@ fn bench_xchacha20_encrypt(c: &mut Criterion) {
 fn bench_xchacha20_decrypt(c: &mut Criterion) {
     use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
     use rand::RngCore;
-    let key = chacha20poly1305::Key::<XChaCha20Poly1305>::generate(&mut rand::thread_rng());
+    let key = SecureChannel::generate_key();
     let cipher = XChaCha20Poly1305::new(&key);
     let mut nonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
@@ -86,7 +86,7 @@ fn bench_xchacha20_decrypt(c: &mut Criterion) {
 fn bench_xchacha20_sizes(c: &mut Criterion) {
     use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
     use rand::RngCore;
-    let key = chacha20poly1305::Key::<XChaCha20Poly1305>::generate(&mut rand::thread_rng());
+    let key = SecureChannel::generate_key();
     let cipher = XChaCha20Poly1305::new(&key);
     let mut nonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
@@ -149,8 +149,8 @@ fn bench_sha256(c: &mut Criterion) {
 fn bench_secure_channel_handshake(c: &mut Criterion) {
     use neuron_wire::identity::NodeIdentity;
     use neuron_wire::secure_channel::SecureChannel;
-    let alice_identity = NodeIdentity::generate();
-    let bob_identity = NodeIdentity::generate();
+    let alice_identity = NodeIdentity::new();
+    let bob_identity = NodeIdentity::new();
     c.bench_function("secure_channel_handshake", |b| {
         b.iter_batched(
             || {
@@ -173,8 +173,8 @@ fn bench_secure_channel_handshake(c: &mut Criterion) {
 fn bench_secure_channel_encrypt(c: &mut Criterion) {
     use neuron_wire::identity::NodeIdentity;
     use neuron_wire::secure_channel::SecureChannel;
-    let alice_identity = NodeIdentity::generate();
-    let bob_identity = NodeIdentity::generate();
+    let alice_identity = NodeIdentity::new();
+    let bob_identity = NodeIdentity::new();
     let mut alice = SecureChannel::new();
     let mut bob = SecureChannel::new();
     let alice_pub = alice_identity.public_key_bytes();
@@ -196,8 +196,8 @@ fn bench_secure_channel_encrypt(c: &mut Criterion) {
 fn bench_secure_channel_decrypt(c: &mut Criterion) {
     use neuron_wire::identity::NodeIdentity;
     use neuron_wire::secure_channel::SecureChannel;
-    let alice_identity = NodeIdentity::generate();
-    let bob_identity = NodeIdentity::generate();
+    let alice_identity = NodeIdentity::new();
+    let bob_identity = NodeIdentity::new();
     let mut alice = SecureChannel::new();
     let mut bob = SecureChannel::new();
     let alice_pub = alice_identity.public_key_bytes();
