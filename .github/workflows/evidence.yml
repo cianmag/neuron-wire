@@ -21,10 +21,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Deterministic simulation matrix (quick profile)
-        run: ./evidence/run_matrix.sh results/evidence quick
+        run: bash ./evidence/run_matrix.sh results/evidence quick
 
       - name: Local multi-process cluster (5 nodes, 15s)
-        run: ./evidence/localhost_cluster.sh 5 15
+        run: bash ./evidence/localhost_cluster.sh 5 15
 
       - name: Archive evidence
         uses: actions/upload-artifact@v4

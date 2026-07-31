@@ -25,12 +25,14 @@ RUN apk add --no-cache musl-dev
 # Create empty project for dependency caching
 WORKDIR /build
 COPY Cargo.toml Cargo.lock* ./
+COPY demo/Cargo.toml demo/
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release --bin node 2>/dev/null || true
 RUN rm -rf src
 
 # Real source
 COPY src ./src
+COPY demo ./demo
 
 # Touch main.rs to force rebuild of the binary (cached deps stay fresh)
 RUN touch src/bin/node.rs && \

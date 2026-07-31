@@ -2,7 +2,19 @@
 
 **Infrastructure layer for decentralized AI** — peer discovery, gradient exchange, and distributed learning over P2P networks without centralized coordination.
 
+> ## Status: Validated Research Prototype
+>
+> **Validated through:** deterministic simulation · local multi-process networking ·
+> property-based and fuzz testing · network impairment emulation · reproducible benchmarks
+>
+> **Not yet completed:** geographically distributed deployment · external security audit ·
+> independent replication
+>
+> **Funding purpose:** build and evaluate the first real distributed test network
+> (see [docs/EVIDENCE_REPORT.md](docs/EVIDENCE_REPORT.md) and [docs/GRANT_SUMMARY.md](docs/GRANT_SUMMARY.md))
+
 [![CI](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml)
+[![Evidence](https://github.com/cianmag/neuron-wire/actions/workflows/evidence.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/evidence.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 [![Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)

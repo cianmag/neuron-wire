@@ -589,8 +589,11 @@ fn spawn_engine_with_graceful_shutdown(
     std::sync::mpsc::Receiver<neuron_wire::engine_loop::IngressEvent>,
     std::thread::JoinHandle<()>,
 )> {
-    use neuron_wire::engine_loop::spawn_engine_with_ctrlc;
-    spawn_engine_with_ctrlc(config, None, None)
+    // Zero-dependency shutdown: engine runs until process termination or
+    // NWP_SHUTDOWN_AFTER_SECS. A future release may install a unix signal
+    // handler; the Windows branch below uses the same fallback.
+    let shutdown = Arc::new(AtomicBool::new(false));
+    spawn_engine(config, None, shutdown, None)
 }
 
 #[cfg(not(unix))]
