@@ -34,20 +34,22 @@ One Rust protocol combining every layer: latency-weighted Kademlia DHT discovery
 
 **Honest boundary:** validated via deterministic simulation, local multi-process tests, property/fuzz testing, and reproducible benchmarks. **Not yet:** geographically distributed deployment, external security audit, independent replication.
 
-## Experimental results (planned)
-Protocols will be timestamped and committed before each run; results land at the named placeholders.
+## Experimental results
+Every run is deterministic (fixed seeds 42/1337/9001, `--paper-mode`), runs on CI per push,
+and archives raw CSVs. Live table: `docs/EVIDENCE_REPORT.md` + `results/evidence/`.
 
-| ID | Planned experiment | Result |
+| ID | Experiment | Status |
 |---|---|---|
-| E1 | 100-node DHT convergence (paper-mode) | ⟨E1⟩ |
-| E2 | 100k-node convergence scaling sweep | ⟨E2⟩ |
-| E3 | Failure injection: node death, partition, malicious peers | ⟨E3⟩ |
-| E4 | Churn recovery under continuous join/leave | ⟨E4⟩ |
-| E5 | Local 25-process real-UDP test | ⟨E5⟩ |
-| E6 | Network-emulated WAN benchmark (loss, jitter, latency) | ⟨E6⟩ |
-| E7 | 20-node, 3-region distributed pilot | ⟨E7⟩ |
-| E8 | Security: Sybil, replay, eclipse resistance | ⟨E8⟩ |
-| E9 | Learning convergence vs FedAvg / decentralized-SGD baselines | ⟨E9⟩ |
+| E1 | Convergence scaling: 10/25/50/100/500 nodes × 3 seeds | ✅ pipeline live — post-fix numbers regenerating on CI |
+| E2 | Node churn (10/20/50% death at t=30s, recovery) | ✅ pipeline live |
+| E4 | Deterministic packet loss (2/5/10%, seeded in-sim) | ✅ pipeline live |
+| E5 | Malicious peer injection (trust response) | ✅ pipeline live |
+| E6 | Network partition + recovery | ✅ pipeline live |
+| E9 | Baseline ablations: no-trust / no-aging / no-apoptosis / no-neurogenesis / random-discovery / static-topology vs control | ✅ pipeline live |
+| — | Local multi-process: 2/5/10/25 real UDP processes | ✅ pipeline live |
+| — | Network emulation: normal/mobile/weak/severe (netem) + partition + attack | ✅ pipeline live |
+| M5 | 20-node, 3-region distributed pilot | funded phase |
+| M7 | Security: Sybil, replay, eclipse — external review | funded phase |
 
 ## Funding request — $20,000
 Funding will convert a validated simulation and local prototype into a **geographically distributed research testbed**: a 20-node, 3-region pilot with network-emulated and real-Internet measurements, an external security review, and a public dataset with a research preprint. The request covers infrastructure, hardware, external review, and publication — **not salaries**. Full breakdown in GRANT_BUDGET.md.

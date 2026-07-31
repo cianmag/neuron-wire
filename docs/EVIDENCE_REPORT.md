@@ -62,15 +62,36 @@ All experiments use fixed seeds (`42`, `1337`, `9001`) via `--paper-mode`.
 
 | Nodes | Seed | Converged | Convergence time (s) | Avg peers | Bandwidth (kbps) |
 |-------|------|-----------|----------------------|-----------|------------------|
-| 10    | 42   | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
-| 25    | 42   | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
-| 50    | 42   | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
-| 100   | 42   | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
-| 500   | 42   | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
-| 100   | 1337 | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
-| 100   | 9001 | ⟨⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
+| 10    | 42   | ✅ | 1.0 | 8.85/9 | 733 |
+| 10    | 1337 | ✅ | 1.0 | 8.85/9 | 713 |
+| 10    | 9001 | ✅ | 1.0 | 8.85/9 | 819 |
+| 50    | 42   | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
+| 100   | 42   | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
+| 100   | 1337 | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
+| 100   | 9001 | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
+| 500   | 42   | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ | ⟨⟩ |
 
 Raw data: `results/evidence/E1_*/summary.csv` (committed with each run)
+
+### ⚠️ E1 Pre-fix finding (2026-07-31, commit 481e371 → fixed in a9c909d)
+
+The first E1 run produced a **genuine negative result**: 10-node networks converged
+(100%, ~1.0 s), but 50- and 100-node networks did **not** converge, with `avg_peers`
+stuck at ≈ 9.97–9.99 regardless of scale:
+
+| Nodes | Avg peers observed | Expected peers | Convergence |
+|-------|-------------------|----------------|-------------|
+| 10    | 8.85 / 9          | 9              | ✅ 1.0 s   |
+| 50    | 9.99 / 49         | 49             | ❌         |
+| 100   | 9.97 / 99         | 99             | ❌         |
+
+**Root cause:** the WAN per-IP DoS guard (`per_ip_max_peers = 10`) — correct when
+each peer has a distinct public IP — throttles *localhost* simulation, where every
+node shares `127.0.0.1`, to the first 10 peers per node. **Fix (a9c909d):** the
+simulator now sets `per_ip_max_peers = max_peers`, modeling distinct-IP WAN nodes.
+This is a documented, reproducible artifact of the validation harness — exactly the
+kind of issue the evidence pipeline exists to catch. Post-fix E1 results are
+reported above as they are regenerated on CI (see §12).
 
 ### E2 — Node churn (100 nodes, death at t=30s)
 
@@ -109,23 +130,46 @@ Logs: `results/localhost_cluster_*/` (node-N.log, health checks, metrics samples
 
 ## 6. Network Emulation Results
 
+Method: `tc netem` on loopback (Linux, root) driving the local multi-process
+cluster of real NWP processes. Each scenario runs the cluster under the
+impairment and records node health + logs.
+
 | Scenario | Latency | Loss | Nodes | Result |
 |----------|---------|------|-------|--------|
-| Normal   | 20 ms   | 0%   | ⟨N⟩   | ⟨⟩ |
-| Mobile   | 80 ms   | 2%   | ⟨N⟩   | ⟨⟩ |
-| Weak     | 150 ms  | 5%   | ⟨N⟩   | ⟨⟩ |
-| Severe   | 300 ms  | 10%  | ⟨N⟩   | ⟨⟩ |
+| Normal   | 20 ms   | 0%   | 4 | ⟨CI⟩ |
+| Mobile   | 80 ms   | 2%   | 4 | ⟨CI⟩ |
+| Weak     | 150 ms  | 5%   | 4 | ⟨CI⟩ |
+| Severe   | 300 ms  | 10%  | 4 | ⟨CI⟩ |
+| Partition | split 30 s (iptables) | — | 4 | ⟨CI⟩ |
+| Attack    | peer flood 15 s | — | 4 | ⟨CI⟩ |
 
-Method: `tc netem` on loopback (Linux, root) driving the local multi-process cluster.
+Artifacts: `results/emulated_4/<scenario>.log` + node logs (CI artifact).
 
-## 7. Baselines (planned)
+## 7. Baselines (E9 ablation suite — implemented, results regenerating)
 
-To be reported after E1–E9: comparison vs random peer discovery, plain Kademlia,
-Kademlia without latency weighting, gossip without gradient aging, static topology,
-no trust scoring, no apoptosis, no neurogenesis. Metrics: convergence time, bytes
-transmitted, message count, retransmissions, CPU, memory, learning accuracy,
-recovery time, performance under churn. (Baseline harness requires simulator
-feature toggles — tracked as funded-phase task M4.)
+Implemented in commit 481e371 as simulator feature toggles, so every ablation is
+deterministic and reproducible:
+
+| Toggle | Flag | What it removes |
+|--------|------|-----------------|
+| Control | (default) | Full NWP stack |
+| No trust | `--disable-trust` | Trust scoring + rate limiting |
+| No aging | `--disable-aging` | Gradient half-life decay |
+| No apoptosis | `--disable-apoptosis` | Apoptosis sweep |
+| No neurogenesis | `--disable-neurogenesis` | Neuron birth |
+| Random discovery | `--random-discovery` | XOR-closest FIND_NODE → random peers |
+| Static topology | `--static-topology` | All DHT maintenance beyond initial peers |
+
+Metrics per ablation: convergence time, avg peers, bytes transmitted, packet count,
+bandwidth, apoptosis deaths. Full table: `results/evidence/E9_*/summary.csv`.
+
+### E4 — Deterministic packet loss (in-sim, seeded xorshift)
+
+| Loss rate | Nodes | Converged | Avg peers | Bandwidth (kbps) |
+|-----------|-------|-----------|-----------|------------------|
+| 2%  | 100 | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ |
+| 5%  | 100 | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ |
+| 10% | 100 | ⟨post-fix⟩ | ⟨⟩ | ⟨⟩ |
 
 ## 8. Reproducibility Instructions
 
@@ -133,14 +177,17 @@ feature toggles — tracked as funded-phase task M4.)
 git clone https://github.com/cianmag/neuron-wire
 cd neuron-wire
 
-# Deterministic simulation matrix (E1, E2, E5, E6)
-./evidence/run_matrix.sh            # → results/evidence/
+# Deterministic simulation matrix — full profile (E1, E2, E4, E5, E6, E9)
+./evidence/run_matrix.sh            # → results/evidence/  (quick: run_matrix.sh results/evidence quick)
 
 # Local multi-process cluster (2/5/10/25 real nodes)
 ./evidence/localhost_cluster.sh 5 30
 
-# Network emulation (Linux, root)
-sudo ./evidence/emulate_network.sh 5 45
+# Network emulation (Linux, root) — normal/mobile/weak/severe/partition/attack
+sudo ./evidence/emulate_network.sh 4 30
+
+# A single ablation, e.g. random peer discovery
+cargo run --release --example simulate -- --nodes 50 --duration 60 --seed 42 --paper-mode --random-discovery
 ```
 
 Expected output:
@@ -204,4 +251,4 @@ results/
 
 ---
 
-*This report is updated on every evidence-producing run. Last updated: ⟨date⟩ at commit ⟨commit⟩.*
+*This report is updated on every evidence-producing run. Last updated: 2026-07-31 (Week 2 pipeline live; post-fix numbers regenerate on CI) at commit a9c909d.*
