@@ -29,7 +29,8 @@ echo "════════════════════════�
 # Run one experiment: log stderr to a file, print a readable result line,
 # and never abort the matrix on a single failure (failures are recorded).
 run_exp() {
-  local NAME="$1" LOG="$OUT/$NAME.log"
+  local NAME="$1"
+  local LOG="$OUT/$NAME.log"
   shift
   # shellcheck disable=SC2086
   if $CARGO run --release --example simulate -- "$@" >"$LOG" 2>&1; then
