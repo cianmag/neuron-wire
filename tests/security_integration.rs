@@ -184,7 +184,7 @@ mod tests {
         let frame = neuron_wire::header::build_frame(5, body, 0);
 
         // ─── Seal: sign the body ─────────────────────────────────
-        let (header, payload) = neuron_wire::header::parse_frame(&frame).unwrap();
+        let (header, payload) = neuron_wire::header::parse_frame(&frame[4..]).unwrap();
         let signature = alice.sign(payload);
         let sig_bytes = signature.to_bytes();
 
@@ -376,7 +376,7 @@ mod tests {
         // Build, sign, encrypt
         let body = b"encrypted gradient data".to_vec();
         let frame = neuron_wire::header::build_frame(5, body, 0);
-        let (header, payload) = neuron_wire::header::parse_frame(&frame).unwrap();
+        let (header, payload) = neuron_wire::header::parse_frame(&frame[4..]).unwrap();
 
         // Step 1: Sign
         let signature = alice.sign(payload);
