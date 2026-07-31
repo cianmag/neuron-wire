@@ -212,7 +212,7 @@ impl core::fmt::Display for HeaderError {
 ///
 /// // Simple frame with no flags
 /// let body = b"gradient update".to_vec();
-/// let frame = header::build_frame(20, body, 0);
+/// let frame = header::build_frame(20, body.clone(), 0);
 /// assert!(frame.len() > 20); // 4 + 16 header + 15 body
 ///
 /// // Parse it back
