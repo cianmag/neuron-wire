@@ -15,7 +15,7 @@ gradient_half_life_ms = 100
 maintenance_mode = "fixed"
 
 [failure]
-mode = "malicious"
+mode = "MaliciousNode"
 trigger_at_sec = 10
 percent = 0.2
 
