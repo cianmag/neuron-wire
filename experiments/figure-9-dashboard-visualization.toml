@@ -1,17 +1,16 @@
-[experiment]
-name = "figure-9-dashboard-screenshot"
-description = "Benchmark for live dashboard visualization (Figure 9)"
-paper_mode = false
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-9-dashboard-visualization.toml --output-dir results/figure-9-dashboard-visualization
+
+description = "figure-9-dashboard-visualization"
+node_count = 25
+duration_secs = 45
 seed = 42
-trials = 1
+paper_mode = true
+bind_prefix = "127.0.0.1"
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "fixed"
 
-[simulation]
-node_count = 5
-duration_secs = 25
-stale_ping_secs = 10
-tick_interval_us = 1000
-
-[output]
-directory = "results/figure-9"
-include_raw_logs = false
-snapshot_interval_ticks = 50

@@ -43,7 +43,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, UdpSocket};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -140,6 +140,41 @@ pub struct SimulationConfig {
     /// Maintenance mode: "fixed" (default) or "sparse-aging"
     #[serde(default)]
     pub maintenance_mode: String,
+    /// Peer capacity per node (simulation models distinct-IP WAN nodes).
+    #[serde(default = "default_max_peers")]
+    pub max_peers: usize,
+    /// Deterministic in-sim packet loss rate in [0,1] (E4; default 0.0).
+    #[serde(default)]
+    pub packet_loss_rate: f32,
+    /// Churn rate in [0,1] — fraction of nodes that die mid-run (E7; default 0.0).
+    #[serde(default)]
+    pub churn_rate: f64,
+    /// Baseline: disable trust scoring & rate limiting (E9; default true).
+    #[serde(default = "default_true")]
+    pub trust_enabled: bool,
+    /// Baseline: disable gradient aging (E9; default true).
+    #[serde(default = "default_true")]
+    pub aging_enabled: bool,
+    /// Baseline: disable apoptosis (E9; default true).
+    #[serde(default = "default_true")]
+    pub apoptosis_enabled: bool,
+    /// Baseline: disable neurogenesis (E9; default true).
+    #[serde(default = "default_true")]
+    pub neurogenesis_enabled: bool,
+    /// Baseline: random peer discovery (E9; default false).
+    #[serde(default)]
+    pub random_discovery: bool,
+    /// Baseline: static topology, no DHT maintenance (E9; default false).
+    #[serde(default)]
+    pub static_topology: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_max_peers() -> usize {
+    500
 }
 
 impl Default for SimulationConfig {
@@ -160,6 +195,15 @@ impl Default for SimulationConfig {
             adversary: AdversaryConfig::default(),
             trace_path: String::new(),
             maintenance_mode: "fixed".to_string(),
+            packet_loss_rate: 0.0,
+            churn_rate: 0.0,
+            max_peers: 500,
+            trust_enabled: true,
+            aging_enabled: true,
+            apoptosis_enabled: true,
+            neurogenesis_enabled: true,
+            random_discovery: false,
+            static_topology: false,
         }
     }
 }
@@ -602,19 +646,55 @@ impl Simulator {
         }
     }
 
-    /// Find a free TCP port for binding.
+    /// Find a free UDP port for binding.
+    /// NOTE: probes with a UDP socket (TCP availability != UDP availability —
+    /// the engine binds UDP, and a TCP probe can report free while the UDP
+    /// port is held by another process).
     fn find_free_port(&self, offset: u16) -> u16 {
         let base: u16 = 42000 + offset;
-        for port in base..(base + 200) {
-            if TcpListener::bind(format!("{}:{}", self.config.bind_prefix, port)).is_ok() {
+        for port in base..(base + 500) {
+            if UdpSocket::bind(format!("{}:{}", self.config.bind_prefix, port)).is_ok() {
                 return port;
             }
         }
         42000 + offset // fallback — will collide but let the OS handle it
     }
 
-    /// Launch all simulated nodes.
+    /// Stop and join all spawned engine threads (used when a launch attempt
+    /// partially fails so retries start from a clean slate).
+    fn teardown_nodes(&mut self) {
+        for mut node in self.nodes.drain(..) {
+            node.shutdown.store(true, Ordering::SeqCst);
+            if let Some(handle) = node.handle.take() {
+                let _ = handle.join();
+            }
+        }
+        self.node_addrs.clear();
+    }
+
+    /// Launch all simulated nodes, retrying if a transient port collision
+    /// occurs (the probe-then-spawn window is racy under parallel load).
     pub fn launch(&mut self) -> Result<(), String> {
+        let mut attempts = 0;
+        loop {
+            match self.try_launch() {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    attempts += 1;
+                    if attempts >= 5 {
+                        return Err(format!("launch failed after 5 attempts: {}", e));
+                    }
+                    eprintln!(
+                        "[SIM] launch attempt {} failed ({}); tearing down and retrying",
+                        attempts, e
+                    );
+                    self.teardown_nodes();
+                }
+            }
+        }
+    }
+
+    fn try_launch(&mut self) -> Result<(), String> {
         let node_count = self.config.node_count;
         self.nodes.reserve(node_count as usize);
 
@@ -663,6 +743,28 @@ impl Simulator {
                     None
                 },
                 identity_seed: None,
+                security_enabled: true,
+                encrypt_payloads: false,
+                stun_enabled: false,
+                stun_server: "stun.l.google.com:19302".to_string(),
+                heartbeat_interval_ticks: 30_000,
+                max_peers: self.config.max_peers,
+                // IMPORTANT: every simulated node binds 127.0.0.1, so the WAN
+                // per-IP DoS guard (default 10) would throttle each node to
+                // ~10 peers and break convergence at scale. Lifting the guard
+                // models the WAN case where each node has a distinct public IP.
+                per_ip_max_peers: 500,
+                peer_cache_path: None,
+                trust_cache_path: None,
+                seed_domain: String::new(),
+                trust_enabled: self.config.trust_enabled,
+                aging_enabled: self.config.aging_enabled,
+                apoptosis_enabled: self.config.apoptosis_enabled,
+                neurogenesis_enabled: self.config.neurogenesis_enabled,
+                random_discovery: self.config.random_discovery,
+                static_topology: self.config.static_topology,
+                packet_loss_rate: self.config.packet_loss_rate,
+                sim_seed: self.config.seed,
             };
 
             // Create shared packet filter for partition injection
@@ -1359,6 +1461,33 @@ pub fn parse_args() -> Result<SimulationConfig, String> {
                     .parse()
                     .map_err(|_| "invalid --adversary-node index")?;
             }
+            "--packet-loss" => {
+                i += 1;
+                let loss: f32 = args
+                    .get(i)
+                    .ok_or("--packet-loss requires a value in [0,1]")?
+                    .parse()
+                    .map_err(|_| "invalid --packet-loss value")?;
+                config.packet_loss_rate = loss.clamp(0.0, 0.9);
+            }
+            "--churn-rate" => {
+                i += 1;
+                let rate: f64 = args
+                    .get(i)
+                    .ok_or("--churn-rate requires a value in [0,1]")?
+                    .parse()
+                    .map_err(|_| "invalid --churn-rate value")?;
+                config.churn_rate = rate.clamp(0.0, 0.9);
+                // Churn = node death without recovery within the run window.
+                config.failure.mode = FailureMode::NodeDeath;
+                config.failure.percent = config.churn_rate;
+            }
+            "--disable-trust" => config.trust_enabled = false,
+            "--disable-aging" => config.aging_enabled = false,
+            "--disable-apoptosis" => config.apoptosis_enabled = false,
+            "--disable-neurogenesis" => config.neurogenesis_enabled = false,
+            "--random-discovery" => config.random_discovery = true,
+            "--static-topology" => config.static_topology = true,
             "--config" => {
                 i += 1;
                 let path = args.get(i).ok_or("--config requires a path")?;
@@ -1452,10 +1581,12 @@ mod tests {
 
     #[test]
     fn test_failure_config_toml() {
-        let mut fc = FailureConfig::default();
-        fc.mode = FailureMode::NodeDeath;
-        fc.trigger_at_sec = 60;
-        fc.percent = 0.9;
+        let fc = FailureConfig {
+            mode: FailureMode::NodeDeath,
+            trigger_at_sec: 60,
+            percent: 0.9,
+            ..Default::default()
+        };
         let toml_str = toml::to_string_pretty(&fc).unwrap();
         let fc2: FailureConfig = toml::from_str(&toml_str).unwrap();
         assert_eq!(fc2.mode, FailureMode::NodeDeath);
@@ -1465,9 +1596,12 @@ mod tests {
 
     #[test]
     fn test_paper_mode_sets_seed() {
-        let mut config = SimulationConfig::default();
-        config.seed = 0;
-        config.paper_mode = true;
+        #[allow(clippy::field_reassign_with_default)] // test mirrors parse_args logic
+        let mut config = SimulationConfig {
+            seed: 0,
+            paper_mode: true,
+            ..Default::default()
+        };
         if config.seed == 0 {
             config.seed = 42; // same logic as parse_args
         }

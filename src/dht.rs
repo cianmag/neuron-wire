@@ -40,6 +40,14 @@ const SEED_NODES: &[&str] = &[
 pub struct NodeId(pub [u8; 32]);
 
 impl NodeId {
+    /// Create a random node ID (used by benches and test harnesses).
+    pub fn random() -> Self {
+        use rand::RngCore;
+        let mut bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut bytes);
+        NodeId::new(bytes)
+    }
+
     /// Create a new `NodeId` from its raw 32-byte representation.
     pub fn new(bytes: [u8; 32]) -> Self {
         NodeId(bytes)
@@ -330,6 +338,15 @@ impl RoutingTable {
 
     fn bucket_idx(&self, target: &NodeId) -> Option<usize> {
         self.local_id.bucket_index(target).map(|i| i as usize)
+    }
+
+    /// Create a routing table on a throwaway local address (bench/test helper).
+    pub fn new_for_test(local_id: NodeId) -> Self {
+        RoutingTable::new(
+            local_id,
+            "127.0.0.1:9000".parse().expect("valid addr"),
+            NodeType::General,
+        )
     }
 
     /// Insert or update a node entry. Returns `true` if accepted.
@@ -719,6 +736,9 @@ pub struct DhtHandler {
     bootstrapped: bool,
     /// Sparse Gradient Aging maintenance tracker (None = standard fixed-interval maintenance).
     pub freshness_tracker: Option<FreshnessTracker>,
+    /// Baseline toggle: respond to FIND_NODE with random peers instead of
+    /// XOR-closest (random peer discovery, default false = Kademlia).
+    pub random_discovery: bool,
 }
 
 impl DhtHandler {
@@ -744,6 +764,7 @@ impl DhtHandler {
             seed_domain,
             bootstrapped: false,
             freshness_tracker: None,
+            random_discovery: false,
         }
     }
 
@@ -897,7 +918,20 @@ impl DhtHandler {
         let target = NodeId(tid);
 
         // Clone results to avoid borrow conflict
-        let nearest: Vec<(NodeId, SocketAddr, NodeType, f32)> = {
+        let nearest: Vec<(NodeId, SocketAddr, NodeType, f32)> = if self.random_discovery {
+            // Baseline: random peer discovery — respond with K entries that are
+            // NOT distance-ordered (deterministic rotation seeded by target ID).
+            let mut all: Vec<(NodeId, SocketAddr, NodeType, f32)> = self
+                .routing_table
+                .all_nodes()
+                .iter()
+                .map(|e| (e.id, e.addr, e.node_type, e.latency_ms))
+                .collect();
+            let start = (target.0[0] as usize) % all.len().max(1);
+            all.rotate_left(start);
+            all.truncate(K);
+            all
+        } else {
             self.routing_table
                 .nearest_nodes(&target, K)
                 .iter()
@@ -1076,6 +1110,19 @@ impl DhtHandler {
             self.routing_table.node_count(),
             self.pending_pings.len()
         );
+    }
+
+    /// Save the routing table to a file at the given path.
+    /// Returns the number of peers saved.
+    pub fn save_peers_to(&self, path: &str) -> std::io::Result<usize> {
+        let count = self.routing_table.node_count();
+        save_peers(&self.routing_table, path)?;
+        Ok(count)
+    }
+
+    /// Get the number of pending pings (awaiting PONG response).
+    pub fn pending_ping_count(&self) -> usize {
+        self.pending_pings.len()
     }
 }
 

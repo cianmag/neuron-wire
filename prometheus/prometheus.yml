@@ -1,0 +1,40 @@
+# Prometheus configuration for Neuron Wire
+# Scrape and evaluation intervals tuned for real-time engine monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alerting rules loaded from rules file
+rule_files:
+  - alert_rules.yml
+
+# Alertmanager integration (uncomment and configure)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#             - alertmanager:9093
+
+scrape_configs:
+  - job_name: neuron-wire
+    scrape_interval: 15s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:9100
+        labels:
+          env: production
+
+    # Optional: additional instances
+    # - targets:
+    #     - node2.internal:9100
+    #   labels:
+    #     env: production
+    #     region: us-east-1
+
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

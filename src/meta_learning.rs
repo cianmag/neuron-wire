@@ -1,6 +1,9 @@
+//! Meta-Learning — learning to learn.
+//!
+//! Implements MAML-inspired gradient-based meta-learning to quickly
+//! adapt to new tasks with minimal data. Optimizes the learning rate
+//! and initialization parameters.
 #![deny(missing_docs)]
-
-//! Meta-learning module — learned optimizers and hypernetworks.
 //!
 //! Provides [`LearnedOptimizer`] for per-synapse learning rates, [`HyperNet`]
 //! for dynamic weight generation, and the [`MetaMethod`] enum unifying both
@@ -59,6 +62,7 @@ impl LearnedOptimizer {
     /// ```
     ///
     /// where `f` is a learned gating function over the current hidden state.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn update(
         &mut self,
         synapse_id: (EntityId, EntityId),
@@ -103,7 +107,7 @@ impl LearnedOptimizer {
     pub fn meta_gradient(&self) -> Vec<f32> {
         // Flatten all cell states into one vector
         let mut grad = Vec::new();
-        for (_syn_id, state) in &self.cell_state {
+        for state in self.cell_state.values() {
             grad.extend_from_slice(state);
         }
         grad
@@ -172,6 +176,7 @@ impl HyperNet {
     /// Forward pass: compute output from an input embedding.
     ///
     /// Architecture:  `input → Linear(hidden_dim) → ReLU → Linear(output_dim) → output`
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn forward(&self, input_embedding: &[f32]) -> Vec<f32> {
         let mut hidden = vec![0.0; self.hidden_dim];
         #[allow(unused_variables)]
@@ -222,14 +227,18 @@ impl HyperNet {
     }
 }
 
+// SAFETY: HyperNet contains only a Vec<f32> params and scalar config values. All mutation
+// goes through `&mut self` in forward() (which only reads params) and construction methods.
+// No interior mutability or shared mutable state exists.
 unsafe impl Sync for HyperNet {}
 
 // ─── MetaMethod ─────────────────────────────────────────────────
 
 /// Which meta-learning strategy (if any) is active.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum MetaMethod {
     /// No meta-learning — standard Hebbian/STDP updates
+    #[default]
     None,
     /// Hyper-network that generates weight deltas from context
     HyperNet(HyperNet),
@@ -281,12 +290,8 @@ impl MetaMethod {
     }
 }
 
-impl Default for MetaMethod {
-    fn default() -> Self {
-        MetaMethod::None
-    }
-}
-
+// SAFETY: MetaMethod is an enum wrapping HyperNet or LearnedOptimizer, both of which are
+// independently justified as Sync. All mutation goes through `&mut self` methods.
 unsafe impl Sync for MetaMethod {}
 
 // ─── Tests ──────────────────────────────────────────────────────

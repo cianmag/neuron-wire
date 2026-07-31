@@ -114,6 +114,18 @@ h2{font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text)}
     <div class="packet-stream" id="failureStream"><div style="color:var(--text-dim)">No failures recorded</div></div>
   </div>
 
+  <!-- Security Metrics Chart -->
+  <div class="card" data-view="bandwidth">
+    <h2>🔐 Security Metrics</h2>
+    <canvas id="securityChart"></canvas>
+  </div>
+
+  <!-- Capacity & Sessions Chart -->
+  <div class="card" data-view="bandwidth">
+    <h2>📊 Capacity & Sessions</h2>
+    <canvas id="capacityChart"></canvas>
+  </div>
+
   <!-- Time Travel Debugger -->
   <div class="card" data-view="all">
     <h2>⏪ Time Travel Debugger</h2>
@@ -162,6 +174,8 @@ const MAX_HISTORY_POINTS = 300;
 // ─── Chart instances ───────────────────────────────────────────
 let learningChart = null;
 let bandwidthChart = null;
+let securityChart = null;
+let capacityChart = null;
 
 // ─── Fetch data ────────────────────────────────────────────────
 async function fetchJSON(url) {
@@ -355,6 +369,61 @@ function updateCharts() {
   bandwidthChart.data.datasets[0].data = history.map(s => s.bps_in);
   bandwidthChart.data.datasets[1].data = history.map(s => s.bps_out);
   bandwidthChart.update();
+
+  // Security chart
+  if (!securityChart) {
+    securityChart = new Chart(document.getElementById('securityChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Auth Failures', data: [], borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,0.1)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+        { label: 'Rate Limited', data: [], borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.1)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+        { label: 'Encrypted', data: [], borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.05)', fill: false, tension: 0.3, pointRadius: 0, borderWidth: 1, borderDash: [4,2] }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { labels: { color: '#8b949e', boxWidth: 8, font: {size:9} } } },
+        scales: {
+          x: { ticks: { color: '#8b949e', maxTicksLimit: 10, font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' } },
+          y: { ticks: { color: '#8b949e', font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+  const sLabels = history.map(s => (s.timestamp_ms / 1000).toFixed(0) + 's');
+  securityChart.data.labels = sLabels;
+  securityChart.data.datasets[0].data = history.map(s => s.auth_failures || 0);
+  securityChart.data.datasets[1].data = history.map(s => s.rate_limited_dropped || 0);
+  securityChart.data.datasets[2].data = history.map(s => s.encrypted_packets || 0);
+  securityChart.update();
+
+  // Capacity & sessions chart
+  if (!capacityChart) {
+    capacityChart = new Chart(document.getElementById('capacityChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Peer Capacity %', data: [], borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y' },
+        { label: 'Active Sessions', data: [], borderColor: '#bc8cff', backgroundColor: 'rgba(188,140,255,0.1)', fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y1' },
+        { label: 'Ephemeral Sessions', data: [], borderColor: '#d4760a', backgroundColor: 'rgba(212,118,10,0.1)', fill: false, tension: 0.3, pointRadius: 0, borderWidth: 1, borderDash: [4,2], yAxisID: 'y1' }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { labels: { color: '#8b949e', boxWidth: 8, font: {size:9} } } },
+        scales: {
+          x: { ticks: { color: '#8b949e', maxTicksLimit: 10, font: {size:9} }, grid: { color: 'rgba(48,54,61,0.5)' } },
+          y: { type: 'linear', position: 'left', min: 0, max: 1, ticks: { color: '#58a6ff', font: {size:9}, callback: v => (v*100).toFixed(0)+'%' }, grid: { color: 'rgba(48,54,61,0.5)' } },
+          y1: { type: 'linear', position: 'right', min: 0, ticks: { color: '#bc8cff', font: {size:9} }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
+  const cLabels = history.map(s => (s.timestamp_ms / 1000).toFixed(0) + 's');
+  capacityChart.data.labels = cLabels;
+  capacityChart.data.datasets[0].data = history.map(s => s.peer_capacity_ratio || 0);
+  capacityChart.data.datasets[1].data = history.map(s => s.active_sessions || 0);
+  capacityChart.data.datasets[2].data = history.map(s => s.ephemeral_sessions || 0);
+  capacityChart.update();
 }
 
 // ─── Latency Heatmap ───────────────────────────────────────────
@@ -449,6 +518,8 @@ function switchView() {
 function clearHistory() {
   history = []; packetEvents = [];
   if (learningChart) { learningChart.data.labels = []; learningChart.data.datasets[0].data = []; learningChart.update(); }
+  if (securityChart) { securityChart.data.labels = []; securityChart.data.datasets.forEach(d => d.data = []); securityChart.update(); }
+  if (capacityChart) { capacityChart.data.labels = []; capacityChart.data.datasets.forEach(d => d.data = []); capacityChart.update(); }
 }
 
 function exportJSON() {

@@ -116,8 +116,8 @@ fn main() {
     // Compute CRC of the payload
     let data_crc = crc::crc32(payload);
     db.write_u32(types::data::DATA_HASH, data_crc);
-    db.write_u16(types::data::CONTENT_TYPE, types::content_type::TEXT as u16);
-    db.write_u16(types::data::COMPRESSION, types::compression::NONE as u16);
+    db.write_u16(types::data::CONTENT_TYPE, types::content_type::TEXT);
+    db.write_u16(types::data::COMPRESSION, types::compression::NONE);
     db.write_u32(types::data::ORIGINAL_LEN, payload_len);
     db.write_u32(types::data::PAYLOAD_LEN, payload_len);
 

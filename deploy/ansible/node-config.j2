@@ -1,0 +1,25 @@
+[node]
+name = "{{ node_name }}"
+bind_addr = "{{ node_bind }}"
+tick_interval_ms = 1
+
+[stun]
+enabled = {{ stun_enabled | lower }}
+server = "{{ stun_server }}"
+
+[dht]
+enabled = true
+bootstrap_peers = [
+{% for peer in bootstrap_peers %}
+  "{{ peer }}",
+{% endfor %}
+]
+listen_port = 0
+
+[transport]
+half_life_ms = 100.0
+retransmit_interval_ms = 10
+
+[security]
+sign_packets = true
+encrypt_payloads = false

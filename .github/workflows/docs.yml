@@ -1,15 +1,21 @@
-name: Documentation
+name: Deploy mdBook
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [main]
+    paths:
+      - 'book/**'
+      - 'book.toml'
+      - 'docs/**'
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -17,51 +23,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build Rust API docs
-        run: |
-          RUSTDOCFLAGS="-D warnings" cargo doc --document-private-items --no-deps
-          echo '<meta http-equiv="refresh" content="0;url=neuron_wire/index.html">' > target/doc/index.html
-          cp -r target/doc docs/src/api
-
       - name: Install mdBook
-        uses: taiki-e/install-action@mdbook
-
-      - name: Copy documentation sources
         run: |
-          mkdir -p docs/src
-          # Copy root markdown files for mdBook
-          for f in README.md ARCHITECTURE.md ARCHITECTURE_DIAGRAMS.md PROTOCOL_SPEC.md \
-                   DEVELOPER_GUIDE.md PAPER.md FOUNDATIONAL_QNA.md LESSONS_LEARNED.md \
-                   ROADMAP.md CONTRIBUTING.md SECURITY.md CHANGELOG.md REPRODUCIBILITY.md \
-                   PUBLISHING_CHECKLIST.md STATS.md \
-                   COMMUNITY.md CODE_OF_CONDUCT.md RELEASE_NOTES.md; do
-            [ -f "$f" ] && cp "$f" "docs/src/$f"
-          done
-          # Copy ADR directory
-          cp -r ADR docs/src/ADR
-          # Copy LICENSE
-          cp LICENSE-MIT docs/src/LICENSE 2>/dev/null || cp LICENSE-APACHE docs/src/LICENSE 2>/dev/null || true
-          # Copy custom landing page if it exists
-          [ -f docs/src/index.md ] || echo "# Neuron-Wire" > docs/src/index.md
+          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.40/mdbook-v0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv mdbook /usr/local/bin/
 
-      - name: Build mdBook
-        run: mdbook build docs
+      - name: Build book
+        run: mdbook build
 
-      - name: Upload Pages artifact
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/book
+          path: book/book
 
   deploy:
-    if: github.ref == 'refs/heads/master'
-    needs: build
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

@@ -1,0 +1,33 @@
+# cargo-fuzz configuration for neuron-wire
+# https://github.com/rust-fuzz/cargo-fuzz/blob/main/docs/reference.md
+
+# Maximum total time in seconds (0 = unlimited, let the user Ctrl+C)
+max_total_time = 0
+
+# Maximum length of a single fuzz input in bytes
+# Our largest target (trust_deserialize) parses 44-byte records,
+# but we want the fuzzer to exercise truncated inputs and large counts.
+max_len = 4096
+
+# Cross-check: run the target under multiple sanitizers (ASan, MSan, etc.)
+# Disable on Windows where sanitizers are unreliable.
+cross_compile = false
+
+# Timeout per individual execution in seconds.
+# Parsing should be near-instant; anything >1s is likely an infinite loop.
+timeout = 10
+
+# Memory limit per execution in MB.
+# Parsing shouldn't need much RAM; limit helps catch OOM bugs.
+rss_limit_mb = 256
+
+# Max number of mutations per input.
+mutations_per_run = 1
+
+# Artifact directory for crashing inputs
+# (default: fuzz/artifacts/)
+# artifacts_dir = "artifacts"
+
+# Corpus directory for interesting inputs
+# (default: fuzz/corpus/)
+# corpus_dir = "corpus"

@@ -1,0 +1,83 @@
+# gitleaks configuration for neuron-wire
+# Excludes test, benchmark, build artifacts, and known
+# false-positive patterns to reduce noise.
+
+title = "neuron-wire gitleaks config"
+
+# ── Global allowlist ────────────────────────────────────
+# Regex patterns for lines/paths that are never secrets.
+allowlist = '''(?i)gitleaks\\.toml'''
+
+# ── Path exclusions ─────────────────────────────────────
+# Files and directories to skip entirely during scanning.
+
+[[exclude]]
+description = "Exclude Cargo.lock (auto-generated)"
+paths = '''(?i)Cargo\\.lock'''
+
+[[exclude]]
+description = "Exclude target/ build directory"
+paths = '''(?i)^target/'''
+
+[[exclude]]
+description = "Exclude test fixtures and mock data"
+paths = '''(?i)^tests/|test_.*\\.rs|_test\\.rs|.*_spec\\.rs'''
+
+[[exclude]]
+description = "Exclude benchmark files"
+paths = '''(?i)^benches/|^benchmarks/'''
+
+[[exclude]]
+description = "Exclude CI/CD config files"
+paths = '''(?i)\\.github/|\\.gitlab-ci\\.yml|Jenkinsfile'''
+
+[[exclude]]
+description = "Exclude documentation and markdown"
+paths = '''(?i)\\.md$|\\.txt$|docs/'''
+
+[[exclude]]
+description = "Exclude example code with dummy secrets"
+paths = '''(?i)^examples/'''
+
+# ── Content-based exclusions (false positives) ──────────
+[[exclude]]
+description = "Exclude placeholder/dummy secret patterns in comments"
+regex = '''(?i)(example|placeholder|dummy|fake|mock|test|TODO|FIXME|XXX).*?(key|secret|token|password)'''
+
+[[exclude]]
+description = "Exclude documentation URLs that look like keys"
+regex = '''(?i)https?://[^\\s]*(example|placeholder|dummy|test)[^\\s]*'''
+
+[[exclude]]
+description = "Exclude Docker env defaults"
+regex = '''(?i)(POSTGRES_PASSWORD|MYSQL_ROOT_PASSWORD)\\s*=\\s*(test|example|password|changeme|root)'''
+
+[[exclude]]
+description = "Exclude Rust doc comments with placeholder values"
+regex = '''(?i)//[!/].*?(secret|key|token|password).*?(=|:).*?(test|example|placeholder|dummy)'''
+
+# ── Custom rules (neuron-wire specific) ────────────────
+
+[[rules]]
+description = "Detect hardcoded private keys (PEM/SSH/RSA)"
+id = "hardcoded-private-key"
+regex = '''-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'''
+tags = ["key", "private-key"]
+
+[[rules]]
+description = "Detect base64-encoded secrets longer than 40 chars"
+id = "base64-secret"
+regex = '''(?:secret|key|token|password)\\s*[=:]\\s*[A-Za-z0-9+/]{40,}'''
+tags = ["secret", "base64"]
+
+[[rules]]
+description = "Detect API keys with common prefixes"
+id = "api-key-pattern"
+regex = '''(?:api[_-]?key|apikey)\\s*[=:]\\s*['"]?[A-Za-z0-9_-]{20,}['"]?'''
+tags = ["key", "api-key"]
+
+[[rules]]
+description = "Detect connection strings with credentials"
+id = "connection-string"
+regex = '''(?:mongodb|postgres|mysql|redis|amqp)://[^\\s]*:[^\\s]*@[^\\s]+'''
+tags = ["connection-string", "credential"]

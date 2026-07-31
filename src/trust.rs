@@ -171,6 +171,28 @@ impl TrustSystem {
     /// Record a trust event for a peer and return the updated score.
     ///
     /// Applies the trust delta, clamps to [0.0, 1.0], and returns the score.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuron_wire::trust::{TrustSystem, TrustEvent};
+    /// use neuron_wire::components::EntityId;
+    ///
+    /// let mut trust = TrustSystem::new();
+    /// let peer = EntityId::new([1u8; 32]);
+    ///
+    /// // New peers start at 0.5
+    /// let score = trust.trust_score(&peer);
+    /// assert!((0.4..=0.6).contains(&score));
+    ///
+    /// // Positive events increase trust
+    /// let score = trust.record_event(peer, TrustEvent::ValidSignature);
+    /// assert!(score > 0.5);
+    ///
+    /// // Negative events decrease trust
+    /// let score = trust.record_event(peer, TrustEvent::ReplayAttack);
+    /// assert!(score < 0.5);
+    /// ```
     pub fn record_event(&mut self, peer: EntityId, event: TrustEvent) -> f32 {
         // Apply time-based decay first
         self.apply_decay(peer);
@@ -221,12 +243,38 @@ impl TrustSystem {
     /// Check if a packet from this peer should be rate-limited.
     ///
     /// Returns `true` if the packet should be dropped (rate limit exceeded).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuron_wire::trust::{TrustSystem, TrustEvent};
+    /// use neuron_wire::components::EntityId;
+    ///
+    /// let mut trust = TrustSystem::new();
+    /// let peer = EntityId::new([1u8; 32]);
+    ///
+    /// // First few packets pass
+    /// assert!(!trust.check_rate_limit(&peer));
+    ///
+    /// // After burst limit exceeded, packets are dropped
+    /// let mut limited = false;
+    /// for _ in 0..20 {
+    ///     if trust.check_rate_limit(&peer) {
+    ///         limited = true;
+    ///         break;
+    ///     }
+    /// }
+    /// assert!(limited, "rate limiting should eventually trigger");
+    /// ```
     pub fn check_rate_limit(&mut self, peer: &EntityId) -> bool {
         let now = now_millis();
         let state = self.peers.entry(*peer).or_default();
 
-        // Reset rate-limit window if expired
-        if now - state.window_start_ms > RATE_LIMIT_WINDOW_MS {
+        // Reset rate-limit window if expired.
+        // NOTE: now_millis() is wall-clock based (SystemTime); it can step
+        // backward under NTP adjustment, so use saturating_sub to avoid
+        // underflow panics in debug builds.
+        if now.saturating_sub(state.window_start_ms) > RATE_LIMIT_WINDOW_MS {
             state.window_start_ms = now;
             state.packet_count_in_window = 0;
         }
@@ -247,8 +295,8 @@ impl TrustSystem {
         state.packet_count_in_window += 1;
         self.global_packet_count += 1;
 
-        // Global rate limit
-        if now - self.global_window_start_ms > 1000 {
+        // Global rate limit (saturating_sub — see window reset note above)
+        if now.saturating_sub(self.global_window_start_ms) > 1000 {
             self.global_window_start_ms = now;
             self.global_window_count = 0;
         }
@@ -325,6 +373,80 @@ impl TrustSystem {
     /// Get the number of tracked peers.
     pub fn peer_count(&self) -> usize {
         self.peers.len()
+    }
+
+    // ─── Persistence ───────────────────────────────────────────
+
+    /// Save trust scores to a binary file.
+    /// Format: [u32 count] for each peer: [32B entity_id][f32 score][u64 total_events]
+    /// Transient fields (rate_limit state, window counters) are NOT saved —
+    /// they reset on restart, which is correct: rate limits should not persist.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use neuron_wire::trust::{TrustSystem, TrustEvent};
+    /// use neuron_wire::components::EntityId;
+    ///
+    /// let mut trust = TrustSystem::new();
+    /// let peer = EntityId::new([1u8; 32]);
+    /// trust.record_event(peer, TrustEvent::ValidSignature);
+    ///
+    /// // Save to disk
+    /// let saved = trust.save_to_file("trust.dat").unwrap();
+    /// assert_eq!(saved, 1);
+    ///
+    /// // Load into a new instance
+    /// let mut trust2 = TrustSystem::new();
+    /// trust2.load_from_file("trust.dat").unwrap();
+    /// assert_eq!(trust2.trust_score(&peer), trust.trust_score(&peer));
+    /// ```
+    pub fn save_to_file(&self, path: &str) -> std::io::Result<usize> {
+        use std::io::Write;
+        let mut file = std::fs::File::create(path)?;
+        let count = self.peers.len() as u32;
+        file.write_all(&count.to_le_bytes())?;
+        let mut saved = 0;
+        for (eid, state) in &self.peers {
+            file.write_all(&eid.0)?;
+            file.write_all(&state.score.to_le_bytes())?;
+            file.write_all(&state.total_events.to_le_bytes())?;
+            saved += 1;
+        }
+        file.flush()?;
+        Ok(saved)
+    }
+
+    /// Load trust scores from a binary file.
+    /// Peers not in the file start at INITIAL_TRUST.
+    /// Returns the number of peers loaded.
+    pub fn load_from_file(&mut self, path: &str) -> std::io::Result<usize> {
+        use std::io::Read;
+        let mut file = std::fs::File::open(path)?;
+        let mut buf = [0u8; 4];
+        file.read_exact(&mut buf)?;
+        let count = u32::from_le_bytes(buf) as usize;
+
+        let mut loaded = 0;
+        for _ in 0..count {
+            let mut eid_bytes = [0u8; 32];
+            file.read_exact(&mut eid_bytes)?;
+            let mut score_buf = [0u8; 4];
+            file.read_exact(&mut score_buf)?;
+            let mut events_buf = [0u8; 8];
+            file.read_exact(&mut events_buf)?;
+
+            let score = f32::from_le_bytes(score_buf);
+            let total_events = u64::from_le_bytes(events_buf);
+
+            let eid = EntityId(eid_bytes);
+            let state = self.peers.entry(eid).or_default();
+            state.score = score.clamp(0.0, 1.0);
+            state.total_events = total_events;
+            state.last_active_ms = now_millis(); // Mark as recently active
+            loaded += 1;
+        }
+        Ok(loaded)
     }
 }
 
@@ -426,6 +548,8 @@ mod tests {
     fn test_rate_limit_low_trust() {
         let mut ts = TrustSystem::new();
         let peer = make_eid(1);
+        // Drop the peer below the Sybil threshold so its burst budget is halved.
+        ts.record_event(peer, TrustEvent::ReplayAttack);
 
         // Low trust peer should get rate-limited quickly
         for i in 0..20 {
@@ -482,8 +606,14 @@ mod tests {
     fn test_global_rate_limit() {
         let mut ts = TrustSystem::with_global_rate_limit(100);
         let peer = make_eid(99);
+        // Raise the peer above TRUSTED_THRESHOLD so its per-peer burst is
+        // RATE_LIMIT_BURST * 10 = 100 — otherwise the per-peer limit (10) would
+        // fire before the global limit (100) can be observed.
+        for _ in 0..5 {
+            ts.record_event(peer, TrustEvent::ValidSignature);
+        }
 
-        // First 100 packets should be fine
+        // First 100 packets should be fine (per-peer burst is exactly 100)
         for _ in 0..100 {
             assert!(
                 !ts.check_rate_limit(&peer),
@@ -491,14 +621,7 @@ mod tests {
             );
         }
 
-        // 101st should be limited (trusted peer)
-        // But wait — this peer has never been seen before, so it starts at INITIAL_TRUST=0.5.
-        // With 100 packets consumed, and RATE_LIMIT_BURST=10, a peer at 0.5 trust gets 10 packets.
-        // So after 10 packets, it's per-peer rate-limited, not global.
-        // Global limit only kicks in if the peer never hits per-peer limit first.
-        // Let's just check that the limit *somewhere* catches it.
-        let limited = ts.check_rate_limit(&peer);
-        // After 101 packets, either per-peer or global limit has fired
-        assert!(limited || ts.peer_count() > 0);
+        // 101st packet trips the limit (per-peer at 101 > 100, global at 101 > 100)
+        assert!(ts.check_rate_limit(&peer), "101st packet must be limited");
     }
 }

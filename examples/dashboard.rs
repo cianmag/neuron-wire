@@ -69,7 +69,7 @@ fn main() {
         metrics.inc_bytes_recv(512 + (tick % 128));
 
         // Alternating idle/busy
-        if tick % 3 != 0 {
+        if !tick.is_multiple_of(3) {
             metrics.inc_busy();
         } else {
             metrics.inc_idle();
@@ -83,10 +83,10 @@ fn main() {
         metrics.set_trust_avg(0.75 + (tick % 10) as f64 * 0.02);
 
         // Add a packet event every 5 ticks
-        if tick % 5 == 0 {
+        if tick.is_multiple_of(5) {
             metrics.push_packet_event(neuron_wire::observability::PacketEvent {
                 seq: tick as u32,
-                dir: if tick % 2 == 0 {
+                dir: if tick.is_multiple_of(2) {
                     "in".to_string()
                 } else {
                     "out".to_string()
@@ -94,7 +94,7 @@ fn main() {
                 size: 128 + (tick as usize % 256),
                 src: format!("192.168.1.{}", (tick % 5) + 1),
                 dst: format!("127.0.0.1:{}", 9000 + (tick % 3)),
-                is_reliable: tick % 3 == 0,
+                is_reliable: tick.is_multiple_of(3),
                 timestamp_ms: tick * 250,
             });
         }

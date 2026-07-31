@@ -126,12 +126,12 @@ impl AuditEntry {
         prev_hash: &[u8; 32],
     ) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(&seq.to_le_bytes());
-        hasher.update(&timestamp_ms.to_le_bytes());
+        hasher.update(seq.to_le_bytes());
+        hasher.update(timestamp_ms.to_le_bytes());
         hasher.update(event_type.to_string().as_bytes());
         hasher.update(description.as_bytes());
         if let Some(eid) = peer {
-            hasher.update(&eid.0);
+            hasher.update(eid.0);
         }
         hasher.update(prev_hash);
         hasher.finalize().into()
@@ -176,6 +176,19 @@ impl AuditLog {
     /// Append an event to the audit log.
     ///
     /// Returns the sequence number of the new entry.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuron_wire::audit::{AuditLog, AuditEventType};
+    ///
+    /// let mut log = AuditLog::new();
+    /// log.append(AuditEventType::NodeStartup, "node started", None);
+    /// log.append(AuditEventType::HandshakeSuccess, "peer connected", None);
+    ///
+    /// assert_eq!(log.total_entries(), 2);
+    /// assert!(log.verify_integrity(), "chain must be intact");
+    /// ```
     pub fn append(
         &mut self,
         event_type: AuditEventType,
@@ -188,7 +201,7 @@ impl AuditLog {
 
         let hash = AuditEntry::compute_hash(seq, now, &event_type, description, &peer, &prev_hash);
 
-        let is_checkpoint = seq > 0 && seq % CHECKPOINT_INTERVAL as u64 == 0;
+        let is_checkpoint = seq > 0 && seq.is_multiple_of(CHECKPOINT_INTERVAL as u64);
 
         let entry = AuditEntry {
             seq,
@@ -222,15 +235,31 @@ impl AuditLog {
         seq
     }
 
-    /// Verify the integrity of the entire hash chain from genesis.
+    /// Verify the integrity of the hash chain.
     ///
     /// Returns `true` if the chain is intact (no tampering).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuron_wire::audit::{AuditLog, AuditEventType};
+    ///
+    /// let mut log = AuditLog::new();
+    /// log.append(AuditEventType::NodeStartup, "started", None);
+    /// log.append(AuditEventType::HandshakeSuccess, "connected", None);
+    ///
+    /// // Intact chain verifies
+    /// assert!(log.verify_integrity());
+    /// ```
     pub fn verify_integrity(&self) -> bool {
         if self.entries.is_empty() {
             return true;
         }
 
-        let first = self.entries.front().unwrap();
+        // Safety: we just checked is_empty() above
+        let Some(first) = self.entries.front() else {
+            return true;
+        };
         if first.seq != 0 {
             // We don't have the full chain in buffer — verify what we have
             return self.verify_buffered();

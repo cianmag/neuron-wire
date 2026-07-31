@@ -1,0 +1,14 @@
+# ─── Exclude from Docker build context ────────────────────────────
+target/
+.git/
+.github/
+.vscode/
+.hermes/
+node_modules/
+*.md
+*.key
+node-config.toml
+*.pem
+*.csv
+*.mp4
+*.gif

@@ -144,7 +144,7 @@ impl BayesianLayer {
 
         let n_vars = self.weight_log_vars.len().max(1) as f32;
         let avg_log_var: f32 = self.weight_log_vars.values().sum::<f32>() / n_vars;
-        let epistemic = (avg_log_var * 0.5).exp().min(10.0).max(0.0);
+        let epistemic = (avg_log_var * 0.5).exp().clamp(0.0, 10.0);
 
         let variance = aleatoric + epistemic;
         let confidence = 1.0 / (1.0 + variance);

@@ -200,6 +200,13 @@ fn route_hedged_attention(
         return route_hebbian_sum(pre_activations, weights);
     }
 
+    // Zero/uninitialised projection weights → no learned attention; fall back
+    // to the plain Hebbian sum so routing never silently degrades to uniform
+    // attention over untrained projections.
+    if attn.w_k.iter().all(|&x| x == 0.0) && attn.w_q.iter().all(|&x| x == 0.0) {
+        return route_hebbian_sum(pre_activations, weights);
+    }
+
     // Group weights by post-neuron.
     let mut post_to_pre: HashMap<EntityId, Vec<(EntityId, f32)>> = HashMap::new();
     for ((pre, post), &w) in weights {

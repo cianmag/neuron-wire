@@ -1,3 +1,8 @@
+//! Machine Learning Subsystem — training orchestration and neural computation.
+//!
+//! Coordinates the neural computation pipeline: forward pass, Hebbian
+//! learning, neurogenesis, and apoptosis. Manages the overall learning
+//! cycle and reports metrics.
 #![deny(missing_docs)]
 #![allow(hidden_glob_reexports)]
 
@@ -225,7 +230,7 @@ impl MLSystem {
             if let CompressionMethod::TopK(k) = self.gradient_compression.method {
                 report.gradients_compressed = k.min(total_gradients);
             } else {
-                report.gradients_compressed = (total_gradients + 3) / 4;
+                report.gradients_compressed = total_gradients.div_ceil(4);
             }
         }
 
@@ -287,6 +292,9 @@ impl Default for MLSystem {
     }
 }
 
+// SAFETY: MLSystem contains no interior mutability — all fields are accessed via `&mut self`
+// in tick(). The contained sub-systems (GradientCompression, AdaptiveLROptimiser, etc.) each
+// provide their own Sync justification. No shared mutable state is accessed through &self.
 unsafe impl Sync for MLSystem {}
 
 // ─── Tests ──────────────────────────────────────────────────────

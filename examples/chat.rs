@@ -86,13 +86,10 @@ fn main() {
     thread::spawn(move || {
         let mut buf = [0u8; 4096];
         while r.load(Ordering::Relaxed) {
-            match sock_rx.recv_from(&mut buf) {
-                Ok((n, src)) => {
-                    let msg = String::from_utf8_lossy(&buf[..n]);
-                    println!("  [{src}] {msg}");
-                }
-                Err(_) => {} // timeout, loop
-            }
+            if let Ok((n, src)) = sock_rx.recv_from(&mut buf) {
+                let msg = String::from_utf8_lossy(&buf[..n]);
+                println!("  [{src}] {msg}");
+            } // timeout → loop
         }
     });
 

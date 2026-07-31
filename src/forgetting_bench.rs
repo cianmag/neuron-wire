@@ -142,6 +142,7 @@ impl ContinualBenchmark {
     /// # Panics
     ///
     /// Panics if the matrix is empty or rows have inconsistent lengths.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn compute_metrics(&mut self, accuracy_matrix: Vec<Vec<f32>>) {
         assert!(
             !accuracy_matrix.is_empty(),
@@ -203,7 +204,10 @@ impl ContinualBenchmark {
         }
 
         // --- Stability ---
-        // 1 / (1 + variance of diagonal entries)
+        // Normalised inverse of the diagonal variance. Accuracy values live in
+        // [0, 1], so the maximum possible variance is 0.25 (balanced 0/1 split);
+        // normalising by that bound keeps stability in [0, 1] and makes
+        // "high variance ⇒ low stability" meaningful across task counts.
         if n_tasks > 0 {
             let diag_mean: f32 =
                 (0..n_tasks).map(|i| accuracy_matrix[i][i]).sum::<f32>() / n_tasks as f32;
@@ -211,7 +215,7 @@ impl ContinualBenchmark {
                 .map(|i| (accuracy_matrix[i][i] - diag_mean).powi(2))
                 .sum::<f32>()
                 / n_tasks as f32;
-            metrics.stability = 1.0 / (1.0 + diag_var);
+            metrics.stability = (1.0 - diag_var / 0.25).clamp(0.0, 1.0);
         }
 
         self.results = Some(metrics);
@@ -421,9 +425,9 @@ mod tests {
 
         // High variance on diagonal.
         let matrix = vec![
-            vec![0.9, 0.01, 0.01],
-            vec![0.9, 0.3, 0.01],
-            vec![0.9, 0.3, 0.9],
+            vec![1.0, 0.01, 0.01],
+            vec![1.0, 0.0, 0.01],
+            vec![1.0, 0.0, 0.0],
         ];
 
         bm.compute_metrics(matrix);

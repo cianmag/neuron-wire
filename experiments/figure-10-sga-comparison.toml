@@ -1,23 +1,16 @@
-[experiment]
-name = "figure-10-sga-comparison"
-description = "Sparse Gossip Aging vs Fixed Gossip comparison (Figure 10)"
-paper_mode = true
-seed = 42
-trials = 5
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-10-sga-comparison.toml --output-dir results/figure-10-sga-comparison
 
-[simulation]
+description = "figure-10-sga-comparison"
 node_count = 25
 duration_secs = 30
-stale_ping_secs = 10
-tick_interval_us = 1000
+seed = 42
+paper_mode = true
+bind_prefix = "127.0.0.1"
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "sparse-aging"
 
-[sga]
-enabled = true
-aging_factor = 0.7
-min_fanout = 2
-max_fanout = 5
-
-[output]
-directory = "results/figure-10"
-include_raw_logs = false
-snapshot_interval_ticks = 100

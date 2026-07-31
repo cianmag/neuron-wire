@@ -1,0 +1,37 @@
+# ─── Ansible inventory template ───────────────────────────────────
+# Copy to inventory.yml and fill in your VPS IPs.
+#
+# Groups:
+#   nwp_nodes  = all machines that run the NWP node
+#   nwp_peers  = machines that other nodes bootstrap from (seed nodes)
+#
+# Variables per host:
+#   ansible_host    = VPS public IP
+#   ansible_user    = SSH user (usually root or ubuntu)
+#   node_name        = human-friendly node name (defaults to inventory_hostname)
+#
+# Example:
+#   nwp_nodes:
+#     hosts:
+#       nwp-1:
+#         ansible_host: 1.2.3.4
+#         ansible_user: root
+
+nwp_nodes:
+  hosts:
+    nwp-alpha:
+      ansible_host: REPLACE_WITH_VPS_IP_1
+      ansible_user: root
+    nwp-beta:
+      ansible_host: REPLACE_WITH_VPS_IP_2
+      ansible_user: root
+    nwp-gamma:
+      ansible_host: REPLACE_WITH_VPS_IP_3
+      ansible_user: root
+
+  vars:
+    # All nodes are seed peers in a small cluster
+    nwp_peers:
+      - "nwp-alpha:9000"
+      - "nwp-beta:9000"
+      - "nwp-gamma:9000"

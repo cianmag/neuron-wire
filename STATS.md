@@ -1,7 +1,7 @@
 # Neuron Wire: Project Statistics
 
 > Engineering metrics and benchmark data for the Neuron Wire protocol.
-> Date: 2026-07-09 | Commit: `94f2d39` | Repository: [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)
+> Date: 2026-07-11 | Commit: `f3c9157` | Repository: [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)
 
 ---
 
@@ -11,7 +11,7 @@
 |--------|-------|
 | Rust source files | 55 (`src/`, `examples/`, `tests/`, `benches/`) |
 | Total lines of Rust | ~8,000 |
-| External dependencies | 5 direct (crc32fast, rand, serde, toml, csv) |
+| External dependencies | 9 direct (crc32fast, rand, serde, toml, csv, ed25519-dalek, chacha20poly1305, blake2, sha2) |
 | Transitive dependencies | ~25 crates |
 | Build profile (release) | `opt-level="z"`, LTO, stripped |
 | Binary | Single statically linked executable |
@@ -23,7 +23,7 @@
 
 | Metric | Value |
 |--------|-------|
-| `#[test]` annotations | 10 + integration + property-based |
+| `#[test]` annotations | 14 + integration (security_integration, 3 tests) + property-based |
 | Test pass rate | 100% (when buildable — Windows GNU blocked) |
 | Zero-warnings policy | Enforced via `cargo clippy -D warnings` |
 | Fuzz testing | cargo-fuzz target for header parsing |
@@ -94,7 +94,26 @@
 | Reliability tiers | 3 (BestEffort, Data, Consensus) |
 | ACK bitfield window | 33 packets per ACK |
 
-## 7. Neural Computation Parameters
+## 7. Security Subsystem
+
+| Metric | Value |
+|--------|-------|
+| Identity scheme | Ed25519 (OsRng key generation) |
+| Identity size | 32 B public key, 64 B signature |
+| Auth prefix per packet | 96 B (32 B pubkey + 64 B signature) |
+| Encryption | XChaCha20-Poly1305 AEAD (key size: 32 B) |
+| Nonce size | 16 B (12 B salt + 4 B counter) |
+| Replay protection | Monotonic nonce in ring buffer (1024 entries) |
+| Trust levels | 3 (untrusted < 0.2, trusted > 0.7, initial = 0.5) |
+| Rate limit | 10 packets/window per peer (window: 1 s) |
+| Trust event types | 7 (Valid/InvalidSignature, SuccessfulDecrypt, ReplayAttack, etc.) |
+| Audit log capacity | 100,000 entries (in-memory) |
+| Audit checkpoints | Every 1,000 entries (hash chain) |
+| Security code | 5 files: identity.rs (339L), secure_channel.rs (423L), trust.rs (504L), audit.rs (534L), security.rs (32L) = 1,832 lines |
+| Engine integration | `seal_outbound()` + `open_inbound()` in engine_loop.rs |
+| Security config flags | `security_enabled`, `encrypt_payloads`, `identity_seed` |
+
+## 8. Neural Computation Parameters
 
 | Parameter | Value |
 |-----------|-------|

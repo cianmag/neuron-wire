@@ -1,0 +1,17 @@
+# ─── Grafana auto-provisioned Prometheus datasource ────────────────
+# This file is mounted read-only into the Grafana container.
+# No manual datasource setup required — just open Grafana.
+# ───────────────────────────────────────────────────────────────────
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://nwp-prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "5s"
+      httpMethod: POST

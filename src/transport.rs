@@ -78,12 +78,18 @@ impl TransportHeader {
     #[inline]
     pub unsafe fn from_bytes(buf: &[u8]) -> &TransportHeader {
         assert!(buf.len() >= Self::SIZE);
+        // SAFETY: buf is at least 16 bytes (asserted above); TransportHeader is repr(C) with
+        // four u32 fields (no padding, naturally aligned), so the byte layout is well-defined.
+        // All fields are read via from_le_bytes at their natural offsets.
         &*(buf.as_ptr() as *const TransportHeader)
     }
 
     /// Serialize to bytes
     #[inline]
     pub fn to_bytes(&self) -> [u8; 16] {
+        // SAFETY: TransportHeader is repr(C) with four u32 fields totaling exactly 16 bytes.
+        // `self` is a valid, aligned reference to a fully-initialized TransportHeader.
+        // The cast to [u8; 16] reinterprets the same 16 bytes; no padding exists.
         unsafe { *(self as *const TransportHeader as *const [u8; 16]) }
     }
 }
@@ -469,6 +475,8 @@ impl UdpTransport {
                 }
 
                 // Zero-copy parse the transport header
+                // SAFETY: len >= TransportHeader::SIZE (checked above at line 467), so the
+                // slice is large enough for from_bytes. from_bytes requires buf.len() >= 16.
                 let header = unsafe { TransportHeader::from_bytes(&self.recv_buf[..len]) };
 
                 // Record the sequence number in our ACK tracker

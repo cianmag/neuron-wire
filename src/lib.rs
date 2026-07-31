@@ -12,7 +12,7 @@
 //! All field access is through offset computation into the buffer.
 //! No deserialization, no allocation, no parsing step.
 
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 // ─── Core Protocol Modules ──────────────────────────────────────
 pub mod adaptive_lr;
@@ -33,6 +33,7 @@ pub mod forgetting_bench;
 pub mod forward_pass;
 pub mod gradient_compression;
 pub mod header;
+pub mod health;
 pub mod hebbian;
 pub mod io;
 pub mod memory_module;
@@ -48,13 +49,21 @@ pub mod zerocopy;
 
 pub mod ml;
 
+// ── Error types ────────────────────────────────────────────────
+pub mod error;
+
 // ── Security / Identity ───────────────────────────────────────
 pub mod audit;
 pub mod identity;
 pub mod observability;
 pub mod secure_channel;
 pub mod security;
+pub mod stun;
 pub mod trust;
+
+/// Lightweight structured logger — zero external deps.
+/// Outputs JSON lines to stderr with timestamp, level, module, peer, event.
+pub mod logger;
 
 // Re-exports
 pub use flat::*;

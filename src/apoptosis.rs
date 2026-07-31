@@ -283,10 +283,15 @@ mod tests {
     #[test]
     fn test_death_spiral_threshold() {
         let sys = ApoptosisSystem::new();
-        let mut r = ApoptosisReport::default();
-        r.total_deaths = 51;
+        let r = ApoptosisReport {
+            total_deaths: 51,
+            ..Default::default()
+        };
         assert!(sys.is_death_spiral(&r));
-        r.total_deaths = 50;
+        let r = ApoptosisReport {
+            total_deaths: 50,
+            ..Default::default()
+        };
         assert!(!sys.is_death_spiral(&r));
     }
 
@@ -298,6 +303,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // contract tests: constants must keep sanity
     fn test_constants_sanity() {
         assert!(MAX_LATENCY_MS > 0.0);
         assert!(MAX_STALE_SECS >= PENDING_PING_TIMEOUT_S);

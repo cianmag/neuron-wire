@@ -1,17 +1,16 @@
-[experiment]
-name = "figure-5-bandwidth-vs-nodes"
-description = "Bandwidth scaling with network size (Figure 5)"
-paper_mode = true
+# Neuron Wire reproducible experiment — flat SimulationConfig schema.
+# Run: cargo run --release --example simulate -- --config experiments/figure-5-bandwidth-vs-nodes.toml --output-dir results/figure-5-bandwidth-vs-nodes
+
+description = "figure-5-bandwidth-vs-nodes"
+node_count = 100
+duration_secs = 60
 seed = 42
-trials = 3
+paper_mode = true
+bind_prefix = "127.0.0.1"
+tick_interval_ms = 1
+gossip_interval_ticks = 500
+cleanup_interval_ticks = 1000
+max_retries = 3
+gradient_half_life_ms = 100
+maintenance_mode = "fixed"
 
-[simulation]
-node_count = 25
-duration_secs = 30
-stale_ping_secs = 10
-tick_interval_us = 1000
-
-[output]
-directory = "results/figure-5"
-include_raw_logs = false
-snapshot_interval_ticks = 100

@@ -32,6 +32,46 @@ pub const FLAG_AUDIT_REQUEST: u16 = 0x0008;
 /// Message body is a bootstrap proof payload.
 pub const FLAG_BOOTSTRAP: u16 = 0x0010;
 
+// ─── Message Types ─────────────────────────────────────────────
+
+/// Central message type registry. All msg_type values used across the protocol.
+/// DHT messages (7-10) are defined in `dht::dht_msg_type` for backward
+/// compatibility but these constants are the authoritative source.
+pub mod msg_type {
+    /// DHT Ping request (probe liveness).
+    pub const PING: u8 = 7;
+    /// DHT Pong reply (acknowledges ping, carries identity).
+    pub const PONG: u8 = 8;
+    /// DHT FindNode query (ask for nodes close to target).
+    pub const FIND_NODE: u8 = 9;
+    /// DHT Nodes response (carries serialised node entries).
+    pub const NODES: u8 = 10;
+    /// Gradient data payload.
+    pub const GRADIENT: u8 = 20;
+    /// Gradient acknowledgment.
+    pub const GRADIENT_ACK: u8 = 21;
+    /// Heartbeat (keepalive, no payload).
+    pub const HEARTBEAT: u8 = 30;
+    /// Graceful disconnect (reason code + optional message).
+    pub const DISCONNECT: u8 = 40;
+}
+
+/// Reason codes for Disconnect messages.
+pub mod disconnect_reason {
+    /// Node is shutting down gracefully.
+    pub const SHUTDOWN: u8 = 0;
+    /// Node is restarting (will reconnect).
+    pub const RESTART: u8 = 1;
+    /// Too many connections / resource limits.
+    pub const TOO_MANY_PEERS: u8 = 2;
+    /// Protocol version mismatch.
+    pub const VERSION_MISMATCH: u8 = 3;
+    /// Rate limited — disconnecting this peer.
+    pub const RATE_LIMITED: u8 = 4;
+    /// Manual/admin disconnect.
+    pub const ADMIN: u8 = 5;
+}
+
 /// 16-byte message header — zero-copy accessible via repr(C)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -54,6 +94,7 @@ impl MessageHeader {
     /// Construct a new `MessageHeader` with the given fields.
     ///
     /// Automatically computes and sets `header_crc` from the other fields.
+    #[inline]
     pub fn new(msg_type: u8, body_len: u32, flags: u16) -> Self {
         let mut h = MessageHeader {
             magic: MAGIC,
@@ -68,17 +109,26 @@ impl MessageHeader {
     }
 
     /// Read from a byte slice (zero-copy cast)
+    #[inline]
     pub fn from_bytes(buf: &[u8]) -> Result<&Self, HeaderError> {
         if buf.len() < HEADER_SIZE {
             return Err(HeaderError::ShortBuffer(buf.len()));
         }
+        // SAFETY: buf.len() >= HEADER_SIZE (16) checked above; MessageHeader is repr(C) with
+        // a [u8;4] + u8 + u8 + u16 + u32 + u32 = 16 bytes, no padding. The pointer cast is
+        // valid because buf is properly aligned for u8 reads and all fields use from_le_bytes
+        // semantics via the subsequent validate() call which reads each field.
         let h = unsafe { &*(buf.as_ptr() as *const MessageHeader) };
         h.validate()?;
         Ok(h)
     }
 
     /// Serialize to bytes
+    #[inline]
     pub fn to_bytes(&self) -> [u8; 16] {
+        // SAFETY: MessageHeader is repr(C), exactly 16 bytes with no padding. `self` is a
+        // valid, aligned, fully-initialized reference. Casting to [u8; 16] reinterprets the
+        // same memory; all bit patterns are valid for u8.
         unsafe { *(self as *const MessageHeader as *const [u8; 16]) }
     }
 
@@ -95,6 +145,7 @@ impl MessageHeader {
     ///
     /// Returns `Ok(())` on success, or a [`HeaderError`] describing the
     /// first validation failure encountered.
+    #[inline]
     pub fn validate(&self) -> Result<(), HeaderError> {
         if self.magic != MAGIC {
             return Err(HeaderError::BadMagic(self.magic));
@@ -112,6 +163,7 @@ impl MessageHeader {
     }
 
     /// Total on-wire size: header size plus body length.
+    #[inline]
     pub fn total_size(&self) -> usize {
         HEADER_SIZE + self.body_len as usize
     }
@@ -152,6 +204,27 @@ impl core::fmt::Display for HeaderError {
 // ─── Helper to build a complete framed message ──────────────────
 
 /// Build a complete wire frame: `[4-byte len][header][body]`
+///
+/// # Examples
+///
+/// ```
+/// use neuron_wire::header::{self, FLAG_AUTHENTICATED};
+///
+/// // Simple frame with no flags
+/// let body = b"gradient update".to_vec();
+/// let frame = header::build_frame(20, body.clone(), 0);
+/// assert!(frame.len() > 20); // 4 + 16 header + 15 body
+///
+/// // Parse it back
+/// let (h, payload) = header::parse_frame(&frame[4..]).unwrap();
+/// assert_eq!(h.msg_type, 20);
+/// assert_eq!(payload, b"gradient update");
+///
+/// // Authenticated frame
+/// let frame = header::build_frame(20, body.clone(), FLAG_AUTHENTICATED);
+/// assert_ne!(frame[4 + 6] & 0x02, 0); // flags byte
+/// ```
+#[inline]
 pub fn build_frame(msg_type: u8, body: Vec<u8>, flags: u16) -> Vec<u8> {
     let body_len = body.len() as u32;
     let header = MessageHeader::new(msg_type, body_len, flags);
@@ -164,16 +237,34 @@ pub fn build_frame(msg_type: u8, body: Vec<u8>, flags: u16) -> Vec<u8> {
 }
 
 /// Build a Ping frame (msg_type = 0) with an empty body.
+#[inline]
 pub fn build_ping() -> Vec<u8> {
     build_frame(0, Vec::new(), 0)
 }
 
 /// Build a Pong frame (msg_type = 1) with an empty body.
+#[inline]
 pub fn build_pong() -> Vec<u8> {
     build_frame(1, Vec::new(), 0)
 }
 
 /// Parse a complete frame: returns (header, body_slice)
+///
+/// # Examples
+///
+/// ```
+/// use neuron_wire::header;
+///
+/// let frame = header::build_frame(7, b"ping body".to_vec(), 0);
+/// let (h, body) = header::parse_frame(&frame[4..]).unwrap();
+/// assert_eq!(h.msg_type, 7);
+/// assert_eq!(body, b"ping body");
+///
+/// // Short buffer returns error
+/// let result = header::parse_frame(&[0u8; 4]);
+/// assert!(result.is_err());
+/// ```
+#[inline]
 pub fn parse_frame(buf: &[u8]) -> Result<(&MessageHeader, &[u8]), HeaderError> {
     let header = MessageHeader::from_bytes(buf)?;
     let body = &buf[HEADER_SIZE..header.total_size()];

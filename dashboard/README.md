@@ -1,18 +1,51 @@
-# Public Benchmark Dashboard
+# Neuron Wire Dashboard
 
-**URL:** https://neuron-wire-dashboard.vercel.app  
-**Repo:** https://github.com/cianmag/neuron-wire  
-**Deployed:** 2026-06-25
+The **neuron-wire** node ships a self-contained production dashboard that
+runs on every node — no external dependencies, no Vercel, no Go.
 
-## What it shows
-- **Network topology animation** — 12-node orbiting force-directed graph with pulse effect
-- **4 live Chart.js charts** — convergence time, bandwidth scaling, peer discovery (5-node + 50-node)
-- **Stats row** — animated counters: 50 max nodes, 100% conv rate, 3.25s avg conv, 36.5 Mbps peak
-- **Full results table** — 21 trials across 5/10/25/50 node scales
-- **Churn & routing stats** — apoptosis deaths = 0, packet delivery = 100%, K=20 buckets
-- **Live uptime clock** — shows how long the page has been open
+## Usage
 
-## Tech
-- Pure HTML+JS+CSS, Chart.js from CDN, zero build step
-- Deployed to Vercel in 7s with zero config (vercel.json)
-- GitHub Pages also available via https://cianmag.github.io/neuron-wire/dashboard/
+Start any NWP node with the health endpoint enabled:
+
+```bash
+NWP_HEALTH_BIND=0.0.0.0:9100 cargo run --bin node
+```
+
+Then open **http://<node-ip>:9100/** in your browser.
+
+## What you see
+
+- **Tick rate** — actual engine Hz (live)
+- **Peers** — nodes in the DHT routing table
+- **Packets in/out** — cumulative traffic counters
+- **Idle ratio** — CPU utilisation gauge (green/yellow/red)
+- **Retransmissions** — reliability-layer health
+- **Live event log** — latest actions streamed
+
+All data comes from `GET /status` (JSON) polled every 3s.
+
+## External monitoring
+
+The node exposes these additional endpoints:
+
+| Endpoint | Format | Use |
+|----------|--------|-----|
+| `/health` | `{"status":"ok"}` | Liveness probe |
+| `/status` | Full JSON dump | Dashboard data source |
+| `/metrics` | Prometheus text | Scrape by Grafana |
+
+## Vercel alternative (optional)
+
+If you want a hosted dashboard separate from your VPS:
+
+```bash
+# 1. Set env var pointing to your node
+vercel env add NWP_NODE_URL https://your-node:9100
+
+# 2. Deploy
+cd dashboard
+vercel deploy --prod
+```
+
+The Vercel function in `api/node.go` proxies `/health`, `/status`, `/metrics`
+to the NWP node and serves the dashboard UI.

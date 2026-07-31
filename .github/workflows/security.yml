@@ -1,0 +1,172 @@
+name: Security Audit & Dependency Scanning
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deny.toml'
+      - '.gitleaks.toml'
+      - 'src/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deny.toml'
+      - '.gitleaks.toml'
+      - 'src/**'
+  schedule:
+    # Run weekly on Sunday at 02:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: stable
+
+jobs:
+  # ─────────────────────────────────────────────────────
+  # Job 1: cargo-audit — known vulnerability scanning
+  # ─────────────────────────────────────────────────────
+  cargo-audit:
+    name: 🔒 Cargo Audit (vulnerabilities)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit
+
+      - name: Run cargo audit with deny advisories
+        run: cargo audit --deny warnings
+
+  # ─────────────────────────────────────────────────────
+  # Job 2: cargo-deny — license compliance + unsafe bans
+  # ─────────────────────────────────────────────────────
+  cargo-deny:
+    name: 🛡️ Cargo Deny (licenses & bans)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+
+      - name: Run cargo deny — advisories
+        run: cargo deny check advisories
+
+      - name: Run cargo deny — licenses
+        run: cargo deny check licenses
+
+      - name: Run cargo deny — bans
+        run: cargo deny check bans
+
+      - name: Run cargo deny — sources
+        run: cargo deny check sources
+
+  # ─────────────────────────────────────────────────────
+  # Job 3: dependency-review — PR-only new-vuln flagging
+  # ─────────────────────────────────────────────────────
+  dependency-review:
+    name: 📋 Dependency Review (PR)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0, SSPL
+          comment-summary-in-pr: always
+          fail-on-empty: false
+
+  # ─────────────────────────────────────────────────────
+  # Job 4: CodeQL — SAST analysis for Rust
+  # ─────────────────────────────────────────────────────
+  codeql-analysis:
+    name: 🔍 CodeQL Analysis (Rust)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['rust']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-and-quality
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust code
+        run: cargo build --release
+        env:
+          CARGO_INCREMENTAL: '0'
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
+
+  # ─────────────────────────────────────────────────────
+  # Job 5: secret-scanning — prevent credential leaks
+  # ─────────────────────────────────────────────────────
+  secret-scanning:
+    name: 🕵️ Secret Scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run gitleaks with custom config
+        run: |
+          gitleaks detect \
+            --source . \
+            --config .gitleaks.toml \
+            --verbose \
+            --redact \
+            --report-format sarif \
+            --report-path gitleaks-report.sarif \
+            --exit-code 1
+        continue-on-error: false
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: gitleaks-report.sarif
+          category: gitleaks

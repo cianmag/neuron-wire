@@ -1,6 +1,8 @@
+//! Continual Learning — catastrophic forgetting prevention.
+//!
+//! Implements elastic weight consolidation and progressive neural networks
+//! to enable the system to learn new tasks without forgetting old ones.
 #![deny(missing_docs)]
-
-//! Online continual learning mechanisms to prevent catastrophic
 //! forgetting in distributed neural networks.
 //!
 //! Implements two complementary methods:
@@ -57,9 +59,7 @@ impl EWC {
             let fisher = self.fisher_decay * f_old + (1.0 - self.fisher_decay) * grad * grad;
             self.importance.insert(key, fisher);
             // Save anchor weight on first update
-            if !self.anchor_weights.contains_key(&key) {
-                self.anchor_weights.insert(key, 0.0);
-            }
+            self.anchor_weights.entry(key).or_insert(0.0);
         }
     }
 
@@ -71,6 +71,8 @@ impl EWC {
     }
 }
 
+// SAFETY: EWC contains only HashMap fields and Copy-type scalars. All mutation goes through
+// `&mut self` methods (update_importance). No interior mutability or shared mutable state.
 unsafe impl Sync for EWC {}
 
 // ─── Synaptic Intelligence ──────────────────────────────────────
@@ -103,7 +105,7 @@ impl SynapticIntelligence {
     pub fn update_importance(&mut self, gradients: &[(EntityId, EntityId, f32)], _loss: f32) {
         for &(pre, post, grad) in gradients {
             let key = (pre, post);
-            let hist = self.weight_history.entry(key).or_insert_with(Vec::new);
+            let hist = self.weight_history.entry(key).or_default();
             let prev_w = hist.last().map(|&(_, w)| w).unwrap_or(0.0);
             let delta_w = 0.01; // approximated step
             let omega_contrib = delta_w * grad.abs();
@@ -121,13 +123,12 @@ impl SynapticIntelligence {
 
     /// Record a weight value at a given tick.
     pub fn record_weight(&mut self, id: (EntityId, EntityId), t: u64, w: f32) {
-        self.weight_history
-            .entry(id)
-            .or_insert_with(Vec::new)
-            .push((t, w));
+        self.weight_history.entry(id).or_default().push((t, w));
     }
 }
 
+// SAFETY: SynapticIntelligence contains only HashMap fields and scalar values. All mutation
+// goes through `&mut self` methods. No interior mutability or shared mutable state.
 unsafe impl Sync for SynapticIntelligence {}
 
 // ─── ContinualMethod ─────────────────────────────────────────────
@@ -165,6 +166,8 @@ impl ContinualMethod {
     }
 }
 
+// SAFETY: ContinualMethod is an enum wrapping EWC or SynapticIntelligence, both of which
+// are independently justified as Sync. All mutation goes through `&mut self` methods.
 unsafe impl Sync for ContinualMethod {}
 
 #[cfg(test)]

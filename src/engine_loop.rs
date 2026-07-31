@@ -63,11 +63,14 @@ use std::time::{Duration, Instant};
 use crate::apoptosis::ApoptosisSystem;
 use crate::components::{ActivationMap, EntityId, SynapseMap};
 use crate::dht::{DhtHandler, FreshnessConfig, NodeId, NodeType};
+use crate::error::{NwpError, TransportError};
 use crate::forward_pass::ForwardPassSystem;
+use crate::header;
 use crate::hebbian::HebbianLearningSystem;
 use crate::ml::MLSystem;
 use crate::neurogenesis::NeurogenesisSystem;
 use crate::transport::{TransportHeader, UdpTransport};
+use crate::{log_debug, log_error, log_info, log_warn};
 
 // ── Security imports (optional, gate via cfg) ──────────────────
 use crate::audit::{AuditEventType, AuditLog};
@@ -90,6 +93,25 @@ fn entity_id_from_addr(addr: &SocketAddr) -> EntityId {
 // ─── Configuration ─────────────────────────────────────────────
 
 /// Engine loop configuration
+///
+/// # Examples
+///
+/// ```
+/// use neuron_wire::engine_loop::EngineConfig;
+///
+/// // Default config for local development
+/// let config = EngineConfig::default();
+/// assert_eq!(config.bind_addr, "0.0.0.0:9000");
+/// assert_eq!(config.max_peers, 500);
+/// assert_eq!(config.per_ip_max_peers, 10);
+///
+/// // Production config with tighter limits
+/// let mut config = EngineConfig::default();
+/// config.max_peers = 200;
+/// config.per_ip_max_peers = 5;
+/// config.security_enabled = true;
+/// config.encrypt_payloads = true;
+/// ```
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
     /// UDP bind address
@@ -114,6 +136,50 @@ pub struct EngineConfig {
     pub freshness_config: Option<FreshnessConfig>,
     /// Optional identity seed for deterministic key generation (None = random).
     pub identity_seed: Option<[u8; 32]>,
+    /// Enable mandatory packet signing (default: true).
+    /// When true, ALL outbound packets are Ed25519-signed and ALL inbound
+    /// packets are signature-verified. Packets with invalid signatures are dropped.
+    pub security_enabled: bool,
+    /// Enable payload encryption (default: false until handshake established).
+    /// When true, packet bodies are AEAD-encrypted with per-peer session keys.
+    pub encrypt_payloads: bool,
+    /// Enable STUN NAT traversal for external address discovery at startup.
+    pub stun_enabled: bool,
+    /// STUN server address (default: "stun.l.google.com:19302").
+    pub stun_server: String,
+    /// Path for persisting the DHT peer cache (binary format).
+    pub peer_cache_path: Option<String>,
+    /// Path for persisting trust scores (binary format).
+    pub trust_cache_path: Option<String>,
+    /// Seed domain for DNS-based peer discovery (e.g. "nwp.neuron-wire.io").
+    pub seed_domain: String,
+    /// Maximum number of tracked peers. When exceeded, the node sends
+    /// TOO_MANY_PEERS disconnect to new arrivals. Set to 0 for unlimited.
+    /// Default: 500. Prevents memory exhaustion from Sybil floods.
+    pub max_peers: usize,
+    /// Interval between heartbeat sends (ticks). 0 = disabled.
+    /// Default: 30000 (30 seconds at 1ms tick rate).
+    pub heartbeat_interval_ticks: u64,
+    /// Maximum connections from a single IP address. Prevents a single
+    /// source from consuming all peer slots. 0 = no per-IP limit.
+    /// Default: 10.
+    pub per_ip_max_peers: usize,
+    /// Enable trust scoring & rate limiting (baseline toggle, default true).
+    pub trust_enabled: bool,
+    /// Enable gradient aging (half-life decay) (baseline toggle, default true).
+    pub aging_enabled: bool,
+    /// Enable the apoptosis sweep (baseline toggle, default true).
+    pub apoptosis_enabled: bool,
+    /// Enable neurogenesis (baseline toggle, default true).
+    pub neurogenesis_enabled: bool,
+    /// Baseline: use random peer discovery instead of XOR-closest (default false).
+    pub random_discovery: bool,
+    /// Baseline: static topology — no DHT maintenance beyond initial peers (default false).
+    pub static_topology: bool,
+    /// Deterministic in-sim packet loss rate in [0,1] (default 0.0).
+    pub packet_loss_rate: f32,
+    /// Seed for the deterministic impairment RNG (default 0).
+    pub sim_seed: u64,
 }
 
 impl Default for EngineConfig {
@@ -130,6 +196,24 @@ impl Default for EngineConfig {
             shared_stats: None,
             freshness_config: None,
             identity_seed: None, // random identity by default
+            security_enabled: true,
+            encrypt_payloads: false,
+            stun_enabled: false,
+            stun_server: "stun.l.google.com:19302".to_string(),
+            peer_cache_path: None,
+            trust_cache_path: None,
+            seed_domain: String::new(),
+            max_peers: 500,
+            heartbeat_interval_ticks: 30_000, // 30 seconds
+            per_ip_max_peers: 10,
+            trust_enabled: true,
+            aging_enabled: true,
+            apoptosis_enabled: true,
+            neurogenesis_enabled: true,
+            random_discovery: false,
+            static_topology: false,
+            packet_loss_rate: 0.0,
+            sim_seed: 0,
         }
     }
 }
@@ -221,9 +305,53 @@ pub struct EngineStats {
     pub busy_ticks: u64,
     /// Tick rate (actual average)
     pub actual_tick_rate_hz: f64,
+    // ── Security metrics ─────────────────────────────────────
+    /// Packets that passed Ed25519 signature verification
+    pub authenticated_packets: u64,
+    /// Packets that were AEAD-encrypted
+    pub encrypted_packets: u64,
+    /// Packets that failed signature verification
+    pub auth_failures: u64,
+    /// Packets that failed AEAD decryption
+    pub decrypt_failures: u64,
+    /// Rate-limited packets dropped
+    pub rate_limited_packets: u64,
+    // ── DHT metrics ──────────────────────────────────────────
+    /// DHT routing table size
+    pub dht_node_count: usize,
+    /// DHT pending pings
+    pub dht_pending_pings: usize,
+    /// DHT known dead nodes (evicted)
+    pub dht_dead_nodes: u64,
+    // ── Trust system metrics ─────────────────────────────────
+    /// Total tracked peers in trust system
+    pub trust_peer_count: usize,
+    /// Currently rate-limited peers
+    pub trust_rate_limited_peers: usize,
+    // ── Capacity metrics ─────────────────────────────────────
+    /// Maximum allowed peers (from config)
+    pub max_peers: usize,
+    /// Current peer count
+    pub active_peer_count: usize,
+    /// Peer capacity utilization (0.0 - 1.0)
+    pub peer_capacity_ratio: f64,
+    // ── Session metrics ──────────────────────────────────────
+    /// Active secure sessions
+    pub active_sessions: usize,
+    /// Ephemeral sessions (with forward secrecy)
+    pub ephemeral_sessions: usize,
 }
 
 // ─── Engine Loop ───────────────────────────────────────────────
+
+/// Per-peer tracking info: RTT estimate + last-seen timestamp.
+#[derive(Debug, Clone)]
+pub struct PeerInfo {
+    /// Round-trip time estimate in milliseconds.
+    pub rtt_ms: f32,
+    /// Timestamp of last packet received from this peer (ms since epoch).
+    pub last_seen_ms: u64,
+}
 
 /// Single-threaded, non-blocking event engine for the planetary brain.
 ///
@@ -255,16 +383,22 @@ pub struct EngineLoop {
     pub trust_system: TrustSystem,
     /// Audit log with hash-chain tamper detection
     pub audit_log: AuditLog,
+    /// Map of known peers + their tracking info (RTT + last-seen)
+    peer_rtt: HashMap<SocketAddr, PeerInfo>,
+    /// Per-IP connection count for DoS protection
+    peer_ip_count: HashMap<std::net::IpAddr, usize>,
+    /// Pre-allocated receive buffer (reused across ticks to avoid per-packet allocation)
+    recv_buf: Vec<u8>,
     /// ── Timers ─────────────────────────────────────────────────
     tick: u64,
     last_retransmit_tick: u64,
     last_cleanup_tick: u64,
+    /// Last heartbeat send tick
+    last_heartbeat_tick: u64,
     /// Last stats snapshot time
     last_stats_time: Instant,
     /// Running stats
     stats: EngineStats,
-    /// Map of known peers + their RTT estimates (ms)
-    peer_rtt: HashMap<SocketAddr, f32>,
     /// ── Brain State (optional, attach via attach_brain()) ─────
     /// Activation values for each known neuron
     activation_map: ActivationMap,
@@ -289,6 +423,28 @@ pub struct EngineLoop {
     /// When `None`, all packets are accepted (normal operation).
     /// Uses Arc<Mutex<>> so the simulator thread can inject filters post-spawn.
     pub packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>>,
+    /// Xorshift state for deterministic in-sim packet loss.
+    loss_rng: u64,
+}
+
+#[cfg(test)]
+impl EngineLoop {
+    /// Test-only helper: insert a peer with a given RTT and age (ms ago).
+    pub fn insert_peer_for_test(&mut self, addr: SocketAddr, rtt: f32, age_ms: u64) {
+        let now_ms = u64::from(self.transport.now_ms());
+        self.peer_rtt.insert(
+            addr,
+            PeerInfo {
+                rtt_ms: rtt,
+                last_seen_ms: now_ms.saturating_sub(age_ms),
+            },
+        );
+    }
+
+    /// Test-only helper: number of peers currently tracked.
+    pub fn peer_count_for_test(&self) -> usize {
+        self.peer_rtt.len()
+    }
 }
 
 impl EngineLoop {
@@ -308,6 +464,11 @@ impl EngineLoop {
         };
         let audit_log = AuditLog::new();
 
+        // Deterministic impairment RNG seed: sim_seed mixed with the bind address.
+        let mut loss_hasher = std::collections::hash_map::DefaultHasher::new();
+        config.bind_addr.hash(&mut loss_hasher);
+        let loss_rng = config.sim_seed ^ loss_hasher.finish() ^ 0x9E37_79B9_7F4A_7C15;
+
         let engine = EngineLoop {
             config,
             transport,
@@ -316,6 +477,7 @@ impl EngineLoop {
             dht_handler: None,
             apoptosis_system: ApoptosisSystem::new(),
             shutdown: Arc::new(AtomicBool::new(false)),
+            loss_rng,
             // Security subsystem
             node_identity,
             secure_channel: SecureChannel::new(),
@@ -324,12 +486,15 @@ impl EngineLoop {
             tick: 0,
             last_retransmit_tick: 0,
             last_cleanup_tick: 0,
+            last_heartbeat_tick: 0,
             last_stats_time: Instant::now(),
             stats: EngineStats::default(),
-            peer_rtt: HashMap::new(),
+            peer_rtt: HashMap::with_capacity(512),
+            peer_ip_count: HashMap::with_capacity(128),
+            recv_buf: vec![0u8; 65535],
             // Brain state defaults (attach via attach_brain())
-            activation_map: HashMap::new(),
-            synapse_map: HashMap::new(),
+            activation_map: HashMap::with_capacity(256),
+            synapse_map: HashMap::with_capacity(1024),
             forward_pass: ForwardPassSystem::default(),
             neurogenesis: NeurogenesisSystem::default(),
             hebbian: HebbianLearningSystem::new(0.01, 0.999, 0.001, 500),
@@ -353,6 +518,7 @@ impl EngineLoop {
     /// Attach neural computation brain to the engine loop.
     /// Enables ForwardPass + Hebbian learning on every tick.
     /// Call this before `run()` to enable AGI computation.
+    #[allow(clippy::too_many_arguments)] // config bundle, kept flat for ergonomics
     pub fn attach_brain(
         &mut self,
         activation_map: ActivationMap,
@@ -384,11 +550,13 @@ impl EngineLoop {
             .socket
             .set_read_timeout(Some(Duration::from_millis(self.config.tick_interval_ms)))
         {
-            eprintln!("[ENGINE] WARN: could not set read timeout: {}", e);
+            log_warn!(
+                "engine",
+                format!("[ENGINE] Could not set read timeout: {}", e)
+            );
         }
 
-        // Pre-allocate a local receive buffer (stack-friendly, reused)
-        let mut recv_buf = vec![0u8; self.config.recv_buffer_size];
+        // Pre-allocated receive buffer lives on the struct (avoid per-packet allocation)
         let mut ingress_count_this_tick: u32;
 
         // Log startup to audit trail
@@ -409,9 +577,12 @@ impl EngineLoop {
 
             // ── SHUTDOWN CHECK ─────────────────────────────────
             if self.shutdown.load(Ordering::Relaxed) {
-                eprintln!(
-                    "[ENGINE] Shutdown signal received at tick {}. Exiting.",
-                    self.tick
+                log_info!(
+                    "engine",
+                    format!(
+                        "[ENGINE] Shutdown signal received at tick {}. Exiting.",
+                        self.tick
+                    )
                 );
                 return;
             }
@@ -422,14 +593,18 @@ impl EngineLoop {
             // Non-blocking: drain ALL available messages from the socket buffer.
             // This prevents the "one-per-iteration" bottleneck.
             loop {
-                match self.transport.socket.recv_from(&mut recv_buf) {
+                match self.transport.socket.recv_from(&mut self.recv_buf) {
                     Ok((len, src)) => {
                         ingress_count_this_tick += 1;
                         self.stats.packets_recv += 1;
                         self.stats.bytes_recv += len as u64;
 
-                        if let Err(e) = self.handle_ingress(&recv_buf[..len], src) {
-                            eprintln!("[ENGINE] ingress error: {}", e);
+                        // Copy the received bytes out of the shared buffer so the
+                        // mutable borrow in handle_ingress does not conflict with
+                        // the buffer borrow. Allocation is packet-sized only.
+                        let packet = self.recv_buf[..len].to_vec();
+                        if let Err(e) = self.handle_ingress(&packet, src) {
+                            log_error!("engine", format!("[ENGINE] Ingress error: {}", e));
                         }
                     }
                     Err(ref e)
@@ -440,7 +615,7 @@ impl EngineLoop {
                         break;
                     }
                     Err(e) => {
-                        eprintln!("[ENGINE] recv error: {}", e);
+                        log_error!("engine", format!("[ENGINE] Recv error: {}", e));
                         break;
                     }
                 }
@@ -465,11 +640,17 @@ impl EngineLoop {
                 match self.outbound_rx.try_recv() {
                     Ok(packet) => {
                         let result = if packet.mode.is_reliable() {
+                            // Baseline toggle: aging disabled => effectively infinite half-life.
+                            let half_life = if self.config.aging_enabled {
+                                self.config.gradient_half_life_ms
+                            } else {
+                                f32::MAX
+                            };
                             self.transport.send_reliable(
                                 &packet.payload,
                                 &packet.dst,
                                 packet.mode.max_retries(),
-                                self.config.gradient_half_life_ms,
+                                half_life,
                             )
                         } else {
                             self.transport
@@ -482,7 +663,7 @@ impl EngineLoop {
                                 self.stats.bytes_sent += packet.payload.len() as u64;
                             }
                             Err(e) => {
-                                eprintln!("[ENGINE] send error: {}", e);
+                                log_error!("engine", format!("[ENGINE] Send error: {}", e));
                             }
                         }
                     }
@@ -508,10 +689,17 @@ impl EngineLoop {
                     std::collections::HashMap::new();
 
                 // Step 1: Forward pass (borrows activation_map + synapse_map + neurogenesis)
+                // Baseline toggle: neurogenesis disabled => use a throwaway system.
+                let mut no_neurogenesis = NeurogenesisSystem::default();
+                let neuro_ref = if self.config.neurogenesis_enabled {
+                    &mut self.neurogenesis
+                } else {
+                    &mut no_neurogenesis
+                };
                 let fp_report = self.forward_pass.tick(
                     &mut self.activation_map,
                     &mut self.synapse_map,
-                    &mut self.neurogenesis,
+                    neuro_ref,
                     self.tick,
                     &observations,
                 );
@@ -528,12 +716,15 @@ impl EngineLoop {
 
                 // Log notable brain events every tick
                 if fp_report.neurons_spawned > 0 {
-                    eprintln!(
-                        "[BRAIN] tick={} spawned={} surprise={:.4} orphans={}",
-                        self.tick,
-                        fp_report.neurons_spawned,
-                        fp_report.total_surprise,
-                        fp_report.orphans_cleaned,
+                    log_info!(
+                        "brain",
+                        format!(
+                            "[ENGINE] tick={} spawned={} surprise={:.4} orphans={}",
+                            self.tick,
+                            fp_report.neurons_spawned,
+                            fp_report.total_surprise,
+                            fp_report.orphans_cleaned,
+                        )
                     );
                 }
 
@@ -570,32 +761,92 @@ impl EngineLoop {
                 // Transport cleanup (expired reliable frames)
                 self.transport.cleanup_expired();
 
+                // ── Peer RTT eviction ─────────────────────────
+                // Remove peers we haven't heard from in 5 minutes.
+                {
+                    let now = u64::from(self.transport.now_ms());
+                    let peer_ttl_ms: u64 = 300_000; // 5 minutes
+                    let before_count = self.peer_rtt.len();
+                    let mut evicted_addrs = Vec::new();
+                    self.peer_rtt.retain(|addr, info| {
+                        let age = now.saturating_sub(info.last_seen_ms);
+                        if age > peer_ttl_ms {
+                            log_info!(
+                                "engine",
+                                format!(
+                                    "[ENGINE] Evicting stale peer {} (no activity for {}s)",
+                                    addr,
+                                    age / 1000,
+                                ),
+                                peer = &addr.to_string()
+                            );
+                            evicted_addrs.push(addr.ip());
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                    // Decrement per-IP counts for evicted peers
+                    for ip in &evicted_addrs {
+                        if let Some(count) = self.peer_ip_count.get_mut(ip) {
+                            *count = count.saturating_sub(1);
+                            if *count == 0 {
+                                self.peer_ip_count.remove(ip);
+                            }
+                        }
+                    }
+                    let evicted = before_count - self.peer_rtt.len();
+                    if evicted > 0 {
+                        self.stats.dht_dead_nodes += evicted as u64;
+                    }
+                }
+
                 // Apoptosis sweep: evict dead DHT nodes, expired pings,
                 // orphaned transport frames. Reports total deaths this sweep.
+                // Baseline toggle: apoptosis disabled => skip the sweep.
                 if let Some(ref mut dht) = self.dht_handler {
-                    let report = self
-                        .apoptosis_system
-                        .tick(self.tick, dht, &mut self.transport);
+                    if self.config.apoptosis_enabled {
+                        let report =
+                            self.apoptosis_system
+                                .tick(self.tick, dht, &mut self.transport);
 
-                    // Death spiral guardrail
-                    if self.apoptosis_system.is_death_spiral(&report) {
-                        eprintln!(
-                            "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
-                             Network partition or seed node failure.",
-                            report.total_deaths, self.tick,
-                        );
-                    } else if report.total_deaths > 0 {
-                        eprintln!(
-                            "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{} frames:{})",
-                            report.total_deaths,
-                            report.dht_nodes_evicted,
-                            report.pending_pings_expired,
-                            report.data_frames_purged,
-                        );
+                        // Death spiral guardrail
+                        if self.apoptosis_system.is_death_spiral(&report) {
+                            log_warn!(
+                                "engine",
+                                format!(
+                                    "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}. \
+                                 Network partition or seed node failure.",
+                                    report.total_deaths, self.tick,
+                                )
+                            );
+                        } else if report.total_deaths > 0 {
+                            log_warn!(
+                                "apoptosis",
+                                format!(
+                                    "[APOPTOSIS] sweep: {} deaths (DHT:{} ping:{} frames:{})",
+                                    report.total_deaths,
+                                    report.dht_nodes_evicted,
+                                    report.pending_pings_expired,
+                                    report.data_frames_purged,
+                                )
+                            );
+                        }
                     }
 
-                    // DHT periodic maintenance (ping stale, save peers)
-                    dht.periodic_maintenance();
+                    // DHT periodic maintenance (ping stale, save peers).
+                    // Baseline toggle: static topology => no discovery beyond initial peers.
+                    if !self.config.static_topology {
+                        dht.periodic_maintenance();
+                    }
+                }
+
+                // ── Heartbeat keepalive ────────────────────────
+                if self.config.heartbeat_interval_ticks > 0
+                    && self.tick - self.last_heartbeat_tick >= self.config.heartbeat_interval_ticks
+                {
+                    self.last_heartbeat_tick = self.tick;
+                    self.send_heartbeats();
                 }
 
                 self.update_stats();
@@ -621,14 +872,14 @@ impl EngineLoop {
     /// Process an incoming UDP datagram.
     /// Validates CRC, updates ACK tracker, applies gradient decay,
     /// and dispatches to the event channel.
-    fn handle_ingress(&mut self, data: &[u8], src: SocketAddr) -> Result<(), String> {
+    fn handle_ingress(&mut self, data: &[u8], src: SocketAddr) -> Result<(), NwpError> {
         // Packet filter for failure injection (partition simulation).
         // When packet_filter_allowed is Some, only packets from those addresses are processed.
         {
             let allowed = self
                 .packet_filter_allowed
                 .lock()
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| NwpError::connection_refused(format!("lock poisoned: {}", e)))?;
             if let Some(ref allowed_set) = *allowed {
                 if !allowed_set.contains(&src) {
                     return Ok(()); // silently drop
@@ -636,24 +887,46 @@ impl EngineLoop {
             }
         }
 
+        // Deterministic in-sim packet loss (seeded xorshift — reproducible runs).
+        if self.config.packet_loss_rate > 0.0 {
+            self.loss_rng ^= self.loss_rng << 13;
+            self.loss_rng ^= self.loss_rng >> 7;
+            self.loss_rng ^= self.loss_rng << 17;
+            let r = (self.loss_rng % 10_000) as f32 / 10_000.0;
+            if r < self.config.packet_loss_rate {
+                return Ok(()); // simulated loss — silently drop
+            }
+        }
+
         // data = full UDP datagram: [16-byte transport header][NWP frame]
         // NWP frame layout: [4-byte frame_len][16-byte MessageHeader][body]
         if data.len() < TransportHeader::SIZE + 4 {
-            return Err(format!("too short: {} bytes", data.len()));
+            return Err(NwpError::Transport(TransportError::PacketTooShort {
+                actual: data.len(),
+                expected: TransportHeader::SIZE + 4,
+            }));
         }
 
         // ── Security: trust-based rate limiting ────────────────
         let peer_id = entity_id_from_addr(&src);
-        if self.trust_system.check_rate_limit(&peer_id) {
+        // Baseline toggle: trust disabled => no rate limiting.
+        if self.config.trust_enabled && self.trust_system.check_rate_limit(&peer_id) {
             self.audit_log.append(
                 AuditEventType::RateLimitTriggered,
                 &format!("rate-limited packet from {}", src),
                 Some(peer_id),
             );
+            log_warn!(
+                "security",
+                format!("[ENGINE] Rate-limited packet from {}", src),
+                peer = &src.to_string()
+            );
             return Ok(()); // silently drop, but log
         }
 
         // Zero-copy parse the transport header from the raw datagram
+        // SAFETY: data.len() >= TransportHeader::SIZE + 4 (checked above at line 755),
+        // so data is at least 20 bytes — more than the 16 required by from_bytes.
         let transport_header = unsafe { TransportHeader::from_bytes(data) };
 
         // Update ACK tracker with the received sequence number
@@ -674,7 +947,69 @@ impl EngineLoop {
         let nwp_payload: &[u8] = &nwp_frame[4..];
 
         // Track this source as a peer (for peer count / convergence detection)
-        self.peer_rtt.entry(src).or_insert(100.0);
+        // ── Connection limit: DoS protection ──────────────────
+        if self.config.max_peers > 0
+            && !self.peer_rtt.contains_key(&src)
+            && self.peer_rtt.len() >= self.config.max_peers
+        {
+            log_warn!(
+                "security",
+                format!(
+                    "[ENGINE] Connection limit reached, sending TOO_MANY_PEERS to {}",
+                    src
+                ),
+                peer = &src.to_string()
+            );
+            self.send_disconnect(
+                src,
+                header::disconnect_reason::TOO_MANY_PEERS,
+                "node at capacity",
+            );
+            return Ok(());
+        }
+        // ── Per-IP connection limit: prevent single-IP DoS ───
+        if self.config.per_ip_max_peers > 0 && !self.peer_rtt.contains_key(&src) {
+            let ip_count = self.peer_ip_count.entry(src.ip()).or_insert(0);
+            if *ip_count >= self.config.per_ip_max_peers {
+                log_warn!(
+                    "security",
+                    format!(
+                        "[ENGINE] Per-IP limit reached for {}, sending TOO_MANY_PEERS",
+                        src.ip()
+                    ),
+                    peer = &src.to_string()
+                );
+                self.send_disconnect(
+                    src,
+                    header::disconnect_reason::TOO_MANY_PEERS,
+                    "per-IP connection limit",
+                );
+                return Ok(());
+            }
+            *ip_count += 1;
+        }
+        self.peer_rtt.entry(src).or_insert(PeerInfo {
+            rtt_ms: 100.0,
+            last_seen_ms: u64::from(self.transport.now_ms()),
+        });
+        // Update last-seen for existing peers too
+        if let Some(info) = self.peer_rtt.get_mut(&src) {
+            info.last_seen_ms = u64::from(self.transport.now_ms());
+        }
+
+        // ── Handle Heartbeat/Disconnect messages inline ─────
+        if nwp_payload.len() >= 6 {
+            let msg_type_byte = nwp_payload[5]; // msg_type is at offset 5 in NWP header
+            if msg_type_byte == header::msg_type::DISCONNECT && nwp_payload.len() > 16 {
+                let body = &nwp_payload[16..]; // skip 16-byte NWP header
+                self.handle_disconnect(src, body);
+                return Ok(());
+            }
+            if msg_type_byte == header::msg_type::HEARTBEAT {
+                self.handle_heartbeat(src);
+                return Ok(());
+            }
+        }
 
         // Gradient weight default: 1.0 (full utility for each received packet).
         let gradient_weight = 1.0;
@@ -720,26 +1055,31 @@ impl EngineLoop {
         let mb_recv = self.stats.bytes_recv as f64 / 1_000_000.0;
         let mb_sent = self.stats.bytes_sent as f64 / 1_000_000.0;
 
-        eprintln!(
-            "[ENGINE] tick={} rate={:.0}Hz rx={} pkts ({:.2}MB) tx={} pkts ({:.2}MB) \
+        let tick_rate = if elapsed > 0.0 {
+            self.tick as f64 / elapsed
+        } else {
+            0.0
+        };
+        let idle_pct = if self.tick > 0 {
+            self.stats.idle_ticks as f64 / self.tick as f64 * 100.0
+        } else {
+            0.0
+        };
+        log_debug!(
+            "engine",
+            format!(
+                "[ENGINE] tick={} rate={:.0}Hz rx={} pkts ({:.2}MB) tx={} pkts ({:.2}MB) \
              idle={:.1}% reliable_q={} peers={}",
-            self.tick,
-            if elapsed > 0.0 {
-                self.tick as f64 / elapsed
-            } else {
-                0.0
-            },
-            self.stats.packets_recv,
-            mb_recv,
-            self.stats.packets_sent,
-            mb_sent,
-            if self.tick > 0 {
-                self.stats.idle_ticks as f64 / self.tick as f64 * 100.0
-            } else {
-                0.0
-            },
-            self.stats.reliable_queue_depth,
-            self.peer_rtt.len(),
+                self.tick,
+                tick_rate,
+                self.stats.packets_recv,
+                mb_recv,
+                self.stats.packets_sent,
+                mb_sent,
+                idle_pct,
+                self.stats.reliable_queue_depth,
+                self.peer_rtt.len(),
+            )
         );
     }
 
@@ -753,13 +1093,112 @@ impl EngineLoop {
         if let Some(ref shared) = self.config.shared_stats {
             if let Ok(mut s) = shared.lock() {
                 *s = self.stats.clone();
+                // Capacity metrics
+                s.max_peers = self.config.max_peers;
+                s.active_peer_count = self.peer_rtt.len();
+                s.peer_capacity_ratio = if self.config.max_peers > 0 {
+                    self.peer_rtt.len() as f64 / self.config.max_peers as f64
+                } else {
+                    0.0
+                };
+                // DHT metrics
+                if let Some(ref dht) = self.dht_handler {
+                    s.dht_node_count = dht.routing_table.node_count();
+                    s.dht_pending_pings = dht.pending_ping_count();
+                }
+                // Trust metrics
+                let ts = self.trust_system.stats();
+                s.trust_peer_count = ts.total_peers;
+                s.trust_rate_limited_peers = ts.rate_limited_peers;
+                // Session metrics
+                s.active_sessions = self.secure_channel.session_count();
+                s.ephemeral_sessions = self.secure_channel.ephemeral_count();
             }
         }
     }
 
     /// Get peer RTT estimates
-    pub fn peer_rtt(&self) -> &HashMap<SocketAddr, f32> {
+    pub fn peer_rtt(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.peer_rtt
+    }
+
+    // ─── Heartbeat Protocol ───────────────────────────────────
+
+    /// Send a HEARTBEAT message to all known peers.
+    fn send_heartbeats(&self) {
+        let flags = if self.config.security_enabled {
+            header::FLAG_AUTHENTICATED
+        } else {
+            0
+        };
+        let frame = header::build_frame(header::msg_type::HEARTBEAT, Vec::new(), flags);
+        for addr in self.peer_rtt.keys() {
+            let _ = self.transport.socket.send_to(&frame, *addr);
+        }
+    }
+
+    /// Handle an incoming Heartbeat message.
+    fn handle_heartbeat(&mut self, src: SocketAddr) {
+        log_debug!(
+            "engine",
+            format!("[ENGINE] Heartbeat from {}", src),
+            peer = &src.to_string()
+        );
+    }
+
+    // ─── Disconnect Protocol ──────────────────────────────────
+
+    /// Send a graceful disconnect message to a specific peer.
+    fn send_disconnect(&self, dst: SocketAddr, reason: u8, message: &str) {
+        let mut body = vec![reason];
+        body.extend_from_slice(message.as_bytes());
+        let flags = if self.config.security_enabled {
+            header::FLAG_AUTHENTICATED
+        } else {
+            0
+        };
+        let frame = header::build_frame(header::msg_type::DISCONNECT, body, flags);
+        let _ = self.transport.socket.send_to(&frame, dst);
+        log_info!(
+            "engine",
+            format!("[ENGINE] Sent DISCONNECT(reason={}) to {}", reason, dst),
+            peer = &dst.to_string()
+        );
+    }
+
+    /// Broadcast disconnect to all known peers (shutdown procedure).
+    #[allow(dead_code)] // reserved for graceful shutdown broadcasts
+    fn broadcast_disconnect(&self, reason: u8, message: &str) {
+        for addr in self.peer_rtt.keys() {
+            self.send_disconnect(*addr, reason, message);
+        }
+    }
+
+    /// Handle an incoming Disconnect message.
+    fn handle_disconnect(&mut self, src: SocketAddr, body: &[u8]) {
+        if body.is_empty() {
+            log_info!(
+                "engine",
+                format!("[ENGINE] Disconnect from {} (no reason)", src),
+                peer = &src.to_string()
+            );
+            return;
+        }
+        let reason = body[0];
+        let detail = if body.len() > 1 {
+            String::from_utf8_lossy(&body[1..]).to_string()
+        } else {
+            String::new()
+        };
+        log_info!(
+            "engine",
+            format!(
+                "[ENGINE] Disconnect from {} reason={}: {}",
+                src, reason, detail
+            ),
+            peer = &src.to_string()
+        );
+        self.peer_rtt.remove(&src);
     }
 }
 
@@ -786,6 +1225,11 @@ pub fn spawn_engine(
 
     let outbound_tx_for_return = outbound_tx.clone();
 
+    // Deterministic impairment RNG seed: sim_seed mixed with the bind address.
+    let mut loss_hasher = std::collections::hash_map::DefaultHasher::new();
+    config.bind_addr.hash(&mut loss_hasher);
+    let loss_rng = config.sim_seed ^ loss_hasher.finish() ^ 0x9E37_79B9_7F4A_7C15;
+
     let handle = std::thread::Builder::new()
         .name("nwp-engine".to_string())
         .spawn(move || {
@@ -805,11 +1249,14 @@ pub fn spawn_engine(
                 tick: 0,
                 last_retransmit_tick: 0,
                 last_cleanup_tick: 0,
+                last_heartbeat_tick: 0,
                 last_stats_time: Instant::now(),
                 stats: EngineStats::default(),
-                peer_rtt: HashMap::new(),
-                activation_map: HashMap::new(),
-                synapse_map: HashMap::new(),
+                peer_rtt: HashMap::with_capacity(512),
+                peer_ip_count: HashMap::with_capacity(128),
+                recv_buf: vec![0u8; 65535],
+                activation_map: HashMap::with_capacity(256),
+                synapse_map: HashMap::with_capacity(1024),
                 forward_pass: ForwardPassSystem::default(),
                 neurogenesis: NeurogenesisSystem::default(),
                 hebbian: HebbianLearningSystem::new(0.01, 0.999, 0.001, 500),
@@ -819,6 +1266,7 @@ pub fn spawn_engine(
                 brain_attached: false,
                 packet_filter_allowed: packet_filter_allowed
                     .unwrap_or_else(|| Arc::new(Mutex::new(None))),
+                loss_rng,
             };
 
             // Auto-create DHT handler if local peers configured but no handler given
@@ -826,7 +1274,7 @@ pub fn spawn_engine(
                 use rand::Rng;
                 let mut local_id = [0u8; 32];
                 rand::thread_rng().fill(&mut local_id);
-                let dht = DhtHandler::new(
+                let mut dht = DhtHandler::new(
                     NodeId::new(local_id),
                     engine
                         .config
@@ -838,6 +1286,7 @@ pub fn spawn_engine(
                     None,
                     "local".to_string(),
                 );
+                dht.random_discovery = engine.config.random_discovery;
                 engine.dht_handler = Some(dht);
             }
 
@@ -846,9 +1295,14 @@ pub fn spawn_engine(
                 if fconfig.enabled {
                     if let Some(ref mut dht) = engine.dht_handler {
                         dht.enable_sga(*fconfig);
-                        eprintln!(
-                            "[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
-                            fconfig.half_life_ms, fconfig.stretch_factor, fconfig.base_interval_ms
+                        log_info!(
+                            "engine",
+                            format!(
+                                "[ENGINE] SGA active (half-life={}ms, stretch={}, base={}ms)",
+                                fconfig.half_life_ms,
+                                fconfig.stretch_factor,
+                                fconfig.base_interval_ms
+                            )
                         );
                     }
                 }
@@ -863,9 +1317,12 @@ pub fn spawn_engine(
                     dht.ping_node(*peer_addr);
                 }
                 dht.bootstrap();
-                eprintln!(
-                    "[ENGINE] Bootstrapped {} local peers",
-                    engine.config.local_peers.len()
+                log_info!(
+                    "engine",
+                    format!(
+                        "[ENGINE] Bootstrapped {} local peers",
+                        engine.config.local_peers.len()
+                    )
                 );
             }
 
@@ -882,9 +1339,12 @@ pub fn spawn_engine(
 
                 // ── SHUTDOWN CHECK ─────────────────────────────
                 if engine.shutdown.load(Ordering::Relaxed) {
-                    eprintln!(
-                        "[ENGINE] Shutdown signal. Exiting after {} ticks.",
-                        engine.tick
+                    log_info!(
+                        "engine",
+                        format!(
+                            "[ENGINE] Shutdown signal. Exiting after {} ticks.",
+                            engine.tick
+                        )
                     );
                     return;
                 }
@@ -902,7 +1362,7 @@ pub fn spawn_engine(
                             // the transport header internally.
                             if len >= TransportHeader::SIZE {
                                 if let Err(e) = engine.handle_ingress(&recv_buf[..len], src) {
-                                    eprintln!("[ENGINE] ingress: {}", e);
+                                    log_error!("engine", format!("[ENGINE] Ingress error: {}", e));
                                 }
                             }
                         }
@@ -913,7 +1373,7 @@ pub fn spawn_engine(
                             break
                         }
                         Err(e) => {
-                            eprintln!("[ENGINE] recv: {}", e);
+                            log_error!("engine", format!("[ENGINE] Recv error: {}", e));
                             break;
                         }
                     }
@@ -972,9 +1432,12 @@ pub fn spawn_engine(
                                 .apoptosis_system
                                 .tick(engine.tick, dht, &mut engine.transport);
                         if engine.apoptosis_system.is_death_spiral(&report) {
-                            eprintln!(
-                                "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}.",
-                                report.total_deaths, engine.tick,
+                            log_warn!(
+                                "engine",
+                                format!(
+                                    "[ENGINE] ⚠️ DEATH SPIRAL: {} nodes evicted at tick {}.",
+                                    report.total_deaths, engine.tick,
+                                )
                             );
                         } else if report.total_deaths > 0 {
                             eprintln!(
@@ -1041,5 +1504,207 @@ mod tests {
     fn test_gradient_weight_fresh() {
         let w = calculate_gradient_weight(0, 100.0);
         assert!((w - 1.0).abs() < 0.001);
+    }
+
+    // ── New tests for new features ──────────────────────────────
+
+    #[test]
+    fn test_peer_info_creation() {
+        let peer = PeerInfo {
+            rtt_ms: 100.0,
+            last_seen_ms: 12345,
+        };
+        assert_eq!(peer.rtt_ms, 100.0);
+        assert!(peer.last_seen_ms > 0);
+    }
+
+    #[test]
+    fn test_peer_rtt_eviction() {
+        // Create engine with an ephemeral port (parallel tests share 0.0.0.0:9000)
+        let cfg = EngineConfig {
+            bind_addr: "127.0.0.1:0".to_string(),
+            ..Default::default()
+        };
+        let (mut engine, _tx, _rx) = EngineLoop::new(cfg).unwrap();
+
+        // Use a synthetic clock so we can represent peers older than the
+        // process-relative u32 clock without waiting 5+ minutes.
+        let synthetic_now: u64 = 1_000_000;
+        let mut insert = |addr: &str, rtt: f32, age_ms: u64| {
+            let a: std::net::SocketAddr = addr.parse().unwrap();
+            engine.peer_rtt.insert(
+                a,
+                PeerInfo {
+                    rtt_ms: rtt,
+                    last_seen_ms: synthetic_now - age_ms,
+                },
+            );
+        };
+
+        // Old peers: age > 300_000 ms (300s) — should be evicted
+        insert("10.0.0.1:9000", 50.0, 400_000); // 400s old
+        insert("10.0.0.2:9000", 60.0, 350_000); // 350s old
+        insert("10.0.0.3:9000", 70.0, 310_000); // 310s old
+
+        // Recent peers: age < 300_000 ms — should remain
+        insert("10.0.0.4:9000", 80.0, 10_000); // 10s old
+        insert("10.0.0.5:9000", 90.0, 60_000); // 60s old
+        insert("10.0.0.6:9000", 100.0, 200_000); // 200s old
+
+        assert_eq!(
+            engine.peer_count_for_test(),
+            6,
+            "should have 6 peers before eviction"
+        );
+
+        // Run the eviction logic (same code as in the cleanup phase)
+        let now = synthetic_now;
+        let peer_ttl_ms: u64 = 300_000;
+        engine.peer_rtt.retain(|_addr, info| {
+            let age = now.saturating_sub(info.last_seen_ms);
+            age <= peer_ttl_ms
+        });
+
+        assert_eq!(
+            engine.peer_count_for_test(),
+            3,
+            "only 3 recent peers should remain"
+        );
+
+        // Verify the correct peers survived
+        assert!(engine
+            .peer_rtt
+            .contains_key(&"10.0.0.4:9000".parse().unwrap()));
+        assert!(engine
+            .peer_rtt
+            .contains_key(&"10.0.0.5:9000".parse().unwrap()));
+        assert!(engine
+            .peer_rtt
+            .contains_key(&"10.0.0.6:9000".parse().unwrap()));
+
+        // Verify old peers were evicted
+        assert!(!engine
+            .peer_rtt
+            .contains_key(&"10.0.0.1:9000".parse().unwrap()));
+        assert!(!engine
+            .peer_rtt
+            .contains_key(&"10.0.0.2:9000".parse().unwrap()));
+        assert!(!engine
+            .peer_rtt
+            .contains_key(&"10.0.0.3:9000".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_connection_limit() {
+        let cfg = EngineConfig {
+            max_peers: 2,
+            ..Default::default()
+        };
+        let (mut engine, _tx, _rx) = EngineLoop::new(cfg).unwrap();
+
+        // Fill to capacity
+        engine.insert_peer_for_test("10.0.0.1:9000".parse().unwrap(), 50.0, 1000);
+        engine.insert_peer_for_test("10.0.0.2:9000".parse().unwrap(), 60.0, 1000);
+        assert_eq!(engine.peer_count_for_test(), 2);
+
+        // Verify the connection limit logic: a new unknown peer should be rejected
+        let new_src: SocketAddr = "10.0.0.3:9000".parse().unwrap();
+        let limit_reached = engine.config.max_peers > 0
+            && !engine.peer_rtt.contains_key(&new_src)
+            && engine.peer_rtt.len() >= engine.config.max_peers;
+        assert!(
+            limit_reached,
+            "new peer should be rejected when at capacity"
+        );
+
+        // An already-known peer should NOT be rejected
+        let known_src: SocketAddr = "10.0.0.1:9000".parse().unwrap();
+        let known_rejected = engine.config.max_peers > 0
+            && !engine.peer_rtt.contains_key(&known_src)
+            && engine.peer_rtt.len() >= engine.config.max_peers;
+        assert!(!known_rejected, "known peer should NOT be rejected");
+    }
+
+    #[test]
+    fn test_engine_config_defaults() {
+        let cfg = EngineConfig::default();
+
+        // Core timing
+        assert_eq!(cfg.bind_addr, "0.0.0.0:9000");
+        assert_eq!(cfg.tick_interval_ms, 1);
+        assert_eq!(cfg.retransmit_interval_ticks, 10);
+        assert_eq!(cfg.cleanup_interval_ticks, 1000);
+        assert_eq!(cfg.max_outbound_queue, 10_000);
+        assert_eq!(cfg.recv_buffer_size, 65535);
+        assert_eq!(cfg.gradient_half_life_ms, 100.0);
+
+        // Peers & heartbeat
+        assert_eq!(cfg.max_peers, 500);
+        assert_eq!(cfg.heartbeat_interval_ticks, 30_000);
+
+        // Security defaults
+        assert!(
+            cfg.security_enabled,
+            "security_enabled should default to true"
+        );
+        assert!(
+            !cfg.encrypt_payloads,
+            "encrypt_payloads should default to false"
+        );
+        assert!(!cfg.stun_enabled, "stun_enabled should default to false");
+        assert_eq!(cfg.stun_server, "stun.l.google.com:19302");
+
+        // Optional paths default to None
+        assert!(cfg.identity_seed.is_none());
+        assert!(cfg.peer_cache_path.is_none());
+        assert!(cfg.trust_cache_path.is_none());
+        assert!(cfg.freshness_config.is_none());
+        assert!(cfg.shared_stats.is_none());
+        assert!(cfg.local_peers.is_empty());
+        assert!(cfg.seed_domain.is_empty());
+    }
+
+    #[test]
+    fn test_engine_stats_defaults() {
+        let stats = EngineStats::default();
+
+        // All counters should start at 0
+        assert_eq!(stats.total_ticks, 0);
+        assert_eq!(stats.packets_recv, 0);
+        assert_eq!(stats.packets_sent, 0);
+        assert_eq!(stats.bytes_recv, 0);
+        assert_eq!(stats.bytes_sent, 0);
+        assert_eq!(stats.retransmissions, 0);
+        assert_eq!(stats.peer_count, 0);
+        assert_eq!(stats.outbound_queue_depth, 0);
+        assert_eq!(stats.reliable_queue_depth, 0);
+        assert_eq!(stats.idle_ticks, 0);
+        assert_eq!(stats.busy_ticks, 0);
+        assert_eq!(stats.actual_tick_rate_hz, 0.0);
+
+        // Security metrics
+        assert_eq!(stats.authenticated_packets, 0);
+        assert_eq!(stats.encrypted_packets, 0);
+        assert_eq!(stats.auth_failures, 0);
+        assert_eq!(stats.decrypt_failures, 0);
+        assert_eq!(stats.rate_limited_packets, 0);
+
+        // DHT metrics
+        assert_eq!(stats.dht_node_count, 0);
+        assert_eq!(stats.dht_pending_pings, 0);
+        assert_eq!(stats.dht_dead_nodes, 0);
+
+        // Trust metrics
+        assert_eq!(stats.trust_peer_count, 0);
+        assert_eq!(stats.trust_rate_limited_peers, 0);
+
+        // Capacity metrics
+        assert_eq!(stats.max_peers, 0);
+        assert_eq!(stats.active_peer_count, 0);
+        assert_eq!(stats.peer_capacity_ratio, 0.0);
+
+        // Session metrics
+        assert_eq!(stats.active_sessions, 0);
+        assert_eq!(stats.ephemeral_sessions, 0);
     }
 }

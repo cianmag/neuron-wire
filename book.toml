@@ -1,0 +1,13 @@
+[book]
+title = "Neuron Wire Protocol"
+authors = ["Zylvon"]
+language = "en"
+src = "book/src"
+
+[build]
+build-dir = "book/book"
+
+[output.html]
+theme = "light"
+git-repository-url = "https://github.com/cianmag/neuron-wire"
+edit-url-template = "https://github.com/cianmag/neuron-wire/edit/master/{path}"

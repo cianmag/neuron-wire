@@ -2,12 +2,25 @@
 
 **Infrastructure layer for decentralized AI** — peer discovery, gradient exchange, and distributed learning over P2P networks without centralized coordination.
 
+> ## Status: Validated Research Prototype
+>
+> **Validated through:** deterministic simulation · local multi-process networking ·
+> property-based and fuzz testing · network impairment emulation · reproducible benchmarks
+>
+> **Not yet completed:** geographically distributed deployment · external security audit ·
+> independent replication
+>
+> **Funding purpose:** build and evaluate the first real distributed test network
+> (see [docs/EVIDENCE_REPORT.md](docs/EVIDENCE_REPORT.md) and [docs/GRANT_SUMMARY.md](docs/GRANT_SUMMARY.md))
+
 [![CI](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml)
+[![Evidence](https://github.com/cianmag/neuron-wire/actions/workflows/evidence.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/evidence.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 [![Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 [![Documentation](https://img.shields.io/badge/docs-mdBook-00c853)](https://github.com/cianmag/neuron-wire)
 [![Crates.io](https://img.shields.io/badge/crate-v0.3.0-blue)]()
+[![Security](https://img.shields.io/badge/security-Ed25519%20signed-ff69b4)](SECURITY.md)
 
 ---
 
@@ -15,7 +28,7 @@
 
 Neuron Wire is an open-source Rust framework that enables any device reachable over a network to participate in collaborative AI without provisioning servers, trusting a central coordinator, or exposing private data.
 
-The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop sustains ~400 KHz–1 MHz tick rates on commodity hardware with zero external runtime dependencies.
+The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, Ed25519 packet authentication with optional XChaCha20-Poly1305 encryption, trust-based rate limiting, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop sustains ~400 KHz–1 MHz tick rates on commodity hardware with zero external runtime dependencies.
 
 ---
 
@@ -73,6 +86,7 @@ cargo run --release --example simulate -- --paper-mode --nodes 10 --duration 120
 | [`FOUNDATIONAL_QNA.md`](FOUNDATIONAL_QNA.md) | FAQ for researchers |
 | [`PROTOCOL_SPEC.md`](PROTOCOL_SPEC.md) | Wire format, message types, DHT routing |
 | [`FORMAL_MODEL.md`](FORMAL_MODEL.md) | Convergence proofs, complexity bounds |
+| [`SECURITY.md`](SECURITY.md) | Security posture, reporting, architecture, configuration |
 | [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Reproduction guide |
 | [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) | Codebase tour, testing, profiling |
 | [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) | Publication readiness |
@@ -92,7 +106,7 @@ API docs: `cargo doc --no-deps --open`
 | Hebbian STDP | [`hebbian.rs`](src/hebbian.rs) | Spike-timing-dependent plasticity, weight decay, sparse gossip |
 | Neurogenesis | [`neurogenesis.rs`](src/neurogenesis.rs) | Surprise-driven neuron birth (leaky accumulator) |
 | Apoptosis | [`apoptosis.rs`](src/apoptosis.rs) | Programmed pruning: 4 criteria, death spiral guard |
-| Identity & Trust | [`identity.rs`](src/identity.rs) | Ed25519 signatures, trust scoring, Sybil resistance |
+| Identity & Trust | [`identity.rs`](src/identity.rs) | Ed25519 keypairs, packet signing + verification, trust scoring, Sybil resistance |
 | Simulator | [`simulator.rs`](src/simulator.rs) | Deterministic paper-mode, metadata capture, known-good validation |
 
 ---
@@ -100,13 +114,13 @@ API docs: `cargo doc --no-deps --open`
 ## Limitations (known)
 
 1. **No NAT traversal** — all nodes must be directly reachable on UDP
-2. **No encryption** — wire format has no transport-layer security
+2. **Encryption disabled by default** — `encrypt_payloads=false` until X25519 ECDH handshake is hardened
 3. **Single-threaded engine** — cannot exploit multi-core
 4. **No persistent storage** — RAM-only state (no snapshot/restore)
 5. **DHT-only discovery** — no mDNS or LAN broadcast fallback
 6. **Static gossip fanout** — fixed at 3 peers; may under-connect at 10³+ nodes
 7. **No BFT consensus** — >⅓ malicious routing table nodes can partition
-8. **Tested on Linux/x86-64 only** — UDP timing may vary on other platforms
+8. **Tested on Windows only** — UDP timing may vary on other platforms
 
 *See [FOUNDATIONAL_QNA.md](FOUNDATIONAL_QNA.md) §Limitations for expanded discussion.*
 
