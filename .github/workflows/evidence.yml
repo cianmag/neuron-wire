@@ -56,12 +56,16 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Rust toolchain (explicit stable for emulation)
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Network emulation (tc netem, 4-node cluster, 6 scenarios)
         run: |
-          # sudo drops the rustup PATH; re-export cargo's bin dir so the
-          # emulation job can build target/release/node
+          # sudo drops the rustup PATH and rustup needs an explicit default;
+          # re-export cargo's bin dir and set RUSTUP_TOOLCHAIN so the build works
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          sudo env "PATH=$PATH" bash ./evidence/emulate_network.sh 4 30
+          export RUSTUP_TOOLCHAIN=stable
+          sudo env "PATH=$PATH" "RUSTUP_TOOLCHAIN=stable" bash ./evidence/emulate_network.sh 4 30
 
       - name: Archive emulation evidence
         uses: actions/upload-artifact@v4
