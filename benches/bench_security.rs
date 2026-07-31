@@ -24,7 +24,7 @@ fn bench_ed25519_sign(c: &mut Criterion) {
 }
 
 fn bench_ed25519_verify(c: &mut Criterion) {
-    use neuron_wire::identity::{entity_id_from_public_key, verify_signature, NodeIdentity};
+    use neuron_wire::identity::{verify_signature, NodeIdentity};
     let identity = NodeIdentity::new();
     let message = vec![0x42u8; 256];
     let signature = identity.sign(&message);
@@ -46,7 +46,7 @@ fn bench_ed25519_sign_sizes(c: &mut Criterion) {
     let identity = NodeIdentity::new();
     for &size in &[64usize, 256, 1024, 4096] {
         let message = vec![0x42u8; size];
-        c.bench_function(format!("ed25519_sign_{}B", size), |b| {
+        c.bench_function(&format!("ed25519_sign_{}B", size), |b| {
             b.iter(|| black_box(identity.sign(black_box(&message))))
         });
     }
@@ -56,9 +56,10 @@ fn bench_ed25519_sign_sizes(c: &mut Criterion) {
 
 fn bench_xchacha20_encrypt(c: &mut Criterion) {
     use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
+    use neuron_wire::secure_channel::SecureChannel;
     use rand::RngCore;
     let key = SecureChannel::generate_key();
-    let cipher = XChaCha20Poly1305::new(&key);
+    let cipher = XChaCha20Poly1305::new_from_slice(&key).expect("valid key");
     let mut nonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
@@ -70,9 +71,10 @@ fn bench_xchacha20_encrypt(c: &mut Criterion) {
 
 fn bench_xchacha20_decrypt(c: &mut Criterion) {
     use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
+    use neuron_wire::secure_channel::SecureChannel;
     use rand::RngCore;
     let key = SecureChannel::generate_key();
-    let cipher = XChaCha20Poly1305::new(&key);
+    let cipher = XChaCha20Poly1305::new_from_slice(&key).expect("valid key");
     let mut nonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
@@ -85,9 +87,10 @@ fn bench_xchacha20_decrypt(c: &mut Criterion) {
 
 fn bench_xchacha20_sizes(c: &mut Criterion) {
     use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305};
+    use neuron_wire::secure_channel::SecureChannel;
     use rand::RngCore;
     let key = SecureChannel::generate_key();
-    let cipher = XChaCha20Poly1305::new(&key);
+    let cipher = XChaCha20Poly1305::new_from_slice(&key).expect("valid key");
     let mut nonce_bytes = [0u8; 24];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = chacha20poly1305::XNonce::from_slice(&nonce_bytes);
@@ -106,9 +109,9 @@ fn bench_xchacha20_sizes(c: &mut Criterion) {
 
 fn bench_x25519_ecdh(c: &mut Criterion) {
     use x25519_dalek::{PublicKey, StaticSecret};
-    let alice_secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
-    let alice_public = PublicKey::from(&alice_secret);
-    let bob_secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
+    let alice_secret = StaticSecret::random_from_rng(rand::thread_rng());
+    let _alice_public = PublicKey::from(&alice_secret);
+    let bob_secret = StaticSecret::random_from_rng(rand::thread_rng());
     let bob_public = PublicKey::from(&bob_secret);
     c.bench_function("x25519_ecdh", |b| {
         b.iter(|| black_box(alice_secret.diffie_hellman(black_box(&bob_public))))
@@ -119,7 +122,7 @@ fn bench_x25519_keygen(c: &mut Criterion) {
     use x25519_dalek::{PublicKey, StaticSecret};
     c.bench_function("x25519_keygen", |b| {
         b.iter(|| {
-            let secret = StaticSecret::random_from_rng(&mut rand::thread_rng());
+            let secret = StaticSecret::random_from_rng(rand::thread_rng());
             black_box(PublicKey::from(&secret))
         })
     });
@@ -149,14 +152,15 @@ fn bench_sha256(c: &mut Criterion) {
 fn bench_secure_channel_handshake(c: &mut Criterion) {
     use neuron_wire::identity::NodeIdentity;
     use neuron_wire::secure_channel::SecureChannel;
-    let alice_identity = NodeIdentity::new();
-    let bob_identity = NodeIdentity::new();
     c.bench_function("secure_channel_handshake", |b| {
         b.iter_batched(
             || {
-                let mut alice = SecureChannel::new();
-                let mut bob = SecureChannel::new();
-                (alice, bob, alice_identity.clone(), bob_identity.clone())
+                let alice = SecureChannel::new();
+                let bob = SecureChannel::new();
+                // Fresh identities per iteration (NodeIdentity is not Clone)
+                let alice_id = NodeIdentity::new();
+                let bob_id = NodeIdentity::new();
+                (alice, bob, alice_id, bob_id)
             },
             |(mut alice, mut bob, alice_id, bob_id)| {
                 let alice_pub = alice_id.public_key_bytes();
@@ -180,13 +184,13 @@ fn bench_secure_channel_encrypt(c: &mut Criterion) {
     let alice_pub = alice_identity.public_key_bytes();
     let bob_pub = bob_identity.public_key_bytes();
     let session_a = alice.handshake(&alice_identity, bob_pub);
-    let session_b = bob.handshake(&bob_identity, alice_pub);
+    let _session_b = bob.handshake(&bob_identity, alice_pub);
     let plaintext = vec![0x42u8; 256];
     c.bench_function("secure_channel_encrypt_256B", |b| {
         b.iter(|| {
             black_box(
                 alice
-                    .encrypt(black_box(&session_a), black_box(&plaintext))
+                    .encrypt(black_box(&session_a), black_box(&plaintext), &[])
                     .unwrap(),
             )
         })
@@ -205,12 +209,17 @@ fn bench_secure_channel_decrypt(c: &mut Criterion) {
     let session_a = alice.handshake(&alice_identity, bob_pub);
     let session_b = bob.handshake(&bob_identity, alice_pub);
     let plaintext = vec![0x42u8; 256];
-    let ciphertext = alice.encrypt(&session_a, &plaintext).unwrap();
+    let (nonce, ciphertext) = alice.encrypt(&session_a, &plaintext, &[]).unwrap();
     c.bench_function("secure_channel_decrypt_256B", |b| {
         b.iter(|| {
             black_box(
-                bob.decrypt(black_box(&session_b), black_box(&ciphertext))
-                    .unwrap(),
+                bob.decrypt(
+                    black_box(&session_b),
+                    black_box(&nonce),
+                    black_box(&ciphertext),
+                    &[],
+                )
+                .unwrap(),
             )
         })
     });
@@ -256,7 +265,19 @@ fn bench_trust_cleanup(c: &mut Criterion) {
     }
     c.bench_function("trust_cleanup_1000_peers", |b| {
         b.iter_batched(
-            || ts.clone(),
+            || {
+                // Rebuild the populated table each iteration (TrustSystem is not Clone)
+                let mut ts = TrustSystem::new();
+                for i in 0..1000 {
+                    let mut eid = [0u8; 32];
+                    eid[0..4].copy_from_slice(&(i as u32).to_le_bytes());
+                    ts.record_event(
+                        EntityId(eid),
+                        neuron_wire::trust::TrustEvent::ValidSignature,
+                    );
+                }
+                ts
+            },
             |mut ts| {
                 black_box(ts.cleanup_expired());
             },
@@ -270,15 +291,15 @@ fn bench_trust_cleanup(c: &mut Criterion) {
 fn bench_gradient_weight(c: &mut Criterion) {
     use neuron_wire::transport::calculate_gradient_weight;
     c.bench_function("gradient_weight", |b| {
-        b.iter(|| black_box(calculate_gradient_weight(black_box(100.0), 50.0)))
+        b.iter(|| black_box(calculate_gradient_weight(black_box(100u32), 50.0)))
     });
 }
 
 fn bench_gradient_weight_sizes(c: &mut Criterion) {
     use neuron_wire::transport::calculate_gradient_weight;
     for &half_life in &[10.0f32, 50.0, 100.0, 500.0] {
-        c.bench_function(format!("gradient_weight_hl{:.0}", half_life), |b| {
-            b.iter(|| black_box(calculate_gradient_weight(black_box(1000.0), half_life)))
+        c.bench_function(&format!("gradient_weight_hl{:.0}", half_life), |b| {
+            b.iter(|| black_box(calculate_gradient_weight(black_box(1000u32), half_life)))
         });
     }
 }

@@ -175,7 +175,7 @@ fn trust_bench(c: &mut Criterion) {
         let peer = EntityId([1u8; 32]);
         group.bench_function(name, |b| {
             b.iter_batched(
-                || TrustSystem::new(),
+                TrustSystem::new,
                 |mut ts| black_box(ts.record_event(black_box(peer), event)),
                 BatchSize::SmallInput,
             )

@@ -40,6 +40,14 @@ const SEED_NODES: &[&str] = &[
 pub struct NodeId(pub [u8; 32]);
 
 impl NodeId {
+    /// Create a random node ID (used by benches and test harnesses).
+    pub fn random() -> Self {
+        use rand::RngCore;
+        let mut bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut bytes);
+        NodeId::new(bytes)
+    }
+
     /// Create a new `NodeId` from its raw 32-byte representation.
     pub fn new(bytes: [u8; 32]) -> Self {
         NodeId(bytes)
@@ -330,6 +338,15 @@ impl RoutingTable {
 
     fn bucket_idx(&self, target: &NodeId) -> Option<usize> {
         self.local_id.bucket_index(target).map(|i| i as usize)
+    }
+
+    /// Create a routing table on a throwaway local address (bench/test helper).
+    pub fn new_for_test(local_id: NodeId) -> Self {
+        RoutingTable::new(
+            local_id,
+            "127.0.0.1:9000".parse().expect("valid addr"),
+            NodeType::General,
+        )
     }
 
     /// Insert or update a node entry. Returns `true` if accepted.

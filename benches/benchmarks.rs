@@ -43,10 +43,10 @@ fn bench_build_frame(c: &mut Criterion) {
     let body_sizes = [0usize, 64, 256, 1024];
     for &size in &body_sizes {
         let body = vec![0x42u8; size];
-        c.bench_function(format!("build_frame_{}B", size), |b| {
+        c.bench_function(&format!("build_frame_{}B", size), |b| {
             b.iter(|| {
                 black_box(neuron_wire::header::build_frame(
-                    black_box(5),
+                    black_box(5u8),
                     black_box(body.clone()),
                     black_box(0),
                 ))
@@ -60,7 +60,7 @@ fn bench_parse_frame(c: &mut Criterion) {
         let body = vec![0x42u8; size];
         let frame = neuron_wire::header::build_frame(5, body, 0);
         let msg = &frame[4..]; // skip 4-byte len prefix
-        c.bench_function(format!("parse_frame_{}B", size), |b| {
+        c.bench_function(&format!("parse_frame_{}B", size), |b| {
             b.iter(|| {
                 let (h, b) = neuron_wire::header::parse_frame(black_box(msg)).unwrap();
                 black_box((h.msg_type, b.len()));
@@ -82,8 +82,8 @@ fn bench_bucket_index(c: &mut Criterion) {
 fn bench_xor_distance(c: &mut Criterion) {
     let a = neuron_wire::dht::NodeId::random();
     let b = neuron_wire::dht::NodeId::random();
-    c.bench_function("dht_xor_distance", |b| {
-        b.iter(|| black_box(a.xor_distance(black_box(&b))))
+    c.bench_function("dht_xor_distance", |bench| {
+        bench.iter(|| black_box(a.xor_distance(black_box(&b))))
     });
 }
 
@@ -95,7 +95,11 @@ fn bench_closest_fast(c: &mut Criterion) {
     for _ in 0..256 {
         let id = NodeId::random();
         let addr = "127.0.0.1:8080".parse().unwrap();
-        rt.insert(id, addr, 100.0);
+        rt.insert(neuron_wire::dht::NodeEntry::new(
+            id,
+            addr,
+            neuron_wire::dht::NodeType::General,
+        ));
     }
     let target = NodeId::random();
     c.bench_function("dht_closest_fast", |b| {
@@ -110,7 +114,11 @@ fn bench_nearest_nodes(c: &mut Criterion) {
     for _ in 0..256 {
         let id = NodeId::random();
         let addr = "127.0.0.1:8080".parse().unwrap();
-        rt.insert(id, addr, 100.0);
+        rt.insert(neuron_wire::dht::NodeEntry::new(
+            id,
+            addr,
+            neuron_wire::dht::NodeType::General,
+        ));
     }
     let target = NodeId::random();
     c.bench_function("dht_nearest_nodes", |b| {
@@ -287,8 +295,8 @@ fn bench_forward_pass_tick_50n(c: &mut Criterion) {
             id,
             SynapseComponent {
                 target_entities: targets,
-                weights: vec![0.5; k],
-                accumulated_gradients: vec![0.0; k],
+                weights: vec![0.5; k as usize],
+                accumulated_gradients: vec![0.0; k as usize],
             },
         );
     }
