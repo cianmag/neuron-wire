@@ -221,7 +221,7 @@ impl core::fmt::Display for HeaderError {
 /// assert_eq!(payload, b"gradient update");
 ///
 /// // Authenticated frame
-/// let frame = header::build_frame(20, body, FLAG_AUTHENTICATED);
+/// let frame = header::build_frame(20, body.clone(), FLAG_AUTHENTICATED);
 /// assert_ne!(frame[4 + 6] & 0x02, 0); // flags byte
 /// ```
 #[inline]

@@ -48,6 +48,7 @@ pub enum CompressionMethod {
 /// # Example
 ///
 /// ```
+/// # use neuron_wire::components::EntityId;
 /// # use neuron_wire::gradient_compression::*;
 /// let comp = GradientCompression::new(CompressionMethod::TopK(10), true);
 /// let grads = vec![
