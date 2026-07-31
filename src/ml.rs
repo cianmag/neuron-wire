@@ -230,7 +230,7 @@ impl MLSystem {
             if let CompressionMethod::TopK(k) = self.gradient_compression.method {
                 report.gradients_compressed = k.min(total_gradients);
             } else {
-                report.gradients_compressed = (total_gradients + 3) / 4;
+                report.gradients_compressed = total_gradients.div_ceil(4);
             }
         }
 

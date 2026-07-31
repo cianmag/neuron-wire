@@ -186,7 +186,7 @@ impl DistributedReplay {
 
     /// Whether a gossip-sharing tick should occur based on `share_interval`.
     pub fn should_share(&self, tick: u64) -> bool {
-        self.share_interval > 0 && tick % self.share_interval == 0
+        self.share_interval > 0 && tick.is_multiple_of(self.share_interval)
     }
 }
 

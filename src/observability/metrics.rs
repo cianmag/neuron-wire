@@ -426,6 +426,7 @@ impl MetricsRegistry {
 
     // ── ML metrics ─────────────────────────────────────────────
 
+    #[allow(clippy::too_many_arguments)] // telemetry fields, kept flat for ergonomics
     pub fn set_ml_metrics(
         &self,
         surprise: f64,

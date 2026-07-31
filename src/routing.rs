@@ -11,9 +11,10 @@ use std::collections::HashMap;
 use crate::components::EntityId;
 
 /// Configuration for attention-like routing of neural signals.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum RoutingMechanism {
     /// Standard Hebbian weighted sum (no attention).
+    #[default]
     HebbianSum,
     /// Learned attention-weighted aggregation.
     HedgedAttention {
@@ -29,12 +30,6 @@ pub enum RoutingMechanism {
         /// Number of top experts to activate.
         top_k: usize,
     },
-}
-
-impl Default for RoutingMechanism {
-    fn default() -> Self {
-        RoutingMechanism::HebbianSum
-    }
 }
 
 /// Route activations from pre-synaptic to post-synaptic neurons.
@@ -70,7 +65,7 @@ fn hebbian_sum(
     weights: &HashMap<(EntityId, EntityId), f32>,
 ) -> HashMap<EntityId, f32> {
     let mut result = HashMap::new();
-    for (post_id, _post_val) in post_activations {
+    for post_id in post_activations.keys() {
         let mut sum = 0.0_f32;
         for ((pid, pre_id), w) in weights {
             if pid == post_id {
@@ -92,7 +87,7 @@ fn moe_routing(
     weights: &HashMap<(EntityId, EntityId), f32>,
 ) -> HashMap<EntityId, f32> {
     let mut result = HashMap::new();
-    for (post_id, _post_val) in post_activations {
+    for post_id in post_activations.keys() {
         let mut inputs: Vec<(f32, f32)> = Vec::new();
         for ((pid, pre_id), w) in weights {
             if pid == post_id {

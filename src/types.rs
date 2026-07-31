@@ -375,6 +375,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // contract tests: constants must keep ordering
     fn test_regions_all() {
         assert_eq!(regions::ALL, 0xFFFF_FFFF);
         assert!(regions::ALL & regions::SENSORY != 0);
@@ -403,6 +404,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)] // contract tests: constants must keep ordering
     fn test_field_offset_ordering() {
         assert!(cmd::COMMAND_ID < cmd::PREDICTION_CODE);
         assert!(cmd::SOURCE_ID < cmd::TARGET_MASK);

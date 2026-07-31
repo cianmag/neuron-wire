@@ -610,7 +610,7 @@ mod tests {
         // Should return at most 3
         let selected = select_gossip_targets(&peers, 3);
         assert!(selected.len() <= 3);
-        assert!(selected.len() >= 1);
+        assert!(!selected.is_empty());
 
         // Empty peers → empty result
         let empty = select_gossip_targets(&[], 3);

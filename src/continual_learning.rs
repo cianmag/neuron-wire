@@ -59,9 +59,7 @@ impl EWC {
             let fisher = self.fisher_decay * f_old + (1.0 - self.fisher_decay) * grad * grad;
             self.importance.insert(key, fisher);
             // Save anchor weight on first update
-            if !self.anchor_weights.contains_key(&key) {
-                self.anchor_weights.insert(key, 0.0);
-            }
+            self.anchor_weights.entry(key).or_insert(0.0);
         }
     }
 
@@ -107,7 +105,7 @@ impl SynapticIntelligence {
     pub fn update_importance(&mut self, gradients: &[(EntityId, EntityId, f32)], _loss: f32) {
         for &(pre, post, grad) in gradients {
             let key = (pre, post);
-            let hist = self.weight_history.entry(key).or_insert_with(Vec::new);
+            let hist = self.weight_history.entry(key).or_default();
             let prev_w = hist.last().map(|&(_, w)| w).unwrap_or(0.0);
             let delta_w = 0.01; // approximated step
             let omega_contrib = delta_w * grad.abs();
@@ -125,10 +123,7 @@ impl SynapticIntelligence {
 
     /// Record a weight value at a given tick.
     pub fn record_weight(&mut self, id: (EntityId, EntityId), t: u64, w: f32) {
-        self.weight_history
-            .entry(id)
-            .or_insert_with(Vec::new)
-            .push((t, w));
+        self.weight_history.entry(id).or_default().push((t, w));
     }
 }
 

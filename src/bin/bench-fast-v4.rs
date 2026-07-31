@@ -178,7 +178,7 @@ fn run_trial(total_nodes: u64) -> TrialStats {
         // ── progress ──
         let elapsed = start.elapsed();
         if elapsed.as_secs_f64() >= last_report as f64 + 15.0 {
-            last_report = elapsed.as_secs() as u64;
+            last_report = elapsed.as_secs();
             eprintln!(
                 "    [{:.0}s] tick {}/{} msgs={:.1}M RSS~?",
                 elapsed.as_secs_f64(),
@@ -238,7 +238,7 @@ fn run_trial(total_nodes: u64) -> TrialStats {
                                 nodes[from.min(active as usize - 1)].peers[idx]
                             } else {
                                 // Recommend a random active node (fast-track discovery)
-                                let rid = (tick_seed as u64)
+                                let rid = tick_seed
                                     .wrapping_mul(6364136223846793005)
                                     .wrapping_add((r as u64).wrapping_mul(1442695040888963407))
                                     % active as u64;
@@ -291,12 +291,11 @@ fn run_trial(total_nodes: u64) -> TrialStats {
                         n.pkts_out += 1;
                     }
                 }
-                3 => {
+                3
                     // NODE_FOUND
-                    if msg.arg != n.id {
+                    if msg.arg != n.id => {
                         n.add_peer(msg.arg);
                     }
-                }
                 _ => {}
             }
         }

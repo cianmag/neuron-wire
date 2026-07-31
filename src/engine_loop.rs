@@ -486,6 +486,7 @@ impl EngineLoop {
     /// Attach neural computation brain to the engine loop.
     /// Enables ForwardPass + Hebbian learning on every tick.
     /// Call this before `run()` to enable AGI computation.
+    #[allow(clippy::too_many_arguments)] // config bundle, kept flat for ergonomics
     pub fn attach_brain(
         &mut self,
         activation_map: ActivationMap,
@@ -1068,7 +1069,7 @@ impl EngineLoop {
             0
         };
         let frame = header::build_frame(header::msg_type::HEARTBEAT, Vec::new(), flags);
-        for (addr, _) in &self.peer_rtt {
+        for addr in self.peer_rtt.keys() {
             let _ = self.transport.socket.send_to(&frame, *addr);
         }
     }
@@ -1105,7 +1106,7 @@ impl EngineLoop {
     /// Broadcast disconnect to all known peers (shutdown procedure).
     #[allow(dead_code)] // reserved for graceful shutdown broadcasts
     fn broadcast_disconnect(&self, reason: u8, message: &str) {
-        for (addr, _) in &self.peer_rtt {
+        for addr in self.peer_rtt.keys() {
             self.send_disconnect(*addr, reason, message);
         }
     }
@@ -1509,8 +1510,10 @@ mod tests {
 
     #[test]
     fn test_connection_limit() {
-        let mut cfg = EngineConfig::default();
-        cfg.max_peers = 2;
+        let cfg = EngineConfig {
+            max_peers: 2,
+            ..Default::default()
+        };
         let (mut engine, _tx, _rx) = EngineLoop::new(cfg).unwrap();
 
         // Fill to capacity

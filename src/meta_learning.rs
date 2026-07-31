@@ -62,6 +62,7 @@ impl LearnedOptimizer {
     /// ```
     ///
     /// where `f` is a learned gating function over the current hidden state.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn update(
         &mut self,
         synapse_id: (EntityId, EntityId),
@@ -106,7 +107,7 @@ impl LearnedOptimizer {
     pub fn meta_gradient(&self) -> Vec<f32> {
         // Flatten all cell states into one vector
         let mut grad = Vec::new();
-        for (_syn_id, state) in &self.cell_state {
+        for state in self.cell_state.values() {
             grad.extend_from_slice(state);
         }
         grad
@@ -175,6 +176,7 @@ impl HyperNet {
     /// Forward pass: compute output from an input embedding.
     ///
     /// Architecture:  `input → Linear(hidden_dim) → ReLU → Linear(output_dim) → output`
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn forward(&self, input_embedding: &[f32]) -> Vec<f32> {
         let mut hidden = vec![0.0; self.hidden_dim];
         #[allow(unused_variables)]
@@ -233,9 +235,10 @@ unsafe impl Sync for HyperNet {}
 // ─── MetaMethod ─────────────────────────────────────────────────
 
 /// Which meta-learning strategy (if any) is active.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum MetaMethod {
     /// No meta-learning — standard Hebbian/STDP updates
+    #[default]
     None,
     /// Hyper-network that generates weight deltas from context
     HyperNet(HyperNet),
@@ -284,12 +287,6 @@ impl MetaMethod {
             MetaMethod::HyperNet(_) => {}
             MetaMethod::LearnedOptimizer(lo) => lo.reset(),
         }
-    }
-}
-
-impl Default for MetaMethod {
-    fn default() -> Self {
-        MetaMethod::None
     }
 }
 

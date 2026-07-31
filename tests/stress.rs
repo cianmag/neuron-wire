@@ -140,7 +140,8 @@ fn stress_many_nodes() {
     let mut nodes: Vec<StressNode> = (0..10).map(|_| StressNode::bind(0)).collect();
     let addrs: Vec<SocketAddr> = nodes.iter().map(|n| n.addr).collect();
 
-    // Bootstrap: each node pings every other node
+    // Bootstrap: each node pings every other node (full-mesh needs both indices)
+    #[allow(clippy::needless_range_loop)]
     for i in 0..nodes.len() {
         for j in 0..nodes.len() {
             if i != j {
@@ -289,7 +290,7 @@ fn stress_rapid_fire_ingress() {
 fn stress_connection_churn() {
     let sockets: Vec<UdpSocket> = (0..100)
         .map(|i| {
-            UdpSocket::bind(format!("127.0.0.1:0")).unwrap_or_else(|_| {
+            UdpSocket::bind("127.0.0.1:0".to_string()).unwrap_or_else(|_| {
                 panic!("Failed to bind socket {}", i);
             })
         })
@@ -446,6 +447,7 @@ fn stress_dht_bootstrap_storm() {
         .map(|(i, node)| {
             let addrs_clone = addrs.clone();
             thread::spawn(move || {
+                #[allow(clippy::needless_range_loop)] // needs both i and j indices
                 for j in 0..addrs_clone.len() {
                     if i != j {
                         let frame = header::build_frame(

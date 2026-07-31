@@ -55,7 +55,7 @@ impl Node {
         }
 
         // Periodic: PING 15 peers + FIND_NODE 10 unknowns
-        if tick > 0 && tick % 1000 == 0 {
+        if tick > 0 && tick.is_multiple_of(1000) {
             let v: Vec<u64> = self.peers.iter().copied().collect();
             let count = v.len();
 
@@ -71,10 +71,7 @@ impl Node {
             if count >= 5 {
                 for _ in 0..10 {
                     let ask_peer = v[(tick as usize + 7) % count];
-                    let mut target = (self
-                        .id
-                        .wrapping_add(tick as u64)
-                        .wrapping_mul(6364136223846793005))
+                    let mut target = (self.id.wrapping_add(tick).wrapping_mul(6364136223846793005))
                         % all_count as u64;
                     for _ in 0..200 {
                         if target != self.id && !self.peers.contains(&target) {
@@ -127,10 +124,8 @@ impl Node {
                     self.bytes_out += 32;
                 }
             }
-            Message::NodeFound(to, found) if to == self.id => {
-                if found != self.id {
-                    self.peers.insert(found);
-                }
+            Message::NodeFound(to, found) if to == self.id && found != self.id => {
+                self.peers.insert(found);
             }
             _ => {}
         }

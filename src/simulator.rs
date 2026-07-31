@@ -1462,10 +1462,12 @@ mod tests {
 
     #[test]
     fn test_failure_config_toml() {
-        let mut fc = FailureConfig::default();
-        fc.mode = FailureMode::NodeDeath;
-        fc.trigger_at_sec = 60;
-        fc.percent = 0.9;
+        let fc = FailureConfig {
+            mode: FailureMode::NodeDeath,
+            trigger_at_sec: 60,
+            percent: 0.9,
+            ..Default::default()
+        };
         let toml_str = toml::to_string_pretty(&fc).unwrap();
         let fc2: FailureConfig = toml::from_str(&toml_str).unwrap();
         assert_eq!(fc2.mode, FailureMode::NodeDeath);
@@ -1475,9 +1477,12 @@ mod tests {
 
     #[test]
     fn test_paper_mode_sets_seed() {
-        let mut config = SimulationConfig::default();
-        config.seed = 0;
-        config.paper_mode = true;
+        #[allow(clippy::field_reassign_with_default)] // test mirrors parse_args logic
+        let mut config = SimulationConfig {
+            seed: 0,
+            paper_mode: true,
+            ..Default::default()
+        };
         if config.seed == 0 {
             config.seed = 42; // same logic as parse_args
         }

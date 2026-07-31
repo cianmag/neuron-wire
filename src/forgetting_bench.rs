@@ -142,6 +142,7 @@ impl ContinualBenchmark {
     /// # Panics
     ///
     /// Panics if the matrix is empty or rows have inconsistent lengths.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn compute_metrics(&mut self, accuracy_matrix: Vec<Vec<f32>>) {
         assert!(
             !accuracy_matrix.is_empty(),

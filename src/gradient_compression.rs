@@ -157,7 +157,7 @@ impl GradientCompression {
             }
             // Quantised serialisation
             1 => {
-                let bits = (bytes[1] as u32).max(1).min(32);
+                let bits = (bytes[1] as u32).clamp(1, 32);
                 let max_bits = bits as usize;
                 let mut result = Vec::with_capacity(count);
                 let mut pos = 2; // header + bits
@@ -185,7 +185,7 @@ impl GradientCompression {
 
                     // Read the packed quantised value
                     let quant = read_bits(bytes, pos, max_bits);
-                    pos += (max_bits + 7) / 8;
+                    pos += max_bits.div_ceil(8);
 
                     let val = if levels > 0 {
                         min + (quant as f32 / levels as f32) * (max - min)
@@ -243,7 +243,7 @@ impl GradientCompression {
         let mut buf = Vec::with_capacity(1 + count * (1 + 64 + 4));
 
         // High nibble: method tag (0 = raw), low nibble: count (capped at 15 per chunk)
-        let header = (0u8 << 4) | (count.min(15) as u8);
+        let header = count.min(15) as u8;
         buf.push(header);
 
         for &(pre, post, val) in entries.iter().take(15) {
@@ -258,7 +258,7 @@ impl GradientCompression {
 
     /// Serialise entries with uniform quantisation.
     fn serialize_quantized(&self, entries: &[(EntityId, EntityId, f32)], bits: u32) -> Vec<u8> {
-        let bits = bits.max(1).min(32);
+        let bits = bits.clamp(1, 32);
         let count = entries.len().min(255);
         if count == 0 {
             return vec![0x10]; // method tag quant, count 0
@@ -287,7 +287,7 @@ impl GradientCompression {
         let max_bits = bits as usize;
 
         // Estimate buffer size
-        let entry_bytes = 64 + (max_bits + 7) / 8;
+        let entry_bytes = 64 + max_bits.div_ceil(8);
         let mut buf = Vec::with_capacity(2 + 8 + count * entry_bytes);
 
         // Header: method tag = 1 (quantised), count
@@ -343,7 +343,7 @@ fn read_bits(data: &[u8], offset: usize, bits: usize) -> u64 {
     if bits == 0 {
         return 0;
     }
-    let byte_count = (bits + 7) / 8;
+    let byte_count = bits.div_ceil(8);
     let mut val = 0u64;
     for i in 0..byte_count {
         if offset + i < data.len() {
@@ -363,7 +363,7 @@ fn write_bits(data: &mut Vec<u8>, val: u64, bits: usize) {
     if bits == 0 {
         return;
     }
-    let byte_count = (bits + 7) / 8;
+    let byte_count = bits.div_ceil(8);
     for i in 0..byte_count {
         data.push(((val >> (i * 8)) & 0xFF) as u8);
     }

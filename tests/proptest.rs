@@ -292,7 +292,7 @@ proptest! {
             };
             let score = ts.record_event(peer, event);
             prop_assert!(
-                score >= 0.0 && score <= 1.0,
+                (0.0..=1.0).contains(&score),
                 "trust score {} out of [0.0, 1.0] bounds after event {:?}", score, event
             );
         }

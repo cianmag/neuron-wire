@@ -10,6 +10,7 @@
 //!    - Local Ed25519 seed → X25519 static secret (via `XStaticSecret::from(seed)`)
 //!    - Peer Ed25519 public key → X25519 public key (via Montgomery-form conversion)
 //!    - `shared = SHA-256("nwp-handshake-v1" || ECDH(static_sec, peer_pk))`
+//!
 //!    Both sides compute the same key because X25519 ECDH is commutative.
 //! 2. **Per-packet encryption**: XChaCha20-Poly1305 AEAD with a per-packet nonce.
 //! 3. **Replay protection**: Monotonic nonce counter per direction, enforced by the
@@ -216,7 +217,7 @@ impl SecureChannel {
         now_ms: u64,
     ) -> [u8; 32] {
         // Session ID = hash of peer's public key
-        let session_id = Sha256::digest(&peer_public_key).into();
+        let session_id = Sha256::digest(peer_public_key).into();
 
         let session = SessionState {
             shared_key,
@@ -419,8 +420,8 @@ impl SecureChannel {
         let session = self.sessions.get_mut(session_id)?;
 
         // Generate ephemeral X25519 keypair
-        let mut csprng = AeadRng;
-        let ephemeral_secret = XStaticSecret::random_from_rng(&mut csprng);
+        let csprng = AeadRng;
+        let ephemeral_secret = XStaticSecret::random_from_rng(csprng);
         let ephemeral_public = XPublicKey::from(&ephemeral_secret);
 
         let pub_bytes = ephemeral_public.to_bytes();
@@ -658,7 +659,7 @@ mod tests {
 
         assert_eq!(channel.session_count(), 3);
 
-        let sid = Sha256::digest(&peer1.public_key_bytes()).into();
+        let sid = Sha256::digest(peer1.public_key_bytes()).into();
         channel.remove_session(&sid);
         assert_eq!(channel.session_count(), 2);
     }

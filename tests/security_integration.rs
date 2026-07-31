@@ -262,10 +262,10 @@ mod tests {
             .map(|(i, msg)| {
                 let (nonce, ct) = alice_chan
                     .encrypt(&alice_sid, msg, b"ctx")
-                    .expect(&format!("encrypt {} should succeed", i));
+                    .unwrap_or_else(|| panic!("encrypt {} should succeed", i));
                 bob_chan
                     .decrypt(&bob_sid, &nonce, &ct, b"ctx")
-                    .expect(&format!("decrypt {} should succeed", i))
+                    .unwrap_or_else(|| panic!("decrypt {} should succeed", i))
             })
             .collect();
 
@@ -323,10 +323,10 @@ mod tests {
             let msg = vec![0xABu8; size];
             let (nonce, ct) = alice_chan
                 .encrypt(&sid_a, &msg, b"test")
-                .expect(&format!("encrypt {}B should succeed", size));
+                .unwrap_or_else(|| panic!("encrypt {}B should succeed", size));
             let decrypted = bob_chan
                 .decrypt(&sid_b, &nonce, &ct, b"test")
-                .expect(&format!("decrypt {}B should succeed", size));
+                .unwrap_or_else(|| panic!("decrypt {}B should succeed", size));
             assert_eq!(decrypted, msg, "roundtrip for {}B must match", size);
         }
     }

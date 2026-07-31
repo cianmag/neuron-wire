@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn test_softplus() {
         let a = activate(&ActivationFn::Softplus, 0.0);
-        assert!((a - 0.69315).abs() < 0.001);
+        assert!((a - std::f32::consts::LN_2).abs() < 0.001);
     }
 
     #[test]

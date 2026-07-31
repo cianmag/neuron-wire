@@ -126,12 +126,12 @@ impl AuditEntry {
         prev_hash: &[u8; 32],
     ) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(&seq.to_le_bytes());
-        hasher.update(&timestamp_ms.to_le_bytes());
+        hasher.update(seq.to_le_bytes());
+        hasher.update(timestamp_ms.to_le_bytes());
         hasher.update(event_type.to_string().as_bytes());
         hasher.update(description.as_bytes());
         if let Some(eid) = peer {
-            hasher.update(&eid.0);
+            hasher.update(eid.0);
         }
         hasher.update(prev_hash);
         hasher.finalize().into()
@@ -201,7 +201,7 @@ impl AuditLog {
 
         let hash = AuditEntry::compute_hash(seq, now, &event_type, description, &peer, &prev_hash);
 
-        let is_checkpoint = seq > 0 && seq % CHECKPOINT_INTERVAL as u64 == 0;
+        let is_checkpoint = seq > 0 && seq.is_multiple_of(CHECKPOINT_INTERVAL as u64);
 
         let entry = AuditEntry {
             seq,

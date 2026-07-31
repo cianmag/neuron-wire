@@ -95,6 +95,7 @@ impl CSRMatrix {
     /// # Panics
     ///
     /// Panics if `x.len() != self.shape.1`.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn matmul(&self, vec: &[f32]) -> Vec<f32> {
         assert_eq!(
             vec.len(),
@@ -127,6 +128,7 @@ impl CSRMatrix {
     /// # Panics
     ///
     /// Panics if `x.len() != self.shape.0`.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn matmul_transpose(&self, vec: &[f32]) -> Vec<f32> {
         assert_eq!(
             vec.len(),
@@ -253,6 +255,7 @@ impl CSRMatrix {
     }
 
     /// Convert back to a dense `Vec<Vec<f32>>`.
+    #[allow(clippy::needless_range_loop)] // index math is clearer here
     pub fn to_dense(&self) -> Vec<Vec<f32>> {
         let (rows, cols) = self.shape;
         let mut dense = vec![vec![0.0_f32; cols]; rows];

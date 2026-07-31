@@ -470,7 +470,7 @@ mod tests {
     fn test_error_trait_source() {
         use std::error::Error;
 
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let io_err = std::io::Error::other("test");
         let nwp_err: NwpError = io_err.into();
         assert!(nwp_err.source().is_some());
 

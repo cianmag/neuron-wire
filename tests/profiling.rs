@@ -126,7 +126,6 @@ fn bench_concurrent_udp() {
     let senders: Vec<_> = (0..num_senders)
         .map(|_| {
             let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
-            let target = target;
             thread::spawn(move || {
                 let frame = header::build_frame(5, vec![0u8; 128], 0);
                 for _ in 0..pkts_per_sender {
