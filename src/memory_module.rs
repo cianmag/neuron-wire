@@ -274,7 +274,8 @@ mod tests {
 
     #[test]
     fn test_lru_eviction() {
-        let mut mem = MemoryModule::new(2, 2, 1, 1.0);
+        // Sharp temperature so retrieval is near-exact (soft attention otherwise interpolates).
+        let mut mem = MemoryModule::new(2, 2, 1, 0.01);
         mem.write(&[1.0, 0.0], &[10.0]);
         mem.write(&[0.0, 1.0], &[20.0]);
         mem.read(&[1.0, 0.0]);

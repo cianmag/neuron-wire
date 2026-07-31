@@ -290,7 +290,7 @@ impl SecureChannel {
         // (XChaCha20-Poly1305 requires a full 24-byte nonce).
         let mut nonce = [0u8; NONCE_SIZE];
         nonce[..20].copy_from_slice(&session.shared_key[..20]);
-        nonce[20..].copy_from_slice(&counter.to_be_bytes());
+        nonce[20..].copy_from_slice(&(counter as u32).to_be_bytes());
 
         // Use XChaCha20Poly1305 with the full 24-byte nonce
         let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key).expect("valid key");
