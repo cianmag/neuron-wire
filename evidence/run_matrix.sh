@@ -26,6 +26,20 @@ echo "════════════════════════�
 echo " NWP EVIDENCE MATRIX — profile=$PROFILE → $OUT"
 echo "═══════════════════════════════════════════════════════════"
 
+# Run one experiment: log stderr to a file, print a readable result line,
+# and never abort the matrix on a single failure (failures are recorded).
+run_exp() {
+  local NAME="$1" LOG="$OUT/$NAME.log"
+  shift
+  # shellcheck disable=SC2086
+  if $CARGO run --release --example simulate -- "$@" >"$LOG" 2>&1; then
+    echo "  ✓ $NAME"
+  else
+    echo "  ✗ $NAME FAILED (exit $?) — see $LOG"
+    tail -5 "$LOG" | sed 's/^/    | /' || true
+  fi
+}
+
 # ── E1: Convergence scaling ──────────────────────────────────────────
 # 10 / 25 / 50 / 100 / 500 nodes, 3 fixed seeds each, 60s duration
 run_e1() {
@@ -35,9 +49,9 @@ run_e1() {
   for N in $NODES; do
     for S in 42 1337 9001; do
       echo "  E1 nodes=$N seed=$S"
-      $CARGO run --release --example simulate -- \
+      run_exp "E1_nodes${N}_seed${S}" \
         --nodes "$N" --duration 60 --seed "$S" --paper-mode \
-        --output-dir "$OUT/E1_nodes${N}_seed${S}" 2>/dev/null
+        --output-dir "$OUT/E1_nodes${N}_seed${S}"
     done
   done
 }
@@ -47,10 +61,10 @@ run_e4() {
   echo "── E4: packet loss ──"
   for L in 0.02 0.05 0.10; do
     echo "  E4 loss=$L (100 nodes, 90s)"
-    $CARGO run --release --example simulate -- \
+    run_exp "E4_loss_${L}" \
       --nodes 100 --duration 90 --seed 42 --paper-mode \
       --packet-loss "$L" \
-      --output-dir "$OUT/E4_loss_${L}" 2>/dev/null
+      --output-dir "$OUT/E4_loss_${L}"
   done
 }
 
@@ -70,10 +84,10 @@ run_e9_one() {
   local NAME="$1" FLAGS="$2"
   echo "  E9 ${NAME} (50 nodes, 60s)"
   # shellcheck disable=SC2086
-  $CARGO run --release --example simulate -- \
+  run_exp "E9_${NAME}" \
     --nodes 50 --duration 60 --seed 42 --paper-mode \
     $FLAGS \
-    --output-dir "$OUT/E9_${NAME}" 2>/dev/null
+    --output-dir "$OUT/E9_${NAME}"
 }
 
 # ── E2: Node churn (death at t=30s; measure recovery) ───────────────
@@ -81,29 +95,29 @@ run_e2() {
   echo "── E2: node churn ──"
   for P in 0.10 0.20 0.50; do
     echo "  E2 churn=$P (100 nodes, death at 30s)"
-    $CARGO run --release --example simulate -- \
+    run_exp "E2_churn_${P}" \
       --nodes 100 --duration 90 --seed 42 --paper-mode \
       --failure-mode node-death --failure-at 30 --failure-percent "$P" \
-      --output-dir "$OUT/E2_churn_${P}" 2>/dev/null
+      --output-dir "$OUT/E2_churn_${P}"
   done
 }
 
 # ── E5: Malicious peer injection ────────────────────────────────────
 run_e5() {
   echo "── E5: malicious peer ──"
-  $CARGO run --release --example simulate -- \
+  run_exp "E5_malicious" \
     --nodes 100 --duration 90 --seed 42 --paper-mode \
     --failure-mode malicious --failure-at 20 \
-    --output-dir "$OUT/E5_malicious" 2>/dev/null
+    --output-dir "$OUT/E5_malicious"
 }
 
 # ── E6: Network partition + recovery ────────────────────────────────
 run_e6() {
   echo "── E6: network partition ──"
-  $CARGO run --release --example simulate -- \
+  run_exp "E6_partition" \
     --nodes 100 --duration 90 --seed 42 --paper-mode \
     --failure-mode partition --failure-at 20 \
-    --output-dir "$OUT/E6_partition" 2>/dev/null
+    --output-dir "$OUT/E6_partition"
 }
 
 # ── Run all ─────────────────────────────────────────────────────────

@@ -270,8 +270,11 @@ impl TrustSystem {
         let now = now_millis();
         let state = self.peers.entry(*peer).or_default();
 
-        // Reset rate-limit window if expired
-        if now - state.window_start_ms > RATE_LIMIT_WINDOW_MS {
+        // Reset rate-limit window if expired.
+        // NOTE: now_millis() is wall-clock based (SystemTime); it can step
+        // backward under NTP adjustment, so use saturating_sub to avoid
+        // underflow panics in debug builds.
+        if now.saturating_sub(state.window_start_ms) > RATE_LIMIT_WINDOW_MS {
             state.window_start_ms = now;
             state.packet_count_in_window = 0;
         }
@@ -292,8 +295,8 @@ impl TrustSystem {
         state.packet_count_in_window += 1;
         self.global_packet_count += 1;
 
-        // Global rate limit
-        if now - self.global_window_start_ms > 1000 {
+        // Global rate limit (saturating_sub — see window reset note above)
+        if now.saturating_sub(self.global_window_start_ms) > 1000 {
             self.global_window_start_ms = now;
             self.global_window_count = 0;
         }
