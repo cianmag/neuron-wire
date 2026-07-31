@@ -275,11 +275,11 @@ fn throughput_bench(c: &mut Criterion) {
                         [offset + PUBLIC_KEY_LENGTH..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH]
                         .try_into()
                         .unwrap();
-                    let recv_nonce: &[u8; 16] = wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH
-                        ..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 16]
+                    let recv_nonce: &[u8; 24] = wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH
+                        ..offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 24]
                         .try_into()
                         .unwrap();
-                    let recv_ct = &wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 16..];
+                    let recv_ct = &wire[offset + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 24..];
 
                     // 6. Verify signature
                     let _ = black_box(verify_signature(
