@@ -123,7 +123,7 @@ fn bench_nearest_nodes(c: &mut Criterion) {
 fn bench_hebbian_stdp_update(c: &mut Criterion) {
     use neuron_wire::components::SynapseComponent;
     let mut synapse = SynapseComponent {
-        target_entities: vec![neuron_wire::types::EntityId([0u8; 32])],
+        target_entities: vec![neuron_wire::components::EntityId([0u8; 32])],
         weights: vec![0.5],
         accumulated_gradients: vec![0.0],
     };
@@ -139,7 +139,7 @@ fn bench_hebbian_stdp_update(c: &mut Criterion) {
 fn bench_hebbian_weight_decay(c: &mut Criterion) {
     use neuron_wire::components::SynapseComponent;
     let mut synapse = SynapseComponent {
-        target_entities: vec![neuron_wire::types::EntityId([0u8; 32])],
+        target_entities: vec![neuron_wire::components::EntityId([0u8; 32])],
         weights: vec![0.5],
         accumulated_gradients: vec![0.0],
     };
@@ -155,7 +155,7 @@ fn bench_hebbian_weight_decay(c: &mut Criterion) {
 
 fn bench_hebbian_micro_pruning(c: &mut Criterion) {
     use neuron_wire::components::SynapseComponent;
-    let mut synapses: HashMap<neuron_wire::types::EntityId, SynapseComponent> = HashMap::new();
+    let mut synapses: HashMap<neuron_wire::components::EntityId, SynapseComponent> = HashMap::new();
     let prune_threshold = 0.001f32;
     for i in 0..100 {
         let mut eid = [0u8; 32];
@@ -164,11 +164,11 @@ fn bench_hebbian_micro_pruning(c: &mut Criterion) {
             .map(|j| {
                 let mut t = [0u8; 32];
                 t[31] = j;
-                neuron_wire::types::EntityId(t)
+                neuron_wire::components::EntityId(t)
             })
             .collect();
         synapses.insert(
-            neuron_wire::types::EntityId(eid),
+            neuron_wire::components::EntityId(eid),
             SynapseComponent {
                 target_entities: targets,
                 weights: vec![if i % 3 == 0 { 0.0005 } else { 0.5 }; 10],

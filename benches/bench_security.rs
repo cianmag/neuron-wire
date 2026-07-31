@@ -219,8 +219,8 @@ fn bench_secure_channel_decrypt(c: &mut Criterion) {
 // ─── Trust System ──────────────────────────────────────────────
 
 fn bench_trust_record_event(c: &mut Criterion) {
+    use neuron_wire::components::EntityId;
     use neuron_wire::trust::{TrustEvent, TrustSystem};
-    use neuron_wire::types::EntityId;
     let mut ts = TrustSystem::new();
     let eid = EntityId([1u8; 32]);
     c.bench_function("trust_record_event", |b| {
@@ -229,8 +229,8 @@ fn bench_trust_record_event(c: &mut Criterion) {
 }
 
 fn bench_trust_check_rate_limit(c: &mut Criterion) {
+    use neuron_wire::components::EntityId;
     use neuron_wire::trust::TrustSystem;
-    use neuron_wire::types::EntityId;
     let mut ts = TrustSystem::new();
     let eid = EntityId([1u8; 32]);
     // Build up some trust first
@@ -243,8 +243,8 @@ fn bench_trust_check_rate_limit(c: &mut Criterion) {
 }
 
 fn bench_trust_cleanup(c: &mut Criterion) {
+    use neuron_wire::components::EntityId;
     use neuron_wire::trust::TrustSystem;
-    use neuron_wire::types::EntityId;
     let mut ts = TrustSystem::new();
     for i in 0..1000 {
         let mut eid = [0u8; 32];
