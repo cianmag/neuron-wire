@@ -214,7 +214,7 @@ fn wire_encrypted_frame_roundtrip() {
     assert_ne!(recv_h.flags & header::FLAG_ENCRYPTED, 0);
 
     let recv_nonce: [u8; 24] = recv_payload[..24].try_into().unwrap();
-    let recv_ct = &recv_payload[16..];
+    let recv_ct = &recv_payload[24..];
     let decrypted = bob_chan.decrypt(&sid_b, &recv_nonce, recv_ct, &[]).unwrap();
 
     // Verify signature
