@@ -406,7 +406,7 @@ mod tests {
 
         // Bob's decrypt
         let recv_nonce: [u8; 24] = enc_payload[..24].try_into().unwrap();
-        let recv_ct = &enc_payload[16..];
+        let recv_ct = &enc_payload[24..];
         let decrypted = bob_chan
             .decrypt(&bob_sid, &recv_nonce, recv_ct, &[])
             .expect("Bob must decrypt Alice's packet");
