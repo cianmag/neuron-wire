@@ -6,6 +6,7 @@ node_count = 25
 duration_secs = 45
 seed = 42
 paper_mode = true
+bind_prefix = "127.0.0.1"
 tick_interval_ms = 1
 gossip_interval_ticks = 500
 cleanup_interval_ticks = 1000
