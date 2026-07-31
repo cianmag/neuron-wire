@@ -45,7 +45,7 @@ run_scenario() {
   reset_qdisc
   tc qdisc add dev "$IFACE" root netem delay "${latency}ms" loss "${loss}%"
   # Apply the impairment to the cluster's UDP + health ports
-  ./evidence/localhost_cluster.sh "$COUNT" "$DURATION" > "$DIR/${name}.log" 2>&1 || true
+  bash ./evidence/localhost_cluster.sh "$COUNT" "$DURATION" > "$DIR/${name}.log" 2>&1 || true
   cp -r "results/localhost_cluster_${COUNT}" "$DIR/${name}" 2>/dev/null || true
   echo "  done → $DIR/${name}.log"
 }
@@ -59,7 +59,7 @@ run_scenario severe 300 10
 run_partition() {
   echo "── scenario: partition (30s network split) ──"
   reset_qdisc
-  ./evidence/localhost_cluster.sh "$COUNT" 35 > "$DIR/partition.log" 2>&1 &
+  bash ./evidence/localhost_cluster.sh "$COUNT" 35 > "$DIR/partition.log" 2>&1 &
   local cluster_pid=$!
   sleep 4  # let the cluster boot and converge
   local HALF=$((COUNT / 2))
@@ -96,7 +96,7 @@ PYEOF
 run_attack() {
   echo "── scenario: attack (peer floods node-0, 15s) ──"
   reset_qdisc
-  ./evidence/localhost_cluster.sh "$COUNT" 25 > "$DIR/attack.log" 2>&1 &
+  bash ./evidence/localhost_cluster.sh "$COUNT" 25 > "$DIR/attack.log" 2>&1 &
   local cluster_pid=$!
   sleep 4
   flood 9000 15 200 &
