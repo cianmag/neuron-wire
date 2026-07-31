@@ -122,7 +122,7 @@ impl MemoryModule {
     /// # Panics
     ///
     /// Panics if `query.len() != self.key_dim`.
-    pub fn read(&self, query: &[f32]) -> Vec<f32> {
+    pub fn read(&mut self, query: &[f32]) -> Vec<f32> {
         assert_eq!(query.len(), self.key_dim, "query dimension mismatch");
 
         let n = self.keys.len();
@@ -154,6 +154,18 @@ impl MemoryModule {
         }
 
         let inv_total = if total > 0.0 { 1.0 / total } else { 0.0 };
+
+        // LRU bookkeeping: bump the most-similar slot so recently read entries
+        // are evicted last.
+        if n > 0 {
+            let mut best_idx = 0;
+            for (i, &s) in similarities.iter().enumerate().skip(1) {
+                if s > similarities[best_idx] {
+                    best_idx = i;
+                }
+            }
+            self.usage[best_idx] = self.usage[best_idx].saturating_add(1);
+        }
 
         // Weighted sum of values.
         let mut result = vec![0.0; self.value_dim];
@@ -274,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_read_empty_returns_zeros() {
-        let mem: MemoryModule = MemoryModule::new(5, 3, 2, 1.0);
+        let mut mem: MemoryModule = MemoryModule::new(5, 3, 2, 1.0);
         let result = mem.read(&[1.0, 0.0, 0.0]);
         assert_eq!(result, vec![0.0, 0.0]);
     }

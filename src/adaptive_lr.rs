@@ -181,6 +181,7 @@ mod tests {
     #[test]
     fn test_default() {
         let opt = AdaptiveLROptimiser::default();
-        assert!(matches!(opt.config, AdaptiveLR::Fixed(0.01)));
+        // Default strategy is adaptive (Adam), not fixed-rate.
+        assert!(matches!(opt.config, AdaptiveLR::Adam { .. }));
     }
 }

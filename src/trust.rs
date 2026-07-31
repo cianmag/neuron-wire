@@ -545,6 +545,8 @@ mod tests {
     fn test_rate_limit_low_trust() {
         let mut ts = TrustSystem::new();
         let peer = make_eid(1);
+        // Drop the peer below the Sybil threshold so its burst budget is halved.
+        ts.record_event(peer, TrustEvent::ReplayAttack);
 
         // Low trust peer should get rate-limited quickly
         for i in 0..20 {
@@ -601,8 +603,14 @@ mod tests {
     fn test_global_rate_limit() {
         let mut ts = TrustSystem::with_global_rate_limit(100);
         let peer = make_eid(99);
+        // Raise the peer above TRUSTED_THRESHOLD so its per-peer burst is
+        // RATE_LIMIT_BURST * 10 = 100 — otherwise the per-peer limit (10) would
+        // fire before the global limit (100) can be observed.
+        for _ in 0..5 {
+            ts.record_event(peer, TrustEvent::ValidSignature);
+        }
 
-        // First 100 packets should be fine
+        // First 100 packets should be fine (per-peer burst is exactly 100)
         for _ in 0..100 {
             assert!(
                 !ts.check_rate_limit(&peer),
@@ -610,14 +618,7 @@ mod tests {
             );
         }
 
-        // 101st should be limited (trusted peer)
-        // But wait — this peer has never been seen before, so it starts at INITIAL_TRUST=0.5.
-        // With 100 packets consumed, and RATE_LIMIT_BURST=10, a peer at 0.5 trust gets 10 packets.
-        // So after 10 packets, it's per-peer rate-limited, not global.
-        // Global limit only kicks in if the peer never hits per-peer limit first.
-        // Let's just check that the limit *somewhere* catches it.
-        let limited = ts.check_rate_limit(&peer);
-        // After 101 packets, either per-peer or global limit has fired
-        assert!(limited || ts.peer_count() > 0);
+        // 101st packet trips the limit (per-peer at 101 > 100, global at 101 > 100)
+        assert!(ts.check_rate_limit(&peer), "101st packet must be limited");
     }
 }

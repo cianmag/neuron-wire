@@ -343,11 +343,12 @@ mod tests {
     #[test]
     fn test_derivatives_non_negative() {
         // Most common activation derivatives are >= 0 for all inputs
+        // Note: Swish is intentionally excluded — its derivative is negative
+        // for x < -1.31 (the function is non-monotonic below the origin).
         for fn_ in &[
             ActivationFn::Tanh,
             ActivationFn::ReLU,
             ActivationFn::LeakyReLU(0.01),
-            ActivationFn::Swish(1.0),
             ActivationFn::Softplus,
         ] {
             for x in [-10.0, -1.0, 0.0, 1.0, 10.0] {

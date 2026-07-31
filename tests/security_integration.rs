@@ -403,7 +403,7 @@ mod tests {
         assert_ne!(enc_hdr.flags & 0x0001, 0, "ENCRYPTED flag must be set");
 
         // Bob's decrypt
-        let recv_nonce: [u8; 16] = enc_payload[..16].try_into().unwrap();
+        let recv_nonce: [u8; 24] = enc_payload[..24].try_into().unwrap();
         let recv_ct = &enc_payload[16..];
         let decrypted = bob_chan
             .decrypt(&bob_sid, &recv_nonce, recv_ct, &[])

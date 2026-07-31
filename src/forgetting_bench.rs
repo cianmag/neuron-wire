@@ -422,9 +422,9 @@ mod tests {
 
         // High variance on diagonal.
         let matrix = vec![
-            vec![0.9, 0.01, 0.01],
-            vec![0.9, 0.3, 0.01],
-            vec![0.9, 0.3, 0.9],
+            vec![1.0, 0.01, 0.01],
+            vec![1.0, 0.0, 0.01],
+            vec![1.0, 0.0, 0.0],
         ];
 
         bm.compute_metrics(matrix);

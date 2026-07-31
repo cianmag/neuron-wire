@@ -1454,16 +1454,29 @@ mod tests {
         let cfg = EngineConfig::default();
         let (mut engine, _tx, _rx) = EngineLoop::new(cfg).unwrap();
 
-        // Insert peers with various ages
+        // Use a synthetic clock so we can represent peers older than the
+        // process-relative u32 clock without waiting 5+ minutes.
+        let synthetic_now: u64 = 1_000_000;
+        let mut insert = |addr: &str, rtt: f32, age_ms: u64| {
+            let a: std::net::SocketAddr = addr.parse().unwrap();
+            engine.peer_rtt.insert(
+                a,
+                PeerInfo {
+                    rtt_ms: rtt,
+                    last_seen_ms: synthetic_now - age_ms,
+                },
+            );
+        };
+
         // Old peers: age > 300_000 ms (300s) — should be evicted
-        engine.insert_peer_for_test("10.0.0.1:9000".parse().unwrap(), 50.0, 400_000); // 400s old
-        engine.insert_peer_for_test("10.0.0.2:9000".parse().unwrap(), 60.0, 350_000); // 350s old
-        engine.insert_peer_for_test("10.0.0.3:9000".parse().unwrap(), 70.0, 310_000); // 310s old
+        insert("10.0.0.1:9000", 50.0, 400_000); // 400s old
+        insert("10.0.0.2:9000", 60.0, 350_000); // 350s old
+        insert("10.0.0.3:9000", 70.0, 310_000); // 310s old
 
         // Recent peers: age < 300_000 ms — should remain
-        engine.insert_peer_for_test("10.0.0.4:9000".parse().unwrap(), 80.0, 10_000); // 10s old
-        engine.insert_peer_for_test("10.0.0.5:9000".parse().unwrap(), 90.0, 60_000); // 60s old
-        engine.insert_peer_for_test("10.0.0.6:9000".parse().unwrap(), 100.0, 200_000); // 200s old
+        insert("10.0.0.4:9000", 80.0, 10_000); // 10s old
+        insert("10.0.0.5:9000", 90.0, 60_000); // 60s old
+        insert("10.0.0.6:9000", 100.0, 200_000); // 200s old
 
         assert_eq!(
             engine.peer_count_for_test(),
@@ -1472,7 +1485,7 @@ mod tests {
         );
 
         // Run the eviction logic (same code as in the cleanup phase)
-        let now = u64::from(engine.transport.now_ms());
+        let now = synthetic_now;
         let peer_ttl_ms: u64 = 300_000;
         engine.peer_rtt.retain(|_addr, info| {
             let age = now.saturating_sub(info.last_seen_ms);

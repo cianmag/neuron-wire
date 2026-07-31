@@ -213,7 +213,7 @@ fn wire_encrypted_frame_roundtrip() {
     let (recv_h, recv_payload) = header::parse_frame(&enc_frame[4..]).unwrap();
     assert_ne!(recv_h.flags & header::FLAG_ENCRYPTED, 0);
 
-    let recv_nonce: [u8; 16] = recv_payload[..16].try_into().unwrap();
+    let recv_nonce: [u8; 24] = recv_payload[..24].try_into().unwrap();
     let recv_ct = &recv_payload[16..];
     let decrypted = bob_chan.decrypt(&sid_b, &recv_nonce, recv_ct, &[]).unwrap();
 

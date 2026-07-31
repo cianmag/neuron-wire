@@ -49,7 +49,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use x25519_dalek::{PublicKey as XPublicKey, StaticSecret as XStaticSecret};
 
 /// 16-byte nonce: 12 bytes salt + 4 bytes counter (big-endian).
-pub const NONCE_SIZE: usize = 16;
+pub const NONCE_SIZE: usize = 24; // XChaCha20-Poly1305 requires a 24-byte nonce
 
 /// Key size for XChaCha20-Poly1305 (32 bytes).
 pub const KEY_SIZE: usize = 32;
@@ -286,14 +286,15 @@ impl SecureChannel {
         let now_ms = now_millis();
         session.last_activity_ms = now_ms;
 
-        // Build 16-byte nonce: first 12 bytes from key, last 4 bytes = counter
+        // Build 24-byte nonce: first 20 bytes from the key, last 4 bytes = counter
+        // (XChaCha20-Poly1305 requires a full 24-byte nonce).
         let mut nonce = [0u8; NONCE_SIZE];
-        nonce[..12].copy_from_slice(&session.shared_key[..12]);
-        nonce[12..].copy_from_slice(&counter.to_be_bytes());
+        nonce[..20].copy_from_slice(&session.shared_key[..20]);
+        nonce[20..].copy_from_slice(&counter.to_be_bytes());
 
-        // Use XChaCha20Poly1305 with a 24-byte nonce (expand our 16-byte one)
+        // Use XChaCha20Poly1305 with the full 24-byte nonce
         let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key).expect("valid key");
-        let xnonce = XNonce::from_slice(&nonce[..24.min(NONCE_SIZE)]);
+        let xnonce = XNonce::from_slice(&nonce);
 
         let payload = Payload {
             msg: plaintext,
@@ -350,7 +351,7 @@ impl SecureChannel {
 
         // Decrypt
         let cipher = XChaCha20Poly1305::new_from_slice(&session.shared_key).expect("valid key");
-        let xnonce = XNonce::from_slice(&nonce[..24.min(NONCE_SIZE)]);
+        let xnonce = XNonce::from_slice(nonce);
 
         let payload = Payload {
             msg: ciphertext,
