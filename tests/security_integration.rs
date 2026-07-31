@@ -197,7 +197,8 @@ mod tests {
         let authed_frame = neuron_wire::header::build_frame(header.msg_type, authed_body, 2); // FLAG_AUTHENTICATED
 
         // ─── Open: verify signature ──────────────────────────────
-        let (authed_hdr, authed_payload) = neuron_wire::header::parse_frame(&authed_frame).unwrap();
+        let (authed_hdr, authed_payload) =
+            neuron_wire::header::parse_frame(&authed_frame[4..]).unwrap();
         assert_eq!(
             authed_hdr.flags & 0x0002,
             0x0002,
@@ -399,7 +400,8 @@ mod tests {
             neuron_wire::header::build_frame(header.msg_type, encrypted_body, 2 | 1); // AUTHENTICATED | ENCRYPTED
 
         // ─── Open: decrypt ──────────────────────────────────────
-        let (enc_hdr, enc_payload) = neuron_wire::header::parse_frame(&encrypted_frame).unwrap();
+        let (enc_hdr, enc_payload) =
+            neuron_wire::header::parse_frame(&encrypted_frame[4..]).unwrap();
         assert_ne!(enc_hdr.flags & 0x0001, 0, "ENCRYPTED flag must be set");
 
         // Bob's decrypt
