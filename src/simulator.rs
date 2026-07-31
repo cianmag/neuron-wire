@@ -140,6 +140,9 @@ pub struct SimulationConfig {
     /// Maintenance mode: "fixed" (default) or "sparse-aging"
     #[serde(default)]
     pub maintenance_mode: String,
+    /// Peer capacity per node (simulation models distinct-IP WAN nodes).
+    #[serde(default = "default_max_peers")]
+    pub max_peers: usize,
     /// Deterministic in-sim packet loss rate in [0,1] (E4; default 0.0).
     #[serde(default)]
     pub packet_loss_rate: f32,
@@ -170,6 +173,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_max_peers() -> usize {
+    500
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         SimulationConfig {
@@ -190,6 +197,7 @@ impl Default for SimulationConfig {
             maintenance_mode: "fixed".to_string(),
             packet_loss_rate: 0.0,
             churn_rate: 0.0,
+            max_peers: 500,
             trust_enabled: true,
             aging_enabled: true,
             apoptosis_enabled: true,
@@ -704,8 +712,12 @@ impl Simulator {
                 stun_enabled: false,
                 stun_server: "stun.l.google.com:19302".to_string(),
                 heartbeat_interval_ticks: 30_000,
-                max_peers: 500,
-                per_ip_max_peers: 10,
+                max_peers: self.config.max_peers,
+                // IMPORTANT: every simulated node binds 127.0.0.1, so the WAN
+                // per-IP DoS guard (default 10) would throttle each node to
+                // ~10 peers and break convergence at scale. Lifting the guard
+                // models the WAN case where each node has a distinct public IP.
+                per_ip_max_peers: 500,
                 peer_cache_path: None,
                 trust_cache_path: None,
                 seed_domain: String::new(),
