@@ -43,7 +43,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, UdpSocket};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -646,19 +646,55 @@ impl Simulator {
         }
     }
 
-    /// Find a free TCP port for binding.
+    /// Find a free UDP port for binding.
+    /// NOTE: probes with a UDP socket (TCP availability != UDP availability —
+    /// the engine binds UDP, and a TCP probe can report free while the UDP
+    /// port is held by another process).
     fn find_free_port(&self, offset: u16) -> u16 {
         let base: u16 = 42000 + offset;
-        for port in base..(base + 200) {
-            if TcpListener::bind(format!("{}:{}", self.config.bind_prefix, port)).is_ok() {
+        for port in base..(base + 500) {
+            if UdpSocket::bind(format!("{}:{}", self.config.bind_prefix, port)).is_ok() {
                 return port;
             }
         }
         42000 + offset // fallback — will collide but let the OS handle it
     }
 
-    /// Launch all simulated nodes.
+    /// Stop and join all spawned engine threads (used when a launch attempt
+    /// partially fails so retries start from a clean slate).
+    fn teardown_nodes(&mut self) {
+        for mut node in self.nodes.drain(..) {
+            node.shutdown.store(true, Ordering::SeqCst);
+            if let Some(handle) = node.handle.take() {
+                let _ = handle.join();
+            }
+        }
+        self.node_addrs.clear();
+    }
+
+    /// Launch all simulated nodes, retrying if a transient port collision
+    /// occurs (the probe-then-spawn window is racy under parallel load).
     pub fn launch(&mut self) -> Result<(), String> {
+        let mut attempts = 0;
+        loop {
+            match self.try_launch() {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    attempts += 1;
+                    if attempts >= 5 {
+                        return Err(format!("launch failed after 5 attempts: {}", e));
+                    }
+                    eprintln!(
+                        "[SIM] launch attempt {} failed ({}); tearing down and retrying",
+                        attempts, e
+                    );
+                    self.teardown_nodes();
+                }
+            }
+        }
+    }
+
+    fn try_launch(&mut self) -> Result<(), String> {
         let node_count = self.config.node_count;
         self.nodes.reserve(node_count as usize);
 
