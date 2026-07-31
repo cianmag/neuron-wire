@@ -189,18 +189,6 @@ impl SecureChannel {
 
         // X25519 ECDH: both sides compute the same shared secret
         let shared = local_static.diffie_hellman(&peer_x_pk);
-        let local_x_pk = XPublicKey::from(&local_static);
-        eprintln!(
-            "[DBG] hs local_pk={:02x}{:02x} local_x={:02x}{:02x} peer_mont={:02x}{:02x} shared={:02x}{:02x}",
-            local_identity.public_key_bytes()[0],
-            local_identity.public_key_bytes()[1],
-            local_x_pk.as_bytes()[0],
-            local_x_pk.as_bytes()[1],
-            peer_x_pk.as_bytes()[0],
-            peer_x_pk.as_bytes()[1],
-            shared.as_bytes()[0],
-            shared.as_bytes()[1]
-        );
 
         // Derive symmetric key with domain separator
         let mut hasher = Sha256::new();
@@ -372,18 +360,7 @@ impl SecureChannel {
             aad: associated_data,
         };
 
-        let decrypted = cipher.decrypt(xnonce, payload);
-        if decrypted.is_err() {
-            eprintln!(
-                "[DBG] AEAD decrypt failed: {:?} (session_id={:02x}{:02x}{:02x}{:02x}..)",
-                decrypted.as_ref().err().unwrap(),
-                session_id[0],
-                session_id[1],
-                session_id[2],
-                session_id[3]
-            );
-        }
-        decrypted.ok()
+        cipher.decrypt(xnonce, payload).ok()
     }
 
     /// Get the number of active sessions.

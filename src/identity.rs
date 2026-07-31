@@ -26,7 +26,7 @@ use ed25519_dalek::{
     Signature, SignatureError, Signer, SigningKey, VerifyingKey, SECRET_KEY_LENGTH,
 };
 use rand::rngs::OsRng;
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use std::fmt;
 use std::path::Path;
 
@@ -156,11 +156,18 @@ impl NodeIdentity {
 
     /// Get the X25519 static secret derived from this Ed25519 identity.
     ///
-    /// Uses the *expanded* signing scalar (`SHA-512(seed)` clamped), not the raw
-    /// seed — the scalar is what the public key was derived from, so X25519 ECDH
-    /// between two such identities commutes (both sides agree on the same key).
+    /// Returns the RAW first 32 bytes of `SHA-512(seed)` — NOT the clamped and
+    /// reduced signing scalar. x25519-dalek's `mul_clamped` re-clamps its input;
+    /// re-clamping an already-reduced scalar can flip bit 254 (the reduction may
+    /// produce a value < 2^253), changing the scalar by 2^254 ≢ 0 (mod L) and
+    /// breaking the correspondence with the Ed25519 public key. The raw bytes
+    /// get exactly one clamp, inside `mul_clamped`, matching dalek's documented
+    /// Ed25519→X25519 conversion.
     pub fn x25519_secret(&self) -> [u8; SECRET_KEY_LENGTH] {
-        self.signing_key.to_scalar().to_bytes()
+        let hash = Sha512::digest(self.signing_key.to_bytes());
+        let mut buf = [0u8; SECRET_KEY_LENGTH];
+        buf.copy_from_slice(&hash[..SECRET_KEY_LENGTH]);
+        buf
     }
 
     /// Sign a message with this identity's signing key.
