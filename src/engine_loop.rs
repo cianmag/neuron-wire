@@ -1216,6 +1216,19 @@ impl EngineLoop {
         self.synapse_map.contains_key(post)
     }
 
+    /// Distributed-learning observability: full synapse state dump
+    /// (test-only) — every (post, target, weight) triple.
+    pub fn synapse_dump_for_test(&self) -> Vec<(EntityId, EntityId, f32)> {
+        let mut out = Vec::new();
+        for (post, syn) in self.synapse_map.iter() {
+            for (j, target) in syn.target_entities.iter().enumerate() {
+                let w = syn.weights.get(j).copied().unwrap_or(f32::NAN);
+                out.push((*post, *target, w));
+            }
+        }
+        out
+    }
+
     // ─── Heartbeat Protocol ───────────────────────────────────
 
     /// Send a HEARTBEAT message to all known peers.
