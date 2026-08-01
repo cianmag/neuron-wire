@@ -316,6 +316,11 @@ pub struct EngineStats {
     pub decrypt_failures: u64,
     /// Rate-limited packets dropped
     pub rate_limited_packets: u64,
+    // ── Distributed learning metrics ─────────────────────────
+    /// Data frames carrying remote learning signals (gossip) received
+    pub learning_frames_recv: u64,
+    /// Data frames carrying remote learning signals (gossip) sent
+    pub learning_frames_sent: u64,
     // ── DHT metrics ──────────────────────────────────────────
     /// DHT routing table size
     pub dht_node_count: usize,
@@ -425,6 +430,9 @@ pub struct EngineLoop {
     pub packet_filter_allowed: Arc<Mutex<Option<Vec<SocketAddr>>>>,
     /// Xorshift state for deterministic in-sim packet loss.
     loss_rng: u64,
+    /// Remote learning signals decoded from Data frames (entity, activation),
+    /// drained by the neural-computation phase each tick.
+    pending_observations: Vec<(EntityId, f32)>,
 }
 
 #[cfg(test)]
@@ -503,6 +511,7 @@ impl EngineLoop {
             outbound_tx: outbound_tx.clone(),
             brain_attached: false,
             packet_filter_allowed: Arc::new(Mutex::new(None)),
+            pending_observations: Vec::new(),
         };
 
         Ok((engine, outbound_tx, events_rx))
@@ -682,11 +691,24 @@ impl EngineLoop {
             // Hebbian: STDP weight updates, micro-pruning, gossip.
             // Only runs when brain is attached via attach_brain().
             if self.brain_attached {
-                // Collect observations from the ingress pipeline.
-                // In a full system, decoded NWP frames carry observed
-                // activation values from remote peers.
-                let observations: std::collections::HashMap<EntityId, f32> =
+                // Collect observations from the ingress pipeline: decoded
+                // remote activation frames (Data gossip) are drained here.
+                // Locally observed values can be added by the caller.
+                let mut observations: std::collections::HashMap<EntityId, f32> =
                     std::collections::HashMap::new();
+                for (entity, value) in self.pending_observations.drain(..) {
+                    observations.insert(entity, value);
+                    // Mirror remote activations into the activation map so
+                    // the Hebbian STDP update sees the remote neuron's
+                    // value this tick (pre * post coupling).
+                    self.activation_map.insert(
+                        entity,
+                        crate::components::ActivationComponent {
+                            value,
+                            last_updated_tick: self.tick,
+                        },
+                    );
+                }
 
                 // Step 1: Forward pass (borrows activation_map + synapse_map + neurogenesis)
                 // Baseline toggle: neurogenesis disabled => use a throwaway system.
@@ -704,15 +726,28 @@ impl EngineLoop {
                     &observations,
                 );
 
-                // Step 2: Hebbian learning (borrows activation_map immutably, synapse_map mutably)
-                let _hebbian_report = self.hebbian.tick(
+                // Step 2: Hebbian learning (borrows activation_map immutably,
+                // synapse_map mutably). Gossip targets come from the DHT
+                // routing table (fall back to direct peers tracked by the
+                // engine when no DHT handler is attached).
+                let peers: Vec<SocketAddr> = if let Some(ref dht) = self.dht_handler {
+                    dht.routing_table
+                        .all_nodes()
+                        .iter()
+                        .map(|entry| entry.addr)
+                        .collect()
+                } else {
+                    self.peer_rtt.keys().cloned().collect()
+                };
+                let hebbian_report = self.hebbian.tick(
                     &self.activation_map,
                     &mut self.synapse_map,
                     self.tick,
                     &self.outbound_tx,
-                    &[], // peers — set via DHT routing table
+                    &peers,
                     self.local_id,
                 );
+                self.stats.learning_frames_sent += hebbian_report.gossip_packets as u64;
 
                 // Log notable brain events every tick
                 if fp_report.neurons_spawned > 0 {
@@ -1009,6 +1044,31 @@ impl EngineLoop {
                 self.handle_heartbeat(src);
                 return Ok(());
             }
+
+            // ── Distributed learning: decode remote activation frames ──
+            // Hebbian gossip frames (MsgType::Data = 5) carry serialized
+            // synapse updates from a remote peer:
+            //   [32 B source_entity] [u16 count] ( post_id, targets,
+            //     weights, accumulated_gradients )*
+            // We decode them into pending observations so the live neural
+            // path (forward pass + Hebbian STDP) consumes remote learning
+            // signals — the bridge between "distributed network" and
+            // "distributed learning".
+            if msg_type_byte == crate::types::MsgType::Data as u8 && nwp_payload.len() > 16 {
+                let body = &nwp_payload[16..]; // skip 16-byte NWP header
+                if let Some((_source, entries)) = crate::hebbian::deserialize_gossip_packet(body) {
+                    for (post_id, _targets, _weights, grads) in entries {
+                        // Activation magnitude = total absolute gradient
+                        // shipped by the remote neuron's update.
+                        let magnitude: f32 = grads.iter().map(|g| g.abs()).sum();
+                        if magnitude > 0.0 {
+                            self.pending_observations
+                                .push((post_id, magnitude.min(1.0)));
+                        }
+                    }
+                    self.stats.learning_frames_recv += 1;
+                }
+            }
         }
 
         // Gradient weight default: 1.0 (full utility for each received packet).
@@ -1120,6 +1180,24 @@ impl EngineLoop {
     /// Get peer RTT estimates
     pub fn peer_rtt(&self) -> &HashMap<SocketAddr, PeerInfo> {
         &self.peer_rtt
+    }
+
+    /// Distributed-learning observability: number of learning frames
+    /// (Data gossip) received and sent so far.
+    pub fn learning_stats(&self) -> (u64, u64) {
+        (
+            self.stats.learning_frames_recv,
+            self.stats.learning_frames_sent,
+        )
+    }
+
+    /// Distributed-learning observability: current synapse weight for an
+    /// entity, if any. Used by end-to-end tests to prove a remote
+    /// activation actually changed local weights.
+    pub fn synapse_weight_for_test(&self, post: &EntityId, target: &EntityId) -> Option<f32> {
+        let synapse = self.synapse_map.get(post)?;
+        let idx = synapse.target_entities.iter().position(|t| t == target)?;
+        Some(synapse.weights[idx])
     }
 
     // ─── Heartbeat Protocol ───────────────────────────────────
@@ -1266,6 +1344,7 @@ pub fn spawn_engine(
                 brain_attached: false,
                 packet_filter_allowed: packet_filter_allowed
                     .unwrap_or_else(|| Arc::new(Mutex::new(None))),
+                pending_observations: Vec::new(),
                 loss_rng,
             };
 
