@@ -102,6 +102,9 @@ struct RunResult {
     b_recv_frames: u64,
     a_recv_frames: u64,
     b_weight: f32,
+    b_synapses: usize,
+    b_activations: usize,
+    b_has_synapse: bool,
 }
 
 /// Run the distributed learning scenario once:
@@ -186,6 +189,9 @@ fn run_scenario(port_a: u16, port_b: u16) -> RunResult {
         b_recv_frames: b_recv,
         a_recv_frames: a_recv,
         b_weight,
+        b_synapses: engine_b.synapse_count_for_test(),
+        b_activations: engine_b.activation_count_for_test(),
+        b_has_synapse: engine_b.has_synapse_for_test(&b_neuron()),
     }
 }
 
@@ -204,8 +210,13 @@ fn distributed_learning_activation_flows_and_learns() {
     //    above the 0.999^tick decay floor of ~0.22).
     assert!(
         r.b_weight > 0.6,
-        "Node B must update its synapse from remote activation (weight={})",
-        r.b_weight
+        "Node B must update its synapse from remote activation (weight={}, synapses={}, activations={}, has_b_synapse={}, b_recv={}, a_recv={})",
+        r.b_weight,
+        r.b_synapses,
+        r.b_activations,
+        r.b_has_synapse,
+        r.b_recv_frames,
+        r.a_recv_frames
     );
 
     // 4-5. Node B sent a learning signal back and Node A received it.

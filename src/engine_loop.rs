@@ -1200,6 +1200,22 @@ impl EngineLoop {
         Some(synapse.weights[idx])
     }
 
+    /// Distributed-learning observability: synapse map size (test-only).
+    pub fn synapse_count_for_test(&self) -> usize {
+        self.synapse_map.len()
+    }
+
+    /// Distributed-learning observability: activation map size (test-only).
+    pub fn activation_count_for_test(&self) -> usize {
+        self.activation_map.len()
+    }
+
+    /// Distributed-learning observability: does the synapse map contain
+    /// `post` at all? (test-only)
+    pub fn has_synapse_for_test(&self, post: &EntityId) -> bool {
+        self.synapse_map.contains_key(post)
+    }
+
     // ─── Heartbeat Protocol ───────────────────────────────────
 
     /// Send a HEARTBEAT message to all known peers.
