@@ -270,7 +270,7 @@
 
 **Can nodes leave dynamically?** Yes — leaving nodes are detected via stale timeout (600 s) or failed ping threshold (3 misses) and removed from routing tables.
 
-**Can malicious nodes attack it?** Yes — the current v0.3.0 prototype adds Ed25519 packet authentication, trust-based rate limiting, and optional AEAD encryption, but lacks formal Sybil resistance, BFT consensus, and DoS amplification protection.
+**Can malicious nodes attack it?** Yes — the current v0.3.1 prototype adds Ed25519 packet authentication, trust-based rate limiting, and optional AEAD encryption, but lacks formal Sybil resistance, BFT consensus, and DoS amplification protection.
 
 **Can it run on Raspberry Pi?** In theory — the single-threaded engine targets 512 MB RAM and compiles to ARM — but this has not been tested.
 

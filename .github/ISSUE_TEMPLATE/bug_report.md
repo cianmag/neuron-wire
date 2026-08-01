@@ -10,7 +10,7 @@ assignees: ''
 
 - **OS:** [e.g. Linux 6.8, macOS 14.5, Windows 11]
 - **Rust Version:** [output of `rustc --version`]
-- **Neuron-wire Version:** [e.g. v0.3.0, commit hash if built from source]
+- **Neuron-wire Version:** [e.g. v0.3.1, commit hash if built from source]
 - **Cargo Profile:** [debug / release]
 
 ## Expected Behavior

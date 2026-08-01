@@ -26,7 +26,7 @@ cargo run --example simulate -- --nodes 5 --duration 25 --seed 42
 
 ## Project Status
 
-- **Version:** v0.3.0 (Quality Infrastructure)
+- **Version:** v0.3.1 (Quality Infrastructure)
 - **Lines of Rust:** ~8,150
 - **Tests:** 110+ unit tests, 14 benchmarks, 7 integration tests, 8 proptest targets
 - **CI:** 8 GitHub Actions jobs (test matrix, docs, audit, benchmarks, release)

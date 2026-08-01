@@ -2,7 +2,7 @@
 
 **Zero-infrastructure AI: one auditable P2P protocol for decentralized discovery, secure transport, and distributed learning.**
 
-Zylvon · v0.3.0 · Rust · MIT · [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)
+Zylvon · v0.3.1 · Rust · MIT · [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire)
 
 > Use with any slide tool. Each `## Slide N` = one slide; keep the narrative tight.
 > Companion docs: GRANT_SUMMARY.md · EVIDENCE_REPORT.md · GRANT_BUDGET.md · GRANT_ROADMAP.md

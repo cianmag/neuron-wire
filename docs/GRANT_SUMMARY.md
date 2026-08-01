@@ -1,7 +1,7 @@
 # Neuron Wire Protocol (NWP) — Grant Summary
 
 **Zero-infrastructure AI: one auditable P2P protocol for decentralized discovery, secure transport, and distributed learning.**
-Zylvon · [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire) · v0.3.0 · Rust · MIT
+Zylvon · [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire) · v0.3.1 · Rust · MIT
 
 ## Problem
 Collaborative AI is centralized by default. Gradients flow through parameter servers; federated learning still needs an aggregator; All-Reduce assumes a static participant set. Every participant must trust a central operator — for availability, privacy, and honesty — and a device with a network connection cannot join on its own terms. No open infrastructure combines P2P discovery, secure transport, distributed learning, and reproducible experimentation in a single auditable codebase.

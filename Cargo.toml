@@ -3,7 +3,7 @@ members = ["demo"]
 
 [package]
 name = "neuron-wire"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 rust-version = "1.87"
 description = "Infrastructure layer for decentralized AI — P2P peer discovery, gradient exchange, and distributed learning"

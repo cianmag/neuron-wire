@@ -22,7 +22,7 @@
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 [![Dashboard](https://img.shields.io/badge/dashboard-live-00c8ff)](https://neuron-wire-dashboard.vercel.app)
 [![Documentation](https://img.shields.io/badge/docs-mdBook-00c853)](https://github.com/cianmag/neuron-wire)
-[![Crates.io](https://img.shields.io/badge/crate-v0.3.0-blue)]()
+[![Crates.io](https://img.shields.io/badge/crate-v0.3.1-blue)]()
 [![Security](https://img.shields.io/badge/security-Ed25519%20signed-ff69b4)](SECURITY.md)
 
 ---
