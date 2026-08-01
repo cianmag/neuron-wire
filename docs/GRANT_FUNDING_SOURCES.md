@@ -143,7 +143,7 @@
   India's INSPIRE (school-student science awards — usually citizenship-restricted, check).
 - **Realistic near-term path:** Direct research collaboration. Cold-email professors in distributed
   systems / P2P / ML (India: IITs, IISc, IIITs; plus any P2P lab anywhere) with a one-page summary
-  and the reproducible repo as evidence. A 20,900-line, 338-test-passing, MIT-licensed codebase with
+  and the reproducible repo as evidence. A 20,900-line, 342-test-passing, MIT-licensed codebase with
   one-command experiment reproduction is a strong cold-email. Even unpaid mentorship from one
   academic strengthens every other application on this list (and unlocks org-gated grants like A6).
 - **Application effort:** Low (email) to Medium (formal programs).

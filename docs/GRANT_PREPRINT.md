@@ -22,7 +22,7 @@ This motivates a research question, stated in the project's [research brief](doc
 3. **Distributed learning without a server** — model updates propagate over the network itself, robust to delay, loss, and adversaries.
 4. **Reproducible experimentation** — the network must be simulable under deterministic, auditable conditions.
 
-The Neuron Wire Protocol (NWP) is our attempt to satisfy these properties in a single auditable Rust codebase (v0.3.0; approximately 20,900 lines across 41 modules, 338 tests passing on Linux CI, 19 benchmarks, per the [audit report](docs/AUDIT_REPORT.md) and [architecture document](docs/ARCHITECTURE.md)). The remainder of this paper describes the system, its threat model, and the experimental protocol we have committed to for evaluating it.
+The Neuron Wire Protocol (NWP) is our attempt to satisfy these properties in a single auditable Rust codebase (v0.3.0; approximately 20,900 lines across 41 modules, 342 tests passing on Linux CI, 19 benchmarks, per the [audit report](docs/AUDIT_REPORT.md) and [architecture document](docs/ARCHITECTURE.md)). The remainder of this paper describes the system, its threat model, and the experimental protocol we have committed to for evaluating it.
 
 ---
 
