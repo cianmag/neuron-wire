@@ -30,10 +30,10 @@ Funding purpose:
 
 **Latest verified evidence release** (all numbers in this report):
 - **Version:** v0.3.0
-- **Commit:** `2e8de6b447d17e460125207a0b94dd361835da68`
-- **CI run:** [ci.yml 30682572416](https://github.com/cianmag/neuron-wire/actions/runs/30682572416) (success)
-- **Evidence run:** [evidence.yml 30682631026](https://github.com/cianmag/neuron-wire/actions/runs/30682631026) (matrix + emulation, success)
-- **Generated:** 2026-08-01T03:46:05Z
+- **Commit:** `7c0ccedd8c26b747bb4c33bd0a3e63704e198517`
+- **CI run:** [ci.yml 30690279229](https://github.com/cianmag/neuron-wire/actions/runs/30690279229) (success)
+- **Evidence run:** [evidence.yml 30690279254](https://github.com/cianmag/neuron-wire/actions/runs/30690279254) (matrix + emulation, success)
+- **Generated:** 2026-08-01T07:42:52Z
 - **Rust:** stable (dtolnay/rust-toolchain@stable)
 - **OS:** ubuntu-latest (Linux), macos-latest (build only), windows-latest (check only)
 
@@ -364,9 +364,9 @@ justify a funded WAN deployment; the learning evidence justifies funding to
 ---
 
 *This report is updated on every evidence-producing run. Last updated: 2026-08-01
-(Week 2 full matrix — all E1/E2/E4/E5/E6/E9 + clusters; results stable across
-consecutive CI runs 30631135875 / 30634743684 / 30637785826 / 30682631026;
-final numbers from the last stable run, commit 2e8de6b).*
+(Week 2 full matrix — all E1/E2/E4/E5/E6/E9 + clusters + distributed learning E2E;
+results stable across consecutive CI runs 30631135875 / 30634743684 / 30637785826 /
+30682631026 / 30690279254; final numbers from the last stable run, commit 7c0cced).*
 
 ### Reproducibility note (Week 2)
 
