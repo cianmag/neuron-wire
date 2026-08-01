@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| v0.3.0  | ✅ (current release) |
+| v0.3.1  | ✅ (current release) |
 | < v0.3  | ❌ (pre-release prototypes) |
 
 ## Reporting a Vulnerability
@@ -26,7 +26,7 @@ You should receive a response within 72 hours. If you don't, follow up.
 
 ## Current Security Posture
 
-### Implemented (v0.3.0)
+### Implemented (v0.3.1)
 
 | Property | Status | Detail |
 |----------|--------|--------|

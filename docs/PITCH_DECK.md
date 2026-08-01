@@ -37,7 +37,7 @@ One Rust protocol, four layers:
 | Layer | What it does |
 |---|---|
 | **Discovery** | Latency-weighted Kademlia DHT — O(log N) convergence, ~constant bandwidth per node |
-| **Transport** | Authenticated + encrypted UDP: Ed25519 signatures, XChaCha20-Poly1305 AEAD, forward secrecy, replay protection |
+| **Transport** | Authenticated UDP: Ed25519 signatures, optional XChaCha20-Poly1305 encryption, replay protection, experimental X25519 key-exchange path |
 | **Trust** | Trust-weighted rate limiting with proven bounded-score convergence — Sybil identities can't out-shout honest peers |
 | **Learning** | Distributed Hebbian/STDP with gradient aging over a sparse P2P mesh |
 

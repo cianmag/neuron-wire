@@ -15,7 +15,7 @@ Collaborative AI is centralized by default. Gradients flow through parameter ser
 | Gossip-SGD overlays | Assume an existing membership layer; no identity or Sybil defense |
 
 ## Neuron Wire approach
-One Rust protocol combining every layer: latency-weighted Kademlia DHT discovery; authenticated, encrypted UDP transport (Ed25519 signatures + XChaCha20-Poly1305 AEAD, forward secrecy, replay protection); trust-based rate limiting with proven convergence (Sybil resistance); and distributed Hebbian/STDP learning with gradient aging over a sparse P2P mesh. Single-threaded engine, ~1 ms ticks, zero busy-wait, targeting 512 MB VPSs and low-power devices.
+One Rust protocol combining every layer: latency-weighted Kademlia DHT discovery; authenticated UDP transport (Ed25519 signatures + optional XChaCha20-Poly1305 encryption, replay protection, and an experimental X25519 key-exchange path); trust-based rate limiting with proven convergence (Sybil resistance); and distributed Hebbian/STDP learning with gradient aging over a sparse P2P mesh. Single-threaded engine, ~1 ms ticks, zero busy-wait, targeting 512 MB VPSs and low-power devices.
 
 ## Technical novelty
 - **Integrated stack** — discovery + secure transport + distributed learning + reproducibility harness in one codebase, backed by a 1,760-line formal model with convergence theorems.

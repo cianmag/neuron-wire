@@ -119,7 +119,8 @@ reproducibility.
 ## Risk 5 — Security has not received external audit
 
 **Description.** The security layer is strong by design and internally audited — Ed25519
-authentication on every packet, XChaCha20-Poly1305 AEAD with ephemeral X25519 forward secrecy,
+authentication on every packet, optional XChaCha20-Poly1305 AEAD encryption with replay
+protection and an experimental X25519 key-exchange path (disabled by default until hardened),
 trust-weighted rate limiting, trust persistence across restarts, hash-chained tamper-evident audit
 log — but no third party has reviewed it. An internal audit (`docs/AUDIT_REPORT.md`) and an
 itemized security checklist (`docs/SECURITY_CHECKLIST.md`, 47/61 items ✅, 10 ⚠️, 4 ❌) are

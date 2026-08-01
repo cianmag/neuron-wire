@@ -31,8 +31,8 @@
 
 ### 2.1 Security Architecture
 - **Ed25519 authentication** on every packet — zero trust in the network
-- **XChaCha20-Poly1305 AEAD** encryption with per-peer session keys
-- **Ephemeral X25519** for forward secrecy (Noise-inspired pattern)
+- **XChaCha20-Poly1305 AEAD** encryption with per-peer session keys (optional, `encrypt_payloads`)
+- **Ephemeral X25519** key-exchange path (experimental; provides forward secrecy when enabled)
 - **Trust-based rate limiting** with per-entity windows
 - **Trust persistence** across restarts — Sybil attackers don't get fresh starts
 - **Header version validation** — incompatible peers rejected at parse time
