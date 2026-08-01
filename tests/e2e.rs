@@ -40,6 +40,7 @@ fn make_config(port: u16) -> EngineConfig {
         static_topology: false,
         packet_loss_rate: 0.0,
         sim_seed: 0,
+        max_ticks: None,
     }
 }
 

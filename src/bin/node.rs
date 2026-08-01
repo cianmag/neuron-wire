@@ -514,6 +514,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         static_topology: false,
         packet_loss_rate: 0.0,
         sim_seed: 0,
+        max_ticks: None,
     };
 
     // ── Spawn health HTTP server (background thread) ─────────

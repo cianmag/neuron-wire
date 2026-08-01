@@ -765,6 +765,7 @@ impl Simulator {
                 static_topology: self.config.static_topology,
                 packet_loss_rate: self.config.packet_loss_rate,
                 sim_seed: self.config.seed,
+                max_ticks: None,
             };
 
             // Create shared packet filter for partition injection

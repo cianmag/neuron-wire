@@ -180,6 +180,10 @@ pub struct EngineConfig {
     pub packet_loss_rate: f32,
     /// Seed for the deterministic impairment RNG (default 0).
     pub sim_seed: u64,
+    /// Optional hard cap on the number of ticks the engine loop executes
+    /// before returning. `None` = run until shutdown (default). Used for
+    /// bounded/scripted runs and deterministic end-to-end tests.
+    pub max_ticks: Option<u64>,
 }
 
 impl Default for EngineConfig {
@@ -214,6 +218,7 @@ impl Default for EngineConfig {
             static_topology: false,
             packet_loss_rate: 0.0,
             sim_seed: 0,
+            max_ticks: None,
         }
     }
 }
@@ -583,6 +588,19 @@ impl EngineLoop {
 
         loop {
             self.tick += 1;
+
+            // ── TICK BUDGET CHECK ──────────────────────────────
+            // Bounded runs: if a max tick count was configured, exit once
+            // it is reached (deterministic scripted runs / E2E tests).
+            if let Some(max) = self.config.max_ticks {
+                if self.tick >= max {
+                    log_info!(
+                        "engine",
+                        format!("[ENGINE] Tick budget reached ({}). Exiting.", self.tick)
+                    );
+                    return;
+                }
+            }
 
             // ── SHUTDOWN CHECK ─────────────────────────────────
             if self.shutdown.load(Ordering::Relaxed) {
@@ -1227,6 +1245,26 @@ impl EngineLoop {
             }
         }
         out
+    }
+
+    /// Distributed-learning observability: final engine tick (test-only).
+    pub fn tick_for_test(&self) -> u64 {
+        self.tick
+    }
+
+    /// Distributed-learning observability: Hebbian prune statistics
+    /// (test-only).
+    pub fn hebbian_prune_stats_for_test(&self) -> (u64, u64) {
+        (
+            self.hebbian.total_micro_pruned,
+            self.hebbian.total_gossip_packets,
+        )
+    }
+
+    /// Distributed-learning observability: activation value of an entity
+    /// (test-only).
+    pub fn activation_for_test(&self, entity: &EntityId) -> Option<f32> {
+        self.activation_map.get(entity).map(|a| a.value)
     }
 
     // ─── Heartbeat Protocol ───────────────────────────────────
