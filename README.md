@@ -12,6 +12,9 @@
 >
 > **Funding purpose:** build and evaluate the first real distributed test network
 > (see [docs/EVIDENCE_REPORT.md](docs/EVIDENCE_REPORT.md) and [docs/GRANT_SUMMARY.md](docs/GRANT_SUMMARY.md))
+>
+> **Test suite:** 342 test functions pass on Linux CI — commit-pinned in
+> [docs/EVIDENCE_REPORT.md](docs/EVIDENCE_REPORT.md)
 
 [![CI](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/ci.yml)
 [![Evidence](https://github.com/cianmag/neuron-wire/actions/workflows/evidence.yml/badge.svg)](https://github.com/cianmag/neuron-wire/actions/workflows/evidence.yml)
@@ -120,7 +123,7 @@ API docs: `cargo doc --no-deps --open`
 5. **DHT-only discovery** — no mDNS or LAN broadcast fallback
 6. **Static gossip fanout** — fixed at 3 peers; may under-connect at 10³+ nodes
 7. **No BFT consensus** — >⅓ malicious routing table nodes can partition
-8. **Primary validation runs on Linux CI** — macOS receives build checks; Windows receives limited checks because of local toolchain restrictions (dlltool linking). See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+8. **Primary validation runs on Linux CI. macOS receives build validation. Windows receives compile checks because of local toolchain restrictions.** See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 *See [FOUNDATIONAL_QNA.md](FOUNDATIONAL_QNA.md) §Limitations for expanded discussion.*
 
@@ -143,4 +146,4 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-*Built with Rust 2021 edition. No async runtime dependency. The engine uses synchronous non-blocking I/O.*
+*Built with Rust 2021. The engine uses synchronous non-blocking I/O and no async runtime.*

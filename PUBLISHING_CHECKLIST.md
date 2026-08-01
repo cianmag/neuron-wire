@@ -19,21 +19,21 @@
 | Weight adaptation engine | ✅ | `hebbian.rs` — STDP learning, gossip, gradient accumulation |
 | Prediction error integrator | ✅ | `forward_pass.rs` — surprise-driven learning |
 | Sparse gossip | ✅ | `hebbian.rs:gossip_target_selection` — mutation-based selection |
-| **End-to-end learning demo** | ⬜ | CORE GAP — no single command that shows "before vs after" learning |
+| **End-to-end learning demo** | ✅ | `cargo test --test distributed_learning_e2e` — A sends activation → B's synapse 0.5 → >0.6 → learning signal returns (real UDP engines) |
 
 ### Testing
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Unit tests | ✅ | 110 unit + 8 proptest + 7 integration = 125 tests across 17 modules |
-| Integration tests | ⬜ | No `tests/` directory — all tests are in-module |
-| Network tests | ⬜ | Simulator runs localhost only — no `#[cfg(network)]` tests |
-| Failure tests | ✅ | `adversary.rs` — 9 tests (corruption, replay, garbage) |
-| Fuzz tests | ⬜ | No `fuzz/` directory, no cargo-fuzz setup |
-| Property-based tests | ⬜ | No proptest/quickcheck dependency |
+| Unit tests | ✅ | 257 unit tests across 41 modules (all inline `#[cfg(test)]`), zero-warning clippy |
+| Integration tests | ✅ | `tests/` — `e2e.rs`, `distributed_learning_e2e.rs`, security, stress, wire protocol (85 tests total) |
+| Network tests | ✅ | `tests/distributed_learning_e2e.rs` — real UDP multi-process engines; `evidence/localhost_cluster.sh` 25-process cluster |
+| Failure tests | ✅ | `adversary.rs` — 9 tests (corruption, replay, garbage) + security suite |
+| Fuzz tests | ✅ | `fuzz/` — cargo-fuzz setup (4 targets) |
+| Property-based tests | ✅ | `tests/proptest.rs` — proptest dependency, wire-protocol roundtrip properties |
 | Regression tests | ⬜ | No `tests/regression/` — known-good comparison exists in CI but only validates benchmarks |
 | 90%+ code coverage | ⬜ | No coverage tool configured |
-| CI runs every test | ✅ | `.github/workflows/ci.yml` — build + test + clippy + fmt + benchmark validation |
+| CI runs every test | ✅ | `.github/workflows/ci.yml` — build + test + clippy + fmt + benchmark validation (342 tests on Linux CI) |
 
 ### Documentation
 

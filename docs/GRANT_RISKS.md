@@ -36,7 +36,7 @@ analyzed in the formal model. Every serious P2P system — BitTorrent, IPFS, Kad
 first validated in simulation before WAN trials. What is unproven is *operational* behavior under
 real network conditions, and that is precisely the question funding would answer.
 
-**What funding unlocks.** 100+ nodes across three continents (us-east-1, eu-west-1,
+**What funding unlocks.** A 20-node, three-region pilot (us-east-1, eu-west-1,
 ap-southeast-2), a sustained 7-day mesh, a public metrics dashboard, and a published WAN dataset —
 positive and negative results alike.
 

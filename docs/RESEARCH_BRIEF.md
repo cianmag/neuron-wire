@@ -62,7 +62,7 @@ There is no open infrastructure that combines P2P discovery, secure transport, d
 
 | Deliverable | Description | Success Metric |
 |-------------|-------------|---------------|
-| D1: Real Internet deployment | 100+ nodes across 3 continents, real metrics | 7-day sustained mesh, public dashboard |
+| D1: Real Internet deployment | 20-node, three-region funded pilot (NA/EU/APAC), real metrics | 7-day sustained mesh, public dashboard; scaling study follows |
 | D2: Publication | Reproducible paper + open datasets | Paper accepted, one-command reproduction |
 | D3: Developer SDK | crates.io, PyPI, 5 documented patterns | `cargo add neuron-wire` → running in 5 min |
 

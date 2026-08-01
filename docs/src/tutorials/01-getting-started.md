@@ -75,8 +75,8 @@ cargo test
 Expect output like:
 
 ```
-running 125 tests
-...
+running 342 tests
+test result: ok. 342 passed
 test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 

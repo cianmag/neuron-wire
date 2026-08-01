@@ -89,7 +89,7 @@ Take neuron-wire from localhost to the real Internet. Deploy across free-tier VP
 
 | Quarter | Deliverable | Milestone |
 |---------|-------------|-----------|
-| Q3 2026 | D1: Real Internet deployment | 100+ nodes across 3 continents |
+| Q3 2026 | D1: Real Internet deployment | 20-node, three-region funded pilot (NA/EU/APAC); scaling study follows |
 | Q3–Q4 2026 | D2: Publication | Paper submission, open dataset release |
 | Q4 2026–Q1 2027 | D3: SDK + ecosystem | crates.io, PyPI, 5 reference apps |
 

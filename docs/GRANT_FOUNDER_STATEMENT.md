@@ -33,7 +33,7 @@ The MIT-licensed repository now contains:
 
 Three deliverables, each with a pre-committed success metric:
 
-1. A **geographically distributed testbed** — 100+ nodes across three continents, sustained for seven days, with a public metrics dashboard: the step that simulation cannot take.
+1. A **geographically distributed testbed** — the funded pilot is **20 nodes across three regions (NA/EU/APAC)**, sustained for seven days, with a public metrics dashboard: the step that simulation cannot take. Scaling beyond the pilot is driven by its data.
 2. An **external security audit** of the cryptographic and transport layers.
 3. **Publication** — reproducible datasets, baselines, and a peer-reviewed paper including negative findings.
 
