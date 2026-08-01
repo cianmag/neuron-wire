@@ -48,9 +48,9 @@ Every number below is produced by **one verified commit** and **one CI/evidence 
 | Field | Value |
 |-------|-------|
 | Version | v0.3.1 |
-| Pinned commit | `265e216` (full SHA in EVIDENCE_REPORT §2) |
-| CI run | link in EVIDENCE_REPORT §2 — green |
-| Evidence run | link in EVIDENCE_REPORT §2 — matrix + emulation, green |
+| Pinned commit | `265e2169949c180d7ad3a0ce0dcf73c4b75687b7` |
+| CI run | [ci.yml 30697662079](https://github.com/cianmag/neuron-wire/actions/runs/30697662079) — green |
+| Evidence run | [evidence.yml 30697662078](https://github.com/cianmag/neuron-wire/actions/runs/30697662078) — matrix + emulation, green |
 | Test count | 342 passing on Linux CI |
 
 Documentation-only commits after the pinned commit do not alter measured results; the tag's own CI
