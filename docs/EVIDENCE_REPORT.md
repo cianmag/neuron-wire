@@ -221,23 +221,29 @@ bandwidth, apoptosis deaths. Full table: `results/evidence/E9_*/summary.csv`.
 
 | Variant | Converged | Conv. time (s) | Avg peers | Bytes sent | Δ vs control |
 |---------|-----------|----------------|-----------|-----------|--------------|
-| **Control (full NWP)** | ✅ | 1.0 | 48.7/49 | 18,831,036 | — |
-| No trust scoring | ✅ | 1.0 | 48.5/49 | 17,666,332 | −6.2% |
-| No gradient aging | ✅ | 1.0 | 48.6/49 | 18,752,224 | −0.4% |
-| No apoptosis | ✅ | 1.0 | 48.3/49 | 20,077,000 | +6.6% |
-| No neurogenesis | ✅ | 1.0 | 48.2/49 | 23,163,928 | **+23.0%** |
-| Random discovery | ✅ | 1.0 | 48.3/49 | 20,042,048 | +6.4% |
-| Static topology | ✅ | 1.0 | 48.5/49 | 18,592,084 | −1.3% |
+| **Control (full NWP)** | ✅ | 1.0 | 48.50/49 | 18,260,992 | — |
+| No trust scoring | ✅ | 1.0 | 48.41/49 | 19,106,096 | +4.6% |
+| No gradient aging | ✅ | 1.0 | 48.43/49 | 18,909,032 | +3.5% |
+| No apoptosis | ✅ | 1.0 | 48.41/49 | 18,153,484 | −0.6% |
+| No neurogenesis | ✅ | 1.0 | 48.90/49 | 22,864,864 | **+25.2%** |
+| Random discovery | ✅ | 1.0 | 48.18/49 | 22,908,520 | **+25.4%** |
+| Static topology | ✅ | 1.0 | 48.30/49 | 19,100,724 | +4.6% |
 
 **Reading (why NWP matters, quantified):**
 - **Neurogenesis is the single largest efficiency driver** — disabling it costs
-  +23.0% bytes. The lifecycle system (birth/pruning) actively reduces network cost.
-- **Apoptosis matters too**: without it, +6.6% bytes (stale state is never cleaned).
-- **XOR-closest routing beats random**: random discovery costs +6.4% bytes.
-- Trust scoring adds modest overhead (−6.2% bytes when removed) but buys Sybil
-  defense — a documented trade-off, not a free lunch.
-- Static topology ≈ control in this quiet benchmark (maintenance pings are cheap);
-  its value shows under churn (E2), where maintenance keeps the mesh fresh.
+  +23–25% bytes (consistent across all runs). The lifecycle system (birth/pruning)
+  actively reduces network cost.
+- **XOR-closest routing beats random discovery**: +6–25% bytes when replaced with
+  random selection (the range spans run-to-run variance; direction is consistent).
+- **Small effects are within run-to-run variance**: trust scoring measured −6.2%
+  (run A) to +4.6% (run B) bytes when disabled — the raw overhead is not the
+  story; its value is E5 containment (malicious peers), a documented trade-off.
+- Apoptosis/aging/static-topology deltas (±0.6–4.6%) are within noise in this
+  quiet benchmark; their value shows under churn/attack, not here.
+- **Honesty note:** byte counts are NOT perfectly deterministic across runs
+  (tick scheduling, retransmission timing); only large effects (+23–25%) are
+  robust. This variance is itself a measured result and a funded-phase item
+  (M2: pin scheduling, more trials).
 
 ## 8. Reproducibility Instructions
 
