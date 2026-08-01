@@ -83,19 +83,33 @@
 - **Eligibility / geography:** Open internationally; builder- and research-friendly (grants platform
   at `fil.org/grants`, applications via `github.com/filecoin-project/devgrants`).
 - **Application effort:** Low–Medium — short form + GitHub issue-style proposal; milestone-based.
-- **Status (2026-07):** Active (Feb-2025 update confirms continued awarding). ⚠️ Crypto-native
-  ecosystem — confirm payout form (FIL vs fiat) and local tax/legal position before applying.
+- **Status (2026-08-01):** ⚠️ **CONCEPT ONLY — do NOT apply yet.** The program funds work that
+  benefits the *Filecoin* ecosystem; NWP is not currently a Filecoin project, and "both are
+  decentralized" is not sufficient. One-page go/no-go concept written
+  (`docs/GRANT_SUBMISSIONS/FILECOIN_CONCEPT.md`): verifiable storage + reproduction for
+  coordinator-free AI experiments (IPFS/Filecoin for experiment manifests, signed results, model
+  checkpoints, immutable evidence packages). Submit only if (a) the program confirms the scope
+  qualifies, AND (b) the integration is worth building independently of the grant.
+- **Crypto payout rule:** accept FIL only when the award agreement defines payout asset,
+  exchange-rate date, vesting/lockup, wallet custody, tax documentation, minor-receipt
+  eligibility, and fiat conversion. Budget using fiat value at receipt; convert promptly.
 
 ### A4. Rust Foundation Community Grants
 - **What it funds:** Work that benefits the Rust community — a pure-Rust, MIT-licensed infrastructure
   project like NWP is the target demographic. Program launched 2022 with a $625k budget across four
   grant categories (project, community, small, hardship).
 - **Amount range:** Small grants typically a few hundred to a few thousand USD; project grants larger
-  but competitive.
-- **Eligibility / geography:** Worldwide; open to individual Rust community members.
+  but competitive (historically $2.5k–$15k).
+- **Eligibility / geography:** ⚠️ **Official policy (2026-08-01, rustfoundation.org/policy/grants-eligibility/):
+  "All grant applicants must be over the age of 18 by the date of the grant award" and "must ensure
+  that they are able to receive financial transfers from the USA."** Applicant is 16 (turns 17 Oct
+  2026) → **BLOCKED** under the age clause; Nepal US-transfer receipt also unverified. Resolve via
+  official written confirmation / fiscal sponsorship / institutional applicant / future eligible round.
+  Draft (full) at `docs/GRANT_SUBMISSIONS/RUST_FOUNDATION.md`; **do NOT submit until the 2026 round,
+  deadline, and age pathway are verified.**
 - **Application effort:** Low–Medium — short proposal; small grants have lightweight review.
-- **Status (2026-07):** Active; the Foundation also announced a Maintainers Fund (Nov 2025). Watch
-  `rustfoundation.org/project-support` for the current call calendar.
+- **Status (2026-08-01):** 2026 open round NOT confirmed (no official application page found);
+  Maintainers Fund announced Nov 2025 — watch `rustfoundation.org/project-support` for the call calendar.
 
 ### A5. Ethereum Foundation — Ecosystem Support Program (ESP)
 - **What it funds:** Public goods, research, and infrastructure for decentralized systems. NWP fits
@@ -163,15 +177,20 @@
 
 ## Tier C — Cloud credits & in-kind compute (the "$10k credits" target)
 
-### C1. DigitalOcean Hatch
+### C1. DigitalOcean Hatch / Startups
 - **What it funds:** Cloud credits + partner perks for early-stage startups.
 - **Amount range:** **$250 base credits (non-expiring)** via direct application; up to ~$100k via
-  partner/accelerator bundles; a separate AI/ML track offers GPU compute for startups that have
+  partner/accelerator bundles (route must be verified — some credit levels require an approved
+  accelerator/investor); a separate AI/ML track offers GPU compute for startups that have
   raised ≤ $10M.
-- **Eligibility / geography:** Early-stage, pre-Series-A startups; available in most markets DO
-  serves (India: yes).
-- **Application effort:** Low — short form on `digitalocean.com/hatch`.
-- **Status (2026-07):** Active. Base tier is the easiest credit win on this list; apply first.
+- **Eligibility / geography (verified 2026-08-01):** Product startups, **≤$10M raised**, company
+  **website + matching corporate-domain email**, **registered DigitalOcean team account with
+  business email**, <24-month company duration, AI-native prioritized; no prior DO promo credit;
+  services (agencies/consultancies) excluded.
+- **Status (2026-08-01):** ⚠️ **BLOCKED — no company website.** `zylvon.com` resolves (Cloudflare
+  DNS) but returns HTTP 000 (no site). Action: stand up a minimal zylvon.com (company page +
+  contact + link to repo/release), then apply on `digitalocean.com/hatch`. Also verify which route
+  actually grants the claimed $250 (direct vs partner/accelerator).
 
 ### C2. AWS Activate
 - **What it funds:** AWS credits + support for startups.
@@ -279,12 +298,11 @@ practical equivalents, in order of usefulness:
 
 | Source | Type | Realistic value | Timing |
 |--------|------|-----------------|--------|
-| **Rust Foundation Community Grants** | Cash | $1k–$5k | Next cycle — verify program page (site Cloudflare-blocked 2026-08-01) |
-| **Filecoin Foundation (Next Step)** | Cash | $5k–$10k | Rolling — verify payout form/tax |
-| Protocol Labs Research | Cash | $10k–$50k | ⚠️ **PAUSED indefinitely** — do NOT submit (draft = template) |
+| **DigitalOcean Startups/Hatch** | Credits | ~$250 (verify route) | **BLOCKED: no company website** (zylvon.com HTTP 000) — stand up site, then apply |
+| **Rust Foundation Community Grants** | Cash | $1k–$5k (project grants historically $2.5k–$15k) | ⚠️ **BLOCKED: applicant under 18** (official policy: over 18 by award date + US transfer receipt) — draft ready, age pathway pending |
 | NLnet (OIS reopen) | Cash | €5k–€20k | Post-summer 2026 reopen (draft: `GRANT_SUBMISSIONS/NLNET_OIS.md`) |
-| DigitalOcean Hatch | Credits | $250 (non-expiring) | **Apply first** — lowest effort |
-| **Filecoin Foundation (Next Step)** | Cash | $5k–$10k | Rolling — verify payout form/tax |
+| **Filecoin Foundation (Next Step)** | Cash | $5k–$10k | ⚠️ **CONCEPT ONLY** — go/no-go pending (no genuine Filecoin integration yet; see `GRANT_SUBMISSIONS/FILECOIN_CONCEPT.md`) |
+| Protocol Labs Research | Cash | $10k–$50k | ⚠️ **PAUSED indefinitely** — do NOT submit (draft = template) |
 | Microsoft Founders Hub | Credits | $1k–$5k (entry tier) | Immediate |
 | AWS Activate (Founders) | Credits | ~$1k | Immediate |
 | Cloudflare for Startups | Credits | ~$10k (self-serve) | Immediate |
