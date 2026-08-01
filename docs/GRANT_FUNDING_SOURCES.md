@@ -49,10 +49,15 @@
   **Applicants under legal consent age may apply; guardian consent required for negotiations.**
 - **Application effort:** Medium — structured form (problem, approach, budget, open-source plan);
   bimonthly open calls, ~1 page of Q&A plus budget.
-- **Status (2026-07):** ⚠️ **Temporary pause announced 2026-06-12** — NLnet is transitioning from
-  NGI to an "Open Internet Stack" program and paused open calls for the summer, with the regular
-  application process expected to resume afterward. **Watch nlnet.nl for reopening — this is the
-  single best-fit cash source on this list.**
+- **Status (2026-08-01):** ⚠️ **Temporary pause announced 2026-06-12** — NLnet is transitioning from
+  NGI to an "Open Internet Stack" (OIS) program. NGI Zero Commons Fund's final call closed
+  **2026-06-01** (no more applications for that fund); NGI Zero Core closed 2024. NLnet states the
+  regular application process will **re-open after summer 2026 with 3 new programs under the OIS
+  umbrella** (exception meanwhile: NGI Taler/Fediversity, not NWP-relevant). **Action: re-verify
+  nlnet.nl/apply weekly; submission-ready draft at `docs/GRANT_SUBMISSIONS/NLNET_OIS.md` — submit
+  within 2 weeks of reopening. This is the single best-fit cash source on this list.**
+- **Submission-ready draft:** `docs/GRANT_SUBMISSIONS/NLNET_OIS.md` (prepared 2026-08-01: tagline,
+  ~150-word abstract, work plan, €18,500 budget, team, sustainability).
 
 ### A2. Protocol Labs Research grants
 - **What it funds:** Collaborative research on problems in decentralized computing (P2P, networking,
@@ -268,10 +273,11 @@ practical equivalents, in order of usefulness:
 
 | Source | Type | Realistic value | Timing |
 |--------|------|-----------------|--------|
-| NLnet (NGI0 / OIS reopen) | Cash | €5k–€20k | Next open call after the 2026 pause |
+| **Protocol Labs Research** | Cash | $10k–$50k | **ACTIVE — submit first** (draft: `GRANT_SUBMISSIONS/PROTOCOL_LABS.md`) |
+| NLnet (OIS reopen) | Cash | €5k–€20k | Post-summer 2026 reopen (draft: `GRANT_SUBMISSIONS/NLNET_OIS.md`) |
+| DigitalOcean Hatch | Credits | $250 (non-expiring) | **Apply first** — lowest effort |
 | Rust Foundation Community Grants | Cash | $1k–$5k | Next cycle |
 | Filecoin Foundation (Next Step) | Cash | $5k–$10k | Rolling |
-| DigitalOcean Hatch | Credits | $250 (+partner tiers later) | Immediate |
 | Microsoft Founders Hub | Credits | $1k–$5k (entry tier) | Immediate |
 | AWS Activate (Founders) | Credits | ~$1k | Immediate |
 | Cloudflare for Startups | Credits | ~$10k (self-serve) | Immediate |
