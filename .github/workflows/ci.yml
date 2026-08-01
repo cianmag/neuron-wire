@@ -1,10 +1,9 @@
-# ─── CI for neuron-wire ───────────────────────────────────────────-
-# Builds and tests on Ubuntu + macOS. The Windows-hosted runner
-# suffers the same toolchain restrictions as our dev environment,
-# so it links against the GNU toolchain and runs a minimal check.
-#
-# Test suite is permanently blocked on Windows (dlltool.exe),
-# so we gate it to Linux hosts only via `cargo test --skip`.
+# ─── CI for neuron-wire ────────────────────────────────────────────
+# Primary validation runs on Linux: full build + test suite + clippy.
+# macOS receives build checks (compile only). The Windows-hosted runner
+# suffers the same toolchain restrictions as our dev environment
+# (dlltool.exe cannot create import libraries), so it links against the
+# GNU toolchain and runs `cargo check` only — no test execution.
 
 name: CI
 

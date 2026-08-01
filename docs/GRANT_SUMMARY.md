@@ -26,7 +26,7 @@ One Rust protocol combining every layer: latency-weighted Kademlia DHT discovery
 ## Current status — validated research prototype
 | Dimension | Evidence |
 |---|---|
-| Codebase | 41 modules · 20,900+ lines Rust · 341 test functions · 4 CI workflows · zero-warning clippy |
+| Codebase | 41 modules · 20,900+ lines Rust · 338 tests passing on Linux CI · 4 CI workflows · zero-warning clippy |
 | Correctness | Unit/integration/property tests + 4 fuzz targets; 100% pass on supported toolchains |
 | Simulation | Deterministic paper-mode simulator; 100k-node convergence; failure injection incl. malicious nodes |
 | Local real UDP | Multi-process localhost tests; OS socket limits identified as the scaling constraint — not the protocol |

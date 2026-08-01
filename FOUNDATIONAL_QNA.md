@@ -124,7 +124,7 @@
 
 **What are the major subsystems?** DHT routing, UDP transport, ForwardPass neural computation, Hebbian STDP learning, Neurogenesis (neuron birth), Apoptosis (neuron death), identity management, trust scoring, audit logging, and deterministic simulation.
 
-**How many modules exist?** 14 public modules across ~8,000 lines of Rust in 55 source files.
+**How many modules exist?** 41 source files (~20,900 lines of Rust) exposing the core subsystems: DHT routing, UDP transport, ForwardPass neural computation, Hebbian STDP learning, neurogenesis, apoptosis, identity, trust, audit, simulation.
 
 **Which module starts first?** The UDP socket opens and the engine loop begins draining inbound packets before any DHT or neural subsystem is initialized.
 

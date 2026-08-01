@@ -28,7 +28,7 @@
 
 Neuron Wire is an open-source Rust framework that enables any device reachable over a network to participate in collaborative AI without provisioning servers, trusting a central coordinator, or exposing private data.
 
-The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, Ed25519 packet authentication with optional XChaCha20-Poly1305 encryption, trust-based rate limiting, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop sustains ~400 KHz–1 MHz tick rates on commodity hardware with zero external runtime dependencies.
+The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, Ed25519 packet authentication with optional XChaCha20-Poly1305 encryption, trust-based rate limiting, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop sustains ~400 KHz–1 MHz tick rates on commodity hardware with no async runtime dependency.
 
 ---
 
@@ -120,7 +120,7 @@ API docs: `cargo doc --no-deps --open`
 5. **DHT-only discovery** — no mDNS or LAN broadcast fallback
 6. **Static gossip fanout** — fixed at 3 peers; may under-connect at 10³+ nodes
 7. **No BFT consensus** — >⅓ malicious routing table nodes can partition
-8. **Tested on Windows only** — UDP timing may vary on other platforms
+8. **Primary validation runs on Linux CI** — macOS receives build checks; Windows receives limited checks because of local toolchain restrictions (dlltool linking). See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 *See [FOUNDATIONAL_QNA.md](FOUNDATIONAL_QNA.md) §Limitations for expanded discussion.*
 
@@ -143,4 +143,4 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
-*Built with Rust 2021 edition. No async runtime. No dependency beyond std.*
+*Built with Rust 2021 edition. No async runtime dependency. The engine uses synchronous non-blocking I/O.*

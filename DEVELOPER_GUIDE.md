@@ -194,7 +194,7 @@ Subsystem (DHT, Hebbian, etc.)
 
 ## 7. Testing Patterns
 
-The project has **110 unit tests** across 16 modules and **15 additional integration/property tests** in `tests/` (7 integration, 8 property-based). All unit tests are inline `#[cfg(test)] mod tests { ... }` blocks in each module.
+The project has **255 unit tests** across 41 modules and **83 integration/property tests** in `tests/` (E2E, integration, profiling, property, security, stress, wire protocol). All unit tests are inline `#[cfg(test)] mod tests { ... }` blocks in each module.
 
 ### Patterns used
 

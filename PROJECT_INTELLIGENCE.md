@@ -72,7 +72,7 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 
 **Explain it to a venture capitalist.** Open-source infrastructure for decentralized AI — any device with a network connection can participate in collaborative learning without servers, central coordination, or a single point of control; validated in simulation up to 1 B nodes. **[S]**
 
-**Explain it to a government grant committee.** An open-source research platform that investigates whether decentralized AI can operate without centralized cloud infrastructure, with 55 Rust source files, 7 Python baseline comparisons, 1,760-line formal mathematical model, deterministic reproducibility, and a WAN deployment milestone awaiting funding. **[I]**
+**Explain it to a government grant committee.** An open-source research platform that investigates whether decentralized AI can operate without centralized cloud infrastructure, with 41 Rust source files, 338 test functions, deterministic reproducibility, and a WAN deployment milestone awaiting funding. **[I]**
 
 **Explain it to a university professor.** A research infrastructure artifact integrating Kademlia DHT routing, custom UDP transport with reliability tiers, Hebbian STDP learning, neurogenesis, and apoptosis into a single deterministic simulation framework designed to evaluate whether P2P collaborative learning is practical under real Internet conditions. **[I+S]**
 
@@ -586,7 +586,7 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 | Hebbian STDP weight updates are deterministic and correct | **[I]** | 8 unit tests pass — pre/post activation correlation produces expected Δw | High |
 | Neurogenesis triggers on sustained prediction error | **[I]** | Leaky accumulator correctly filters transient noise, integrates sustained error | High |
 | Apoptosis correctly prunes inactive neurons and stale routing entries | **[I]** | 5 unit tests + simulator validation pass | High |
-| UDP transport with 3 reliability tiers works on localhost | **[I]** | 10 unit tests + multi-node real UDP at small scale | High |
+| UDP transport with 3 reliability tiers works on localhost | **[I]** | 338 test functions + multi-node real UDP at small scale | High |
 | Hybrid model simulation cost is independent of N for N > ACTIVE_MAX | **[S]** | 100 M and 1 B produce statistically identical metrics | High |
 | Protocol can simulate 1 B nodes in < 20 seconds | **[S]** | 15.6 s wall time for 100 K → 1 B sweep, 5 runs | High |
 | Real-node DHT converges at 100 K nodes | **[S]** | v3 simulator, 100 K real node objects, 100% convergence | High |
@@ -778,7 +778,7 @@ Every answer is one sentence unless otherwise noted. Claims are tagged with thei
 | Hebbian STDP update rule is correct | **[I]** | Verified | High | 8 unit tests confirm Δw = η · pre · post produces correct sign and magnitude |
 | Neurogenesis triggers on sustained surprise | **[I]** | Verified | High | Leaky accumulator correctly filters vs. integrates |
 | Apoptosis prunes stale entries | **[I]** | Verified | High | 5 unit tests + death spiral guard validation |
-| UDP transport works on localhost | **[I]** | Verified | High | 10 unit tests + small cluster (3–5 nodes) |
+| UDP transport works on localhost | **[I]** | Verified | High | 338 test functions + small cluster (3–5 nodes) |
 | **Learning subsystem produces useful results at any task** | **[F]** | **Not tested — biggest scientific gap** | **Low** | **No end-to-end benchmark exists. Benchmark protocol is designed (PROJECT_INTELLIGENCE.md §8 + RESEARCH_QUESTIONS.md RQ9) but not executed. Estimated 200–400 lines of harness code to produce the first graph.** |
 | Protocol works over real WAN links | **[F]** | Not tested | Low | All benchmarks are localhost; WAN deployment is D1 milestone |
 | Hebbian STDP converges over P2P gossip | **[F]** | Not tested | Low | Subsystems tested individually; end-to-end learning not demonstrated |

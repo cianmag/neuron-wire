@@ -23,7 +23,7 @@ Building infrastructure without infrastructure meant making different choices:
 The MIT-licensed repository now contains:
 
 - **20,900+ lines of Rust** across the protocol, engine, security layer, simulator, and benchmarks;
-- **341 tests**, all passing, plus 19 benchmarks and 4 fuzz targets;
+- **338 tests passing** on Linux CI, plus 19 benchmarks and 4 fuzz targets;
 - **Simulated convergence of 100,000 nodes** (100% in 7.0 simulated seconds), with the caveat — documented in the repo — that simulation is not reality;
 - **Formal specifications**: a 1,760-line formal model (convergence, trust, partition tolerance, entropy bounds) and a 485-line wire-protocol spec with complexity analysis;
 - **A security layer**: Ed25519 authentication on every packet, XChaCha20-Poly1305 encryption with forward secrecy, trust-based Sybil resistance, and a hash-chained audit log — 47 of 61 security-checklist items implemented, with an internal audit published alongside the remaining gaps;
