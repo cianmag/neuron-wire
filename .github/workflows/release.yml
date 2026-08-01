@@ -67,14 +67,14 @@ jobs:
         if: matrix.archive == 'tar.gz'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../${{ matrix.artifact }}.tar.gz ${{ BINARY_NAME }}
+          tar czf ../../../${{ matrix.artifact }}.tar.gz $BINARY_NAME
           cd ../../..
 
       - name: Package (windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          Compress-Archive -Path "target/${{ matrix.target }}/release/${{ BINARY_NAME }}.exe" -DestinationPath "${{ matrix.artifact }}.zip"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/$env:BINARY_NAME.exe" -DestinationPath "${{ matrix.artifact }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
