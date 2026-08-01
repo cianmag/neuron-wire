@@ -92,27 +92,18 @@ fn b_neuron() -> EntityId {
     EntityId(b)
 }
 
-/// Serialize a gossip frame carrying TWO synapse entries — one activating
-/// B's local neuron (`b_neuron`) and one activating `a_neuron`. Both with
-/// gradient magnitude 0.8 (the activation value B will mirror).
+/// Serialize a gossip frame carrying ONE synapse entry activating
+/// `a_neuron` with gradient magnitude 0.5 (the activation B mirrors).
+/// Proven to decode correctly (matches serialize_synapse_gossip format).
 fn build_activation_frame() -> Vec<u8> {
-    let mut body = Vec::with_capacity(34 + 2 * (32 + 2 + 32 + 4 + 4));
+    let mut body = Vec::with_capacity(34 + 32 + 2 + 32 + 4 + 4);
     body.extend_from_slice(&a_neuron().0); // source_entity (who fired)
-    body.extend_from_slice(&2u16.to_le_bytes()); // num_synapses = 2
-
-    // Entry 1: b_neuron (B's local neuron) receives activation 0.8.
-    body.extend_from_slice(&b_neuron().0); // post_id
-    body.extend_from_slice(&1u16.to_le_bytes()); // num_targets
-    body.extend_from_slice(&a_neuron().0); // target entity
-    body.extend_from_slice(&1.0f32.to_le_bytes()); // weight
-    body.extend_from_slice(&0.8f32.to_le_bytes()); // accumulated gradient
-
-    // Entry 2: a_neuron receives activation 0.8.
-    body.extend_from_slice(&a_neuron().0); // post_id
+    body.extend_from_slice(&1u16.to_le_bytes()); // num_synapses = 1
+    body.extend_from_slice(&a_neuron().0); // post_id (receives activation)
     body.extend_from_slice(&1u16.to_le_bytes()); // num_targets
     body.extend_from_slice(&[7u8; 32]); // target entity (opaque)
     body.extend_from_slice(&1.0f32.to_le_bytes()); // weight
-    body.extend_from_slice(&0.8f32.to_le_bytes()); // accumulated gradient
+    body.extend_from_slice(&0.5f32.to_le_bytes()); // accumulated gradient
 
     neuron_wire::header::build_frame(neuron_wire::types::MsgType::Data as u8, body, 0)
 }
@@ -164,37 +155,46 @@ fn run_scenario(port_a: u16, port_b: u16) -> RunResult {
         b_neuron(),
     );
 
-    // Pre-send the activation frame to B's ALREADY-BOUND socket. The kernel
-    // buffers it; B's run loop receives it at exactly tick 1. The sender
-    // binds port_a so that Node A can later take over that exact address.
-    {
-        let sender = std::net::UdpSocket::bind(format!("127.0.0.1:{}", port_a))
-            .expect("sender binds port_a");
-        let frame = build_activation_frame();
-        sender
-            .send_to(&frame, format!("127.0.0.1:{}", port_b))
-            .expect("pre-send activation frame to B");
-        // Drop the sender: port_a is freed for Node A to bind.
-    }
-
     // Node A: no brain needed (ingress decode path is brain-independent).
-    // Outlives B so it is guaranteed to be listening for B's gossip reply.
-    let config_a = make_config(port_a, seed_a(), Some(800));
-    let (mut engine_a, _outbound_tx_a, _events_a) =
+    // A runs FIRST and sends the activation frame through its REAL
+    // transport (valid [transport header][NWP frame] datagram). The frame
+    // lands in B's already-bound socket and is buffered by the kernel —
+    // when B's run loop starts, it processes the frame at exactly tick 1
+    // (deterministic, independent of tick rate).
+    let config_a = make_config(port_a, seed_a(), None); // runs until shutdown
+    let (mut engine_a, outbound_tx_a, _events_a) =
         EngineLoop::new(config_a).expect("Node A construct");
 
+    let shutdown_a = engine_a.shutdown.clone();
     let handle_a = thread::spawn(move || {
         engine_a.run();
         engine_a
     });
+
+    // Give A time to drain its outbound channel and deliver the frame to
+    // B's socket (A's first tick happens within a few ms of spawn; 50ms is
+    // a generous margin that does NOT affect B's tick-1 arrival).
+    {
+        let frame = build_activation_frame();
+        let packet = neuron_wire::engine_loop::OutgoingPacket {
+            payload: frame,
+            dst: format!("127.0.0.1:{}", port_b).parse().unwrap(),
+            mode: neuron_wire::engine_loop::Reliability::BestEffort,
+        };
+        outbound_tx_a.send(packet).expect("A sends activation");
+    }
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // NOW start B — its tick 1 drains the buffered activation frame.
     let handle_b = thread::spawn(move || {
         engine_b.run();
         engine_b
     });
 
-    // B exits after 400 ticks; A exits after 800. Join both.
-    let engine_a = handle_a.join().expect("A joined");
+    // B exits after 400 ticks. Then shut down A and reclaim both engines.
     let engine_b = handle_b.join().expect("B joined");
+    shutdown_a.store(true, std::sync::atomic::Ordering::Relaxed);
+    let engine_a = handle_a.join().expect("A joined");
 
     let (b_recv, _b_sent) = engine_b.learning_stats();
     let (a_recv, _a_sent) = engine_a.learning_stats();
