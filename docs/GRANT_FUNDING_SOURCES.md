@@ -62,7 +62,13 @@
 ### A2. Protocol Labs Research grants
 - **What it funds:** Collaborative research on problems in decentralized computing (P2P, networking,
   distributed systems, verifiability) — NWP is squarely in scope.
-- **Amount range:** Open grants typically $10k–$50k; targeted RFPs up to $150k (research) / $300k
+- **Status (2026-08-01):** ⚠️ **INDEFINITELY PAUSED** — the official
+  [protocol/research-grants README](https://github.com/protocol/research-grants) (updated
+  2026-06-12) states "the research grants programme is indefinitely paused, and we are not
+  accepting new applications at this time." **Do NOT submit.** The submission-ready draft
+  (`docs/GRANT_SUBMISSIONS/PROTOCOL_LABS.md`) is preserved as a template for active programs
+  (Rust Foundation Community Grants, Filecoin Foundation). Re-verify before any submission.
+- **Amount range (when active):** Open grants typically $10k–$50k; targeted RFPs up to $150k (research) / $300k
   (implementation) per the program's published terms.
 - **Eligibility / geography:** Worldwide; researcher-centric, individual-friendly.
 - **Application effort:** High — research proposal with related work, methods, deliverables.
@@ -273,11 +279,12 @@ practical equivalents, in order of usefulness:
 
 | Source | Type | Realistic value | Timing |
 |--------|------|-----------------|--------|
-| **Protocol Labs Research** | Cash | $10k–$50k | **ACTIVE — submit first** (draft: `GRANT_SUBMISSIONS/PROTOCOL_LABS.md`) |
+| **Rust Foundation Community Grants** | Cash | $1k–$5k | Next cycle — verify program page (site Cloudflare-blocked 2026-08-01) |
+| **Filecoin Foundation (Next Step)** | Cash | $5k–$10k | Rolling — verify payout form/tax |
+| Protocol Labs Research | Cash | $10k–$50k | ⚠️ **PAUSED indefinitely** — do NOT submit (draft = template) |
 | NLnet (OIS reopen) | Cash | €5k–€20k | Post-summer 2026 reopen (draft: `GRANT_SUBMISSIONS/NLNET_OIS.md`) |
 | DigitalOcean Hatch | Credits | $250 (non-expiring) | **Apply first** — lowest effort |
-| Rust Foundation Community Grants | Cash | $1k–$5k | Next cycle |
-| Filecoin Foundation (Next Step) | Cash | $5k–$10k | Rolling |
+| **Filecoin Foundation (Next Step)** | Cash | $5k–$10k | Rolling — verify payout form/tax |
 | Microsoft Founders Hub | Credits | $1k–$5k (entry tier) | Immediate |
 | AWS Activate (Founders) | Credits | ~$1k | Immediate |
 | Cloudflare for Startups | Credits | ~$10k (self-serve) | Immediate |

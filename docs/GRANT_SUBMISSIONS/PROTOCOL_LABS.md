@@ -1,6 +1,11 @@
 # Protocol Labs Research Grant — Application Draft
 
-**Status:** DRAFT for submission · verified 2026-08-01 · research.protocol.ai/outreach/grants (active)
+**Status:** ⚠️ **PROGRAM PAUSED — draft preserved for reopening** · verified 2026-08-01
+The official [protocol/research-grants README](https://github.com/protocol/research-grants)
+(updated 2026-06-12) states: *"the research grants programme is indefinitely paused, and we
+are not accepting new applications at this time."* Do NOT submit to this program until the
+README says otherwise. Re-verify before any submission; if still paused, use this draft as a
+template for the Rust Foundation Community Grants / Filecoin Foundation applications.
 **Applicant:** Zylvon (solo founder, 16, Nepali citizen studying in India — guardian consent available)
 **Project:** Neuron Wire (NWP) — validated P2P infrastructure for decentralized AI
 **Request:** $20,000 · **Timeline:** 12 months
