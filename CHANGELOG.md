@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] — 2026-08-01
 
 ### Added
 
@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (active program) and `docs/GRANT_SUBMISSIONS/NLNET_OIS.md` (post-summer reopen).
 - **Release tooling** — `release/` scripts: grant-package PDF builder, demo-slide
   generator, narration, and video assembly (artifacts attached to the v0.3.1 release).
+- **Fixed release workflow** — the packaged binary is `node` (auto-detected from
+  `src/bin/node.rs`), not `neuron-wire`; the previous packaging step failed on every
+  tag push.
+
+## [Unreleased]
+
+### Added
+
+#### Engine & Core
 - **Engine loop rebuild** — 1,434-line engine loop with full security hardening
 - **Trust-based rate limiting** with convergence proof (formal specification)
 - **Heartbeat protocol** — 30s keepalive for connection health
