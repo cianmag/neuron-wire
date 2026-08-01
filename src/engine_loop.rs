@@ -9,7 +9,7 @@
 //!
 //! A single-threaded `recv_from()` loop with a 1ms read timeout gives us:
 //!
-//!   - **Deterministic timing**: tick every ~1ms, no scheduler jitter
+//!   - **Stable tick cadence**: ~1ms target per tick (actual timing depends on OS scheduling)
 //!   - **Zero busy-wait**: OS blocks the thread during idle (0% CPU)
 //!   - **Max throughput**: sustained traffic drains as fast as the socket delivers
 //!
@@ -32,7 +32,7 @@
 //! │  └──────────────────────────────────────────────┘  │
 //! │                                                    │
 //! │  Attach brain via engine.attach_brain(...)         │
-//! │  before run() to enable AGI computation.           │
+//! │  before run() to enable distributed learning.      │
 //! └──────────────────────────────────────────────────┘
 //!                    │                    ▲
 //!        outbound_tx │                    │ events_tx
@@ -363,7 +363,7 @@ pub struct PeerInfo {
     pub last_seen_ms: u64,
 }
 
-/// Single-threaded, non-blocking event engine for the planetary brain.
+/// Single-threaded, non-blocking event engine for the coordinator-free learning network.
 ///
 /// ## Usage
 ///
@@ -397,7 +397,8 @@ pub struct EngineLoop {
     peer_rtt: HashMap<SocketAddr, PeerInfo>,
     /// Per-IP connection count for DoS protection
     peer_ip_count: HashMap<std::net::IpAddr, usize>,
-    /// Pre-allocated receive buffer (reused across ticks to avoid per-packet allocation)
+    /// Pre-allocated receive buffer, reused across ticks. Ingress processing currently copies
+    /// each accepted datagram into an owned packet buffer (`recv_buf[..len].to_vec()`).
     recv_buf: Vec<u8>,
     /// ── Timers ─────────────────────────────────────────────────
     tick: u64,
@@ -531,7 +532,7 @@ impl EngineLoop {
 
     /// Attach neural computation brain to the engine loop.
     /// Enables ForwardPass + Hebbian learning on every tick.
-    /// Call this before `run()` to enable AGI computation.
+    /// Call this before `run()` to enable distributed learning.
     #[allow(clippy::too_many_arguments)] // config bundle, kept flat for ergonomics
     pub fn attach_brain(
         &mut self,
@@ -570,7 +571,8 @@ impl EngineLoop {
             );
         }
 
-        // Pre-allocated receive buffer lives on the struct (avoid per-packet allocation)
+        // Pre-allocated receive buffer lives on the struct (reduces syscall/alloc churn);
+        // ingress still copies each accepted datagram into an owned packet buffer via to_vec().
         let mut ingress_count_this_tick: u32;
 
         // Log startup to audit trail

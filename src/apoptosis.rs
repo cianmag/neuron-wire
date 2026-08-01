@@ -71,7 +71,7 @@ pub struct ApoptosisReport {
 
 // ─── The Apoptosis System ─────────────────────────────────────
 
-/// The death-driven garbage collector for the planetary brain.
+/// The death-driven garbage collector for the collaborative learning runtime.
 ///
 /// Call `tick()` once per second from the engine loop's cleanup phase.
 /// Returns a report that feeds into observability stats.

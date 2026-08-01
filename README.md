@@ -27,9 +27,21 @@
 
 ---
 
+## Documentation map (read in this order)
+
+1. **`docs/PROJECT_STATUS.md`** — canonical status: what's done, what's not, where everything lives
+2. **`docs/ARCHITECTURE.md`** — system architecture
+3. **`docs/WIRE_PROTOCOL.md`** — wire format, reliability, encryption
+4. **`SECURITY.md`** — security posture
+5. **`docs/EVIDENCE_REPORT.md`** — commit-pinned results with metric definitions
+6. **`docs/GRANT_SUBMISSIONS/TRACKER.md`** — live grant status
+7. **`GRANT.md`** — grant package index
+
+Historical/superseded documents live in `archive/` (cleanup tracked in `docs/PROJECT_STATUS.md`).
+
 ## Overview
 
-Neuron Wire is an open-source Rust framework that enables any device reachable over a network to participate in collaborative AI without provisioning servers, trusting a central coordinator, or exposing private data.
+Neuron Wire is an open-source Rust framework that enables any device reachable over a network to participate in collaborative AI without provisioning servers or trusting a central coordinator. In the tested workflow, no raw dataset is transferred — only gradients and activations, over an encrypted transport where enabled.
 
 The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, Ed25519 packet authentication with optional XChaCha20-Poly1305 encryption, trust-based rate limiting, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop sustains ~400 KHz–1 MHz tick rates on commodity hardware with no async runtime dependency.
 

@@ -23,7 +23,7 @@ Why? Three reasons (from `src/engine_loop.rs`, lines 1–50):
 //! Tokio on a free-tier VPS (512MB RAM, shared CPU) is overhead we don't need.
 //! ...
 //! A single-threaded recv_from() loop with a 1ms read timeout gives us:
-//!   - Deterministic timing: tick every ~1ms, no scheduler jitter
+//!   - Stable tick cadence: ~1ms target per tick (actual timing depends on OS scheduling)
 //!   - Zero busy-wait: OS blocks the thread during idle (0% CPU)
 //!   - Max throughput: sustained traffic drains as fast as the socket delivers
 ```

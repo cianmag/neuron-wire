@@ -72,6 +72,36 @@ Funding purpose:
 
 ## 4. Deterministic Simulation Results
 
+### ⚠️ Metric definitions (read before interpreting any number below)
+
+These definitions answer the three questions reviewers must be able to answer from the report:
+what is counted, why it saturates, and what "recovery" actually measures.
+
+- **`avg_peers` / `peers per node`** = mean of `node.peers.len()` across all nodes, where `peers`
+  is the node's **in-memory peer registry** — every peer the node has discovered and retained in
+  the simulated routing table. It is **not** a bounded Kademlia K-bucket capacity, and the
+  simulator deliberately does **not** model the production `max_peers` routing-table cap
+  (default 500) as a per-node ceiling. That is why the value approaches `N − 1` at small `N`:
+  with full discovery, each node retains every other node. The production binary enforces
+  `max_peers`, so the simulator's `avg_peers ≈ N − 1` is an upper bound on real-world routing
+  state, not a claim that production nodes retain all peers. Memory scaling with `avg_peers` is
+  therefore linear in discovered peers in simulation, and capped by `max_peers` in production.
+  A bounded-K-bucket variant is a funded-phase task (see §13).
+- **`converged`** = at least 80% of nodes reached the target peer count (edge-weight stability),
+  sampled per tick. `conv_rate` is the fraction of nodes meeting that criterion.
+- **`recovery time`** = the interval from the failure-injection tick to the tick where the
+  routing table re-meets the convergence criterion. In the deterministic simulator this is
+  measured at 1 ms tick granularity, so sub-tick recovery reports as `~0 s`; the reported `~0`
+  **does not** claim sub-millisecond WAN recovery — it means the simulator's convergence
+  criterion was already met on the tick after injection. Phase definitions for future WAN
+  measurements are: (1) failure injection time, (2) detection time (first node observes the
+  loss), (3) first corrective action (first re-discovery/repair message), (4) routing recovery
+  threshold (95% of nodes re-connected), (5) full convergence threshold (criterion met for all
+  nodes). Only (4) and (5) are currently measurable in simulation; the rest require the
+  funded WAN pilot (M2).
+- **`bandwidth_kbps`** = aggregate bytes sent across all nodes / wall-clock window, converted
+  to kbps. It is a simulation-internal aggregate, not a per-node wire measurement.
+
 All experiments use fixed seeds (`42`, `1337`, `9001`) via `--paper-mode`.
 
 ### E1 — Convergence scaling
@@ -210,8 +240,10 @@ single-threaded engine absorbed a 250× packet burst without crashing.
 
 **Partition caveat:** the iptables OUTPUT rule split did not fully isolate the two
 UDP groups on loopback (kernel may bypass OUTPUT for loopback or the multiport
-ranges overlapped). Result reported honestly; a Toxiproxy-based split is the
-funded-phase improvement (M4).
+ranges overlapped). Result reported honestly. The correct methodology — Linux
+network namespaces (or separate Docker bridges) with veth pairs, with isolation
+verified by packet capture *before* starting the recovery test — is a funded-phase
+task (M4), not yet executed.
 
 Artifacts: `results/emulated_4/<scenario>.log` + node logs (CI artifact).
 
