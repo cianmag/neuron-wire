@@ -29,17 +29,23 @@ Funding purpose:
 ## 2. Evidence Trail (commit-pinned)
 
 **Latest verified evidence release** (all numbers in this report):
-- **Version:** v0.3.0
-- **Commit:** `7c0ccedd8c26b747bb4c33bd0a3e63704e198517`
-- **CI run:** [ci.yml 30690279229](https://github.com/cianmag/neuron-wire/actions/runs/30690279229) (success)
-- **Evidence run:** [evidence.yml 30690279254](https://github.com/cianmag/neuron-wire/actions/runs/30690279254) (matrix + emulation, success)
-- **Generated:** 2026-08-01T07:42:52Z
+- **Version:** v0.3.1
+- **Commit:** `265e2169949c180d7ad3a0ce0dcf73c4b75687b7`
+- **CI run:** [ci.yml 30697662079](https://github.com/cianmag/neuron-wire/actions/runs/30697662079) (success)
+- **Evidence run:** [evidence.yml 30697662078](https://github.com/cianmag/neuron-wire/actions/runs/30697662078) (matrix + emulation, success)
+- **Generated:** 2026-08-01T12:14:17Z
 - **Rust:** stable (dtolnay/rust-toolchain@stable)
 - **OS:** ubuntu-latest (Linux), macos-latest (build only), windows-latest (check only)
 
+> **Provenance.** All measured results in this report — 342 tests, E1–E9 matrix, cluster and
+> emulation experiments, and the distributed-learning E2E — are pinned to the single commit
+> `265e216` (v0.3.1) and its verified runs above. Documentation-only commits after that release
+> (this file included) do not alter measured results. Current repository head is always visible in
+> the [commit log](https://github.com/cianmag/neuron-wire/commits/master).
+
 | Artifact | Location | Status |
 |----------|----------|--------|
-| Source code | `src/` (41 modules, ~21,000 lines) | ✅ `2e8de6b` |
+| Source code | `src/` (41 modules, ~21,000 lines) | ✅ `265e216` |
 | Unit + integration tests | `tests/` (342 test functions pass on Linux CI) | ✅ pass on Linux CI |
 | Property-based tests | `tests/proptest.rs` (20) | ✅ pass on Linux CI |
 | Wire protocol tests | `tests/wire_protocol.rs` (14) | ✅ pass on Linux CI |
@@ -366,7 +372,8 @@ justify a funded WAN deployment; the learning evidence justifies funding to
 *This report is updated on every evidence-producing run. Last updated: 2026-08-01
 (Week 2 full matrix — all E1/E2/E4/E5/E6/E9 + clusters + distributed learning E2E;
 results stable across consecutive CI runs 30631135875 / 30634743684 / 30637785826 /
-30682631026 / 30690279254; final numbers from the last stable run, commit 7c0cced).*
+30682631026 / 30690279254 / 30697662079; final numbers from the last stable run,
+commit 265e216, evidence run 30697662078 — see §2 provenance).*
 
 ### Reproducibility note (Week 2)
 

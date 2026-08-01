@@ -1,6 +1,6 @@
 # Neuron Wire Protocol: A Self-Organizing Peer-to-Peer Infrastructure for Decentralized Neural Computation
 
-**Version:** 0.3.0-preprint · **Date:** 2026-07-31 · **Status:** Draft for review
+**Version:** 0.3.1-preprint · **Date:** 2026-08-01 · **Status:** Draft for review
 **Project:** [Neuron Wire (github.com/cianmag/neuron-wire)](https://github.com/cianmag/neuron-wire) · **Organization:** Zylvon
 
 ---

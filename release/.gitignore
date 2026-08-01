@@ -1,0 +1,7 @@
+# Regenerable release artifacts (scripts in release/ rebuild them)
+audio/
+segments/
+slides/
+*.mp4
+*.mp3
+*.pdf

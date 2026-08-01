@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Engine & Core
+#### Release & Evidence (v0.3.1)
+- **v0.3.1 evidence release** — all experimental numbers pinned to commit `265e216`
+  (342 tests, E1–E9 matrix, clusters, emulation, distributed-learning E2E); evidence run
+  `30697662078` green. Tag `v0.3.1`.
+- **Two-page technical summary** — `docs/TECHNICAL_SUMMARY.md` for grant reviewers.
+- **Submission-ready grant drafts** — `docs/GRANT_SUBMISSIONS/PROTOCOL_LABS.md`
+  (active program) and `docs/GRANT_SUBMISSIONS/NLNET_OIS.md` (post-summer reopen).
+- **Release tooling** — `release/` scripts: grant-package PDF builder, demo-slide
+  generator, narration, and video assembly (artifacts attached to the v0.3.1 release).
 - **Engine loop rebuild** — 1,434-line engine loop with full security hardening
 - **Trust-based rate limiting** with convergence proof (formal specification)
 - **Heartbeat protocol** — 30s keepalive for connection health

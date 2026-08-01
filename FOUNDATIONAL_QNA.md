@@ -382,9 +382,9 @@
 
 ## 14. Roadmap
 
-**Current stage?** Research prototype (v0.3.0) with complete simulation infrastructure, formal model, and all baseline comparisons implemented — no WAN deployment.
+**Current stage?** Research prototype (v0.3.1) with complete simulation infrastructure, formal model, and all baseline comparisons implemented — no WAN deployment.
 
-**Next milestone?** Deliverable 1: Deploy 100+ nodes across AWS free-tier in 3 continents (us-east-1, eu-west-1, ap-southeast-2) and measure real-Internet behavior.
+**Next milestone?** Milestone 5: Deploy the funded 20-node, three-region pilot (NA/EU/APAC — us-east-1, eu-west-1, ap-southeast-2) and measure real-Internet behavior.
 
 **Six-month goal?** Published reproducible evaluation paper with open datasets and one-command figure reproduction (Deliverable 2).
 
