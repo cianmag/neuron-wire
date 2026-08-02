@@ -1,7 +1,7 @@
 # Neuron Wire — Evidence Report
 
 > **Public evidence package for grant evaluation.**
-> Repository: [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire) · Company: Zylvon · Version: 0.3.0
+> Repository: [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wire) · Company: Zylvon · Version: v0.3.1
 
 ---
 
@@ -42,6 +42,10 @@ Funding purpose:
 > `265e216` (v0.3.1) and its verified runs above. Documentation-only commits after that release
 > (this file included) do not alter measured results. Current repository head is always visible in
 > the [commit log](https://github.com/cianmag/neuron-wire/commits/master).
+>
+> **E1.2 addition (2026-08-02).** The bounded-routing comparison (§4.2) is a post-release
+> measurement, pinned to commit `ba4e2ff` and CI run `30736370023` (evidence workflow, green).
+> It is not part of the v0.3.1 evidence package; it is a fresh, separately-pinned run.
 
 | Artifact | Location | Status |
 |----------|----------|--------|
