@@ -35,6 +35,16 @@ jobs:
           bash ./evidence/localhost_cluster.sh 10 20
           bash ./evidence/localhost_cluster.sh 25 20
 
+      - name: Bounded-routing comparison (bench-fast --max-peers, E1.2)
+        run: |
+          cargo build --release --bin bench-fast
+          mkdir -p results/bench-fast
+          ./target/release/bench-fast 100,500,1000 1 0 > results/bench-fast/unbounded.log 2>&1
+          ./target/release/bench-fast 100,500,1000 1 32 > results/bench-fast/bounded32.log 2>&1
+          echo "═══ unbounded (cap=0) ═══"; cat results/bench-fast/unbounded.log
+          echo "═══ bounded (cap=32) ═══"; cat results/bench-fast/bounded32.log
+          cat results/bench-fast/fast_scaling_results.csv
+
       - name: Archive evidence
         uses: actions/upload-artifact@v4
         with:
@@ -42,6 +52,7 @@ jobs:
           path: |
             results/evidence/
             results/localhost_cluster_*/
+            results/bench-fast/
           retention-days: 30
 
       - name: Show aggregated table

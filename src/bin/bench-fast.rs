@@ -3,10 +3,13 @@
 //! No UDP sockets, no OS threads per node.
 //! Uses gossip PEX + Kademlia FIND_NODE, without periodic peer heartbeat flood.
 //!
-//! Usage: cargo run --release --bin bench-fast [node_counts...] [trials]
+//! Usage: cargo run --release --bin bench-fast [node_counts...] [trials] [max_peers]
 //!   Default: 100,1000,10000,50000,100000 3
+//!   max_peers: 0 = unbounded full-registry mode (default); N>0 = bounded-production
+//!   routing mode (FIFO eviction at cap, mirroring the engine's max_peers bound).
 
 use std::collections::HashSet;
+use std::collections::VecDeque;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::time::Instant;
@@ -17,6 +20,8 @@ const MAX_TICKS: u64 = 120_000; // sim ticks per trial (120s simulated, ~0.1-10s
 struct Node {
     id: u64,
     peers: HashSet<u64>,
+    peer_order: VecDeque<u64>, // FIFO insertion order for bounded eviction
+    max_peers: usize,          // 0 = unbounded (full-registry research mode)
     pkts_out: u64,
     pkts_in: u64,
     bytes_out: u64,
@@ -25,16 +30,34 @@ struct Node {
 }
 
 impl Node {
-    fn new(id: u64) -> Self {
+    fn new(id: u64, max_peers: usize) -> Self {
         Self {
             id,
             peers: HashSet::new(),
+            peer_order: VecDeque::new(),
+            max_peers,
             pkts_out: 0,
             pkts_in: 0,
             bytes_out: 0,
             bytes_in: 0,
             converged: false,
         }
+    }
+
+    /// Insert a peer, honoring the routing-table cap (FIFO eviction, mirroring the
+    /// engine's `max_peers` bound). Unbounded mode (0) keeps full-registry behavior.
+    fn insert_peer(&mut self, p: u64) {
+        if p == self.id || self.peers.contains(&p) {
+            return;
+        }
+        if self.max_peers > 0 && self.peers.len() >= self.max_peers {
+            // Evict oldest-known peer to make room (Kademlia-style bounded table).
+            if let Some(oldest) = self.peer_order.pop_front() {
+                self.peers.remove(&oldest);
+            }
+        }
+        self.peers.insert(p);
+        self.peer_order.push_back(p);
     }
 
     /// Generate messages for this tick.
@@ -92,7 +115,7 @@ impl Node {
         self.bytes_in += msg.wire_size() as u64;
         match *msg {
             Message::Ping(from, to) if to == self.id => {
-                self.peers.insert(from);
+                self.insert_peer(from);
                 // PONG back with 3 random peer recommendations (offset by tick for variety)
                 let v: Vec<u64> = self.peers.iter().copied().collect();
                 let len = v.len();
@@ -107,13 +130,13 @@ impl Node {
                 }
             }
             Message::Pong(from, to, rec) if to == self.id => {
-                self.peers.insert(from);
+                self.insert_peer(from);
                 if rec != self.id && rec != 0 {
-                    self.peers.insert(rec);
+                    self.insert_peer(rec);
                 }
             }
             Message::FindNode(from, to, target) if to == self.id => {
-                self.peers.insert(from);
+                self.insert_peer(from);
                 if self.peers.contains(&target) || target == self.id {
                     msgq.push(Message::NodeFound(from, target));
                     self.pkts_out += 1;
@@ -125,7 +148,7 @@ impl Node {
                 }
             }
             Message::NodeFound(to, found) if to == self.id && found != self.id => {
-                self.peers.insert(found);
+                self.insert_peer(found);
             }
             _ => {}
         }
@@ -162,8 +185,10 @@ impl Message {
 }
 
 // ── Run one trial ──
-fn run_trial(num_nodes: u32) -> TrialStats {
-    let mut nodes: Vec<Node> = (0..num_nodes).map(|i| Node::new(i as u64)).collect();
+fn run_trial(num_nodes: u32, max_peers: usize) -> TrialStats {
+    let mut nodes: Vec<Node> = (0..num_nodes)
+        .map(|i| Node::new(i as u64, max_peers))
+        .collect();
     let min_peers = ((num_nodes as f64).log2().ceil() * 3.0) as usize;
     let mut msgq: Vec<Message> = Vec::with_capacity(1_000_000);
     let mut converged_at: Option<u64> = None;
@@ -237,6 +262,7 @@ fn run_trial(num_nodes: u32) -> TrialStats {
         ap_mean: avg_peers,
         mp_mean: max_peers as f64,
         pkts_mean: total_pkts,
+        peer_cap: nodes.first().map(|n| n.max_peers).unwrap_or(0),
     }
 }
 
@@ -266,6 +292,7 @@ struct TrialStats {
     ap_mean: f64,
     mp_mean: f64,
     pkts_mean: u64,
+    peer_cap: usize,
 }
 
 fn main() {
@@ -275,20 +302,27 @@ fn main() {
         .map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect())
         .unwrap_or_else(|| vec![100, 1000, 10000, 50000, 100000]);
     let trials: u32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(3);
+    // max_peers: 0 = unbounded full-registry mode (default); N>0 = bounded routing.
+    let max_peers: usize = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(0);
 
     let out_dir = std::path::PathBuf::from("results/bench-fast");
     fs::create_dir_all(&out_dir).ok();
     let csv_path = out_dir.join("fast_scaling_results.csv");
-    fs::write(&csv_path, "node_count,trial,converged,conv_rate,convergence_time_s,max_peers,avg_peers,bandwidth_kbps,packets_recv\n").ok();
+    fs::write(
+        &csv_path,
+        "node_count,trial,peer_cap,converged,conv_rate,convergence_time_s,max_peers,avg_peers,bandwidth_kbps,packets_recv\n",
+    )
+    .ok();
 
     let total = node_counts.len() as u32 * trials;
     let start_all = Instant::now();
 
     eprintln!(
-        "═══════ FAST DHT v3 ═══════ {} cfgs × {} trials = {} runs (scale-optimized)",
+        "═══════ FAST DHT v3 ═══════ {} cfgs × {} trials = {} runs (scale-optimized, peer_cap={})",
         node_counts.len(),
         trials,
-        total
+        total,
+        max_peers
     );
     eprintln!("No periodic peer heartbeats; gossip PEX + FIND_NODE every 500 ticks");
     eprintln!("Max {} sim-ticks per trial\n", MAX_TICKS);
@@ -297,13 +331,14 @@ fn main() {
         eprintln!("─── {}n × {}t ───", nc, trials);
         for t in 0..trials {
             let start = Instant::now();
-            let stats = run_trial(nc);
+            let stats = run_trial(nc, max_peers);
             let elapsed = start.elapsed();
 
             let line = format!(
-                "{},{},{},{:.1},{:.4},{},{:.4},{:.4},{}\n",
+                "{},{},{},{},{:.1},{:.4},{},{:.4},{:.4},{}\n",
                 nc,
                 t,
+                stats.peer_cap,
                 stats.converged,
                 stats.conv_rate,
                 stats.ct_mean,

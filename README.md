@@ -41,9 +41,9 @@ Historical/superseded documents live in `archive/` (cleanup tracked in `docs/PRO
 
 ## Overview
 
-Neuron Wire is an open-source Rust framework that enables any device reachable over a network to participate in collaborative AI without provisioning servers or trusting a central coordinator. In the tested workflow, no raw dataset is transferred — only gradients and activations, over an encrypted transport where enabled.
+Neuron Wire is an open-source Rust framework that enables compatible devices capable of running the Rust node and receiving UDP traffic to participate in collaborative AI without provisioning servers or trusting a central coordinator. In the tested workflow, no raw dataset is transferred — only gradients and activations, over an encrypted transport where enabled.
 
-The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, Ed25519 packet authentication with optional XChaCha20-Poly1305 encryption, trust-based rate limiting, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop sustains ~400 KHz–1 MHz tick rates on commodity hardware with no async runtime dependency.
+The protocol provides: latency-weighted Kademlia DHT for peer discovery, custom reliable UDP transport with gradient decay, Hebbian STDP distributed learning, Ed25519 packet authentication with optional XChaCha20-Poly1305 encryption, trust-based rate limiting, and deterministic paper-mode simulation. A single-threaded non-blocking engine loop reached approximately 400 KHz–1 MHz in local benchmark configurations documented in the evidence package, with no async runtime dependency.
 
 ---
 
@@ -116,7 +116,7 @@ API docs: `cargo doc --no-deps --open`
 |-----------|--------|-------------|
 | DHT Routing | [`dht.rs`](src/dht.rs) | Latency-weighted Kademlia, 256 buckets, K=20, DNS seeds |
 | UDP Transport | [`transport.rs`](src/transport.rs) | Custom reliable UDP, 3 tiers, ACK bitfield, gradient decay |
-| Engine Loop | [`engine_loop.rs`](src/engine_loop.rs) | Single-threaded non-blocking 6-phase tick, 400 KHz–1 MHz |
+| Engine Loop | [`engine_loop.rs`](src/engine_loop.rs) | Single-threaded non-blocking 6-phase tick (~400 KHz–1 MHz in local benchmarks) |
 | Neural Compute | [`forward_pass.rs`](src/forward_pass.rs) | Activation propagation, tanh squashing, prediction error |
 | Hebbian STDP | [`hebbian.rs`](src/hebbian.rs) | Spike-timing-dependent plasticity, weight decay, sparse gossip |
 | Neurogenesis | [`neurogenesis.rs`](src/neurogenesis.rs) | Surprise-driven neuron birth (leaky accumulator) |

@@ -8,14 +8,15 @@ Zylvon · [github.com/cianmag/neuron-wire](https://github.com/cianmag/neuron-wir
 
 ## 1. What it is
 
-**Neuron Wire (NWP)** is a Rust framework that lets any device reachable over a network participate in
+**Neuron Wire (NWP)** is a Rust framework that lets compatible devices capable of running the Rust node and receiving UDP traffic participate in
 collaborative AI — without a central coordinator and without provisioning servers. In the tested
 workflow, no raw dataset is transferred — only gradients and activations, over an encrypted transport
 where enabled. It is the infrastructure layer for a coordinator-free, peer-to-peer neural network:
 nodes discover each other, exchange neural gradients, and learn collectively.
 
-The core is a **single-threaded, non-blocking UDP engine** running at ~400 KHz–1 MHz ticks on commodity
-hardware, with **no async runtime dependency**. The protocol combines:
+The core is a **single-threaded, non-blocking UDP engine** that reached approximately 400 KHz–1 MHz
+ticks in local benchmark configurations documented in the evidence package, with **no async runtime
+dependency**. The protocol combines:
 
 | Subsystem | What it does | Status |
 |-----------|--------------|--------|

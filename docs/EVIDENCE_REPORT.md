@@ -79,14 +79,12 @@ what is counted, why it saturates, and what "recovery" actually measures.
 
 - **`avg_peers` / `peers per node`** = mean of `node.peers.len()` across all nodes, where `peers`
   is the node's **in-memory peer registry** — every peer the node has discovered and retained in
-  the simulated routing table. It is **not** a bounded Kademlia K-bucket capacity, and the
-  simulator deliberately does **not** model the production `max_peers` routing-table cap
-  (default 500) as a per-node ceiling. That is why the value approaches `N − 1` at small `N`:
-  with full discovery, each node retains every other node. The production binary enforces
-  `max_peers`, so the simulator's `avg_peers ≈ N − 1` is an upper bound on real-world routing
-  state, not a claim that production nodes retain all peers. Memory scaling with `avg_peers` is
-  therefore linear in discovered peers in simulation, and capped by `max_peers` in production.
-  A bounded-K-bucket variant is a funded-phase task (see §13).
+  the simulated routing table. The `simulate` example drives the **real engine** (in-process), so
+  it inherits the production `max_peers` routing-table bound (default 500): at node counts well
+  below the cap the registry saturates to `N − 1` (full mesh); the cap binds only once
+  discovered peers approach 500. Memory therefore scales linearly with discovered peers up to the
+  cap. A bounded-routing comparison at realistic K-bucket-scale caps (e.g. 32) is provided by
+  `bench-fast` `--max-peers N` and reported in §4.2.
 - **`converged`** = at least 80% of nodes reached the target peer count (edge-weight stability),
   sampled per tick. `conv_rate` is the fraction of nodes meeting that criterion.
 - **`recovery time`** = the interval from the failure-injection tick to the tick where the
@@ -130,6 +128,31 @@ convergence criterion (edge-weight stability) does not trigger inside the window
 expected for the 60 s cap; longer runs are a funded-phase task (M2).
 
 Raw data: `results/evidence/E1_*/summary.csv` (committed with each run)
+
+### E1.2 — Bounded-routing comparison (bench-fast, `--max-peers`)
+
+The E1 harness (`simulate`) drives the real engine, so its `max_peers=500` cap only
+binds near 500 discovered peers. To answer the reviewer's question — *what happens to
+convergence, memory, and message volume when the routing table is bounded at a
+realistic K-bucket scale?* — `bench-fast` now supports `--max-peers N` (0 = unbounded
+full-registry mode; N>0 = bounded-production routing with FIFO eviction at the cap,
+mirroring the engine's bound). Results (CI-regenerated):
+
+| Nodes | Cap | Converged | Conv time (s) | Avg peers | Max peers | Bandwidth (kbps) | Packets |
+|-------|-----|-----------|---------------|-----------|-----------|-------------------|---------|
+| 100   | 0   | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| 100   | 32  | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| 500   | 0   | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| 500   | 32  | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| 1000  | 32  | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+
+**Reading (filled on CI):** bounded mode caps per-node registry at `cap`, so
+`avg_peers ≤ cap` regardless of `N` — answering the memory-scaling question directly.
+Convergence is measured against `log2(N)·3` peers (Kademlia-style reachability), not
+full mesh, so bounded tables can still "converge". Message volume may rise under a cap
+(FIND_NODE retries for evicted targets) — the trade-off is quantified here.
+
+Raw data: `results/bench-fast/fast_scaling_results.csv` (CI artifact, `peer_cap` column).
 
 ### ⚠️ E1 Pre-fix finding (2026-07-31, commit 481e371 → fixed in a9c909d)
 
