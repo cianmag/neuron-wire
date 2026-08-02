@@ -1,0 +1,12 @@
+═══════ FAST DHT v3 ═══════ 3 cfgs × 1 trials = 3 runs (scale-optimized, peer_cap=0)
+No periodic peer heartbeats; gossip PEX + FIND_NODE every 500 ticks
+Max 120000 sim-ticks per trial
+
+─── 100n × 1t ───
+  [ 1/1]    100n t0 ✅ ct=0.00s peers=48.6/21 bw=96 pkt=51864 wall=0.00s
+─── 500n × 1t ───
+  [ 1/1]    500n t0 ✅ ct=0.00s peers=54.9/27 bw=484 pkt=259872 wall=0.02s
+─── 1000n × 1t ───
+  [ 1/1]   1000n t0 ✅ ct=1.00s peers=56.7/30 bw=1119 pkt=599868 wall=0.06s
+
+═══════ DONE → results/bench-fast/fast_scaling_cap0.csv (0s)

@@ -1,0 +1,4 @@
+node_count,trial,peer_cap,converged,conv_rate,convergence_time_s,max_peers,avg_peers,bandwidth_kbps,packets_recv
+100,0,32,true,100.0,0.0000,32,32.0000,96.2699,51864
+500,0,32,true,99.2,0.0000,32,32.0000,484.0256,259872
+1000,0,32,true,100.0,1.0000,32,32.0000,1119.3437,599868
