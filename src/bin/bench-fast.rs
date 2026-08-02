@@ -307,7 +307,8 @@ fn main() {
 
     let out_dir = std::path::PathBuf::from("results/bench-fast");
     fs::create_dir_all(&out_dir).ok();
-    let csv_path = out_dir.join("fast_scaling_results.csv");
+    // Cap-specific filename so unbounded and bounded runs archive side by side.
+    let csv_path = out_dir.join(format!("fast_scaling_cap{}.csv", max_peers));
     fs::write(
         &csv_path,
         "node_count,trial,peer_cap,converged,conv_rate,convergence_time_s,max_peers,avg_peers,bandwidth_kbps,packets_recv\n",

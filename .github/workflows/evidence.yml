@@ -43,7 +43,8 @@ jobs:
           ./target/release/bench-fast 100,500,1000 1 32 > results/bench-fast/bounded32.log 2>&1
           echo "═══ unbounded (cap=0) ═══"; cat results/bench-fast/unbounded.log
           echo "═══ bounded (cap=32) ═══"; cat results/bench-fast/bounded32.log
-          cat results/bench-fast/fast_scaling_results.csv
+          echo "═══ cap0.csv ═══"; cat results/bench-fast/fast_scaling_cap0.csv
+          echo "═══ cap32.csv ═══"; cat results/bench-fast/fast_scaling_cap32.csv
 
       - name: Archive evidence
         uses: actions/upload-artifact@v4
