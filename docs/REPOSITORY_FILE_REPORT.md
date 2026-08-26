@@ -1,11 +1,12 @@
-# Neuron-Wire Repository File-by-File Report
+# Neuron-Wire Repository Inventory and Architecture Audit
 Generated from local repository ground truth.
 
 - Branch: `master`
-- HEAD: `ea97e04`
+- HEAD at generation: `ea97e04`
 - Git status before report: `clean`
-- Tracked files covered: **486 / 486**
+- Tracked files covered: **487 / 487**
 - Scope: every `git ls-files` tracked path, including source, docs, CI, evidence, results, dashboards, deployment, fuzzing, and examples.
+- Limitation: this is a repository inventory and structural architecture audit, not a behavioral code audit.
 ## Executive map
 This repo is not just a Rust crate. It is a full research artifact: core NWP runtime code, deterministic simulation/benchmarking harnesses, CI evidence workflows, grant/publication docs, committed experiment outputs, and deployment/observability scaffolding.
 ### Directory inventory
@@ -23,7 +24,7 @@ This repo is not just a Rust crate. It is a full research artifact: core NWP run
 | `dashboard` | 5 | Vercel dashboard app. |
 | `demo` | 6 | Rust/WASM browser demo. |
 | `deploy` | 4 | Ansible/provisioning deployment files. |
-| `docs` | 36 | Evidence, grant, technical, mdBook, tutorial documentation. |
+| `docs` | 37 | Evidence, grant, technical, mdBook, tutorial documentation. |
 | `evidence` | 9 | Raw evidence, CI evidence scripts, and bounded-routing artifacts. |
 | `examples` | 6 | Runnable Rust examples. |
 | `experiments` | 11 | TOML experiment definitions. |
@@ -225,6 +226,7 @@ This repo is not just a Rust crate. It is a full research artifact: core NWP run
 | `docs/GRANT_SUMMARY.md` | 68 | 5405 | Project documentation / grant / evidence material. headings: Neuron Wire Protocol (NWP) — Grant Summary; Problem; Current systems and their limitations; Neuron Wire approach \| opens: **Zero-infrastructure AI: one auditable P2P protocol for decentralized discovery, secure transport, and distributed learning.** |
 | `docs/PITCH_DECK.md` | 161 | 6663 | Project documentation / grant / evidence material. headings: Neuron Wire Protocol — Pitch Deck; Slide 1 — Title; Slide 2 — The Problem; Slide 3 — The Approach \| opens: **Zero-infrastructure AI: one auditable P2P protocol for decentralized discovery, secure transport, and distributed learning.** |
 | `docs/PROJECT_STATUS.md` | 51 | 3180 | Project documentation / grant / evidence material. headings: Project Status; What this project is; Current status (2026-08-01); Documentation map (strict hierarchy) \| opens: Neuron Wire (NWP) is an MIT-licensed Rust framework for **coordinator-free, peer-to-peer |
+| `docs/REPOSITORY_FILE_REPORT.md` | 656 | 138430 | Project documentation / grant / evidence material. Repository inventory and structural architecture audit generated from `git ls-files`; covers every tracked path once, with line counts, byte counts, purpose classification, and content/symbol summaries. |
 | `docs/RESEARCH_BRIEF.md` | 82 | 4680 | Project documentation / grant / evidence material. headings: Research Brief: Neuron Wire (NWP); Problem; Research Question; Architecture \| opens: **Zero-Infrastructure AI — Open infrastructure for collaborative AI without central servers.** |
 | `docs/SECURITY_CHECKLIST.md` | 152 | 7015 | Project documentation / grant / evidence material. headings: Neuron Wire Protocol — Security Hardening Checklist; 1. Authentication & Identity; 2. Encryption; 3. Rate Limiting \| opens: 1. **Zeroize key material** — Use `zeroize` crate on `NodeIdentity` drop |
 | `docs/SUMMARY.md` | 87 | 3703 | Project documentation / grant / evidence material. headings: Neuron-Wire Documentation; Getting Started; Examples; Architecture \| opens: [Introduction](index.md) |
@@ -598,8 +600,8 @@ This repo is not just a Rust crate. It is a full research artifact: core NWP run
 | `src/health.rs` | 291 | 13668 | Core Rust library source. doc: Health and metrics HTTP endpoint for production monitoring. Spawns a minimal, dependency-free HTTP server in a background thread. Reads engine stats via a shared `Mutex<EngineStats>` and serves three endpoints: - `GET /h \| symbols: spawn_health_server, format_metrics, format_status |
 | `src/hebbian.rs` | 683 | 23393 | Core Rust library source. doc: HebbianLearningSystem — Spike-Timing-Dependent Plasticity over NWP. ## The Four Phases of a Hebbian Tick ```text For every (post_id, synapse) in the synapse map: 1. STDP:      Δw = η · pre_activation · post_activation 2. \| symbols: new, tick, seed_weight, deserialize_gossip_packet, default, serialize_synapse_gossip, serialize_gossip_packet, select_gossip_targets, eid, make_synapse, … |
 | `src/identity.rs` | 479 | 17184 | Core Rust library source. doc: Node Identity — Ed25519 keypairs, digital signatures, EntityId derivation. Every node in the NWP network has a cryptographic identity backed by an Ed25519 keypair. The public key is used to derive the node's EntityId (25 \| symbols: new, from_seed, from_keypair_bytes, entity_id, public_key, public_key_bytes, secret_key_bytes, x25519_secret, sign, sign_packet, next_sequence, rotate |
-| `src/io.rs` | 167 | 5857 | Core Rust library source. doc: I/O for the neuron protocol over TCP (blocking, threads). Each connection runs in its own thread. Messages are framed with a 4-byte length prefix for zero-copy reading. \| symbols: read_frame, write_frame, read_message, io_error, fmt, test_io_error_display, test_read_write_frame_loopback, test_read_message_loopback, test_frame_too_large_error, IoError |
-| `src/lib.rs` | 85 | 2532 | Core Rust library source. doc: Neuron Wire Protocol v2 — Zero-Copy FlatBuffer over TCP ## Wire Format ```text [4 bytes]  frame_len: u32   (NWP message size, excludes this field) [16 bytes] MessageHeader    (magic + version + type + flags + body_len +  |
+| `src/io.rs` | 169 | 6056 | Core Rust library source. doc: Legacy/tooling TCP framing helpers for NWP messages. The production NWP runtime uses UDP (`transport.rs` + `engine_loop.rs`). This module is intentionally limited to blocking `TcpStream` length-prefix helpers for tests, local tooling, and adapters; it is not the runtime transport. \| symbols: read_frame, write_frame, read_message, io_error, fmt, test_io_error_display, test_read_write_frame_loopback, test_read_message_loopback, test_frame_too_large_error, IoError |
+| `src/lib.rs` | 91 | 2893 | Core Rust library source. doc: Neuron Wire Protocol v2 — Zero-Copy FlatBuffer over UDP. NWP's production transport is UDP, implemented in `transport` and driven by `engine_loop`. The `io` module contains only legacy/tooling TCP length-prefix framing helpers; it is not the runtime transport. |
 | `src/logger.rs` | 637 | 17442 | Core Rust library source. doc: Lightweight structured logger — zero external dependencies. Outputs JSON lines to stderr, filterable by log level. Each line: ```json {"ts":"2026-07-22T14:30:00Z","level":"INFO","module":"engine","msg":"peer connected"," \| symbols: init, log, as_str, from_env, timestamp, is_leap, json_escape, from_u8, Level |
 | `src/memory_module.rs` | 294 | 9789 | Core Rust library source. doc: Differentiable external memory module for the Planetary Brain. Provides a content-addressable read/write memory that uses cosine-similarity attention over stored keys to retrieve weighted combinations of stored values. L \| symbols: new, observe, write, read, clear, default, vector_norm, cosine_similarity, eid, test_new_memory_default, test_write_and_read, test_observe |
 | `src/meta_learning.rs` | 342 | 12246 | Core Rust library source. doc: Meta-Learning — learning to learn. Implements MAML-inspired gradient-based meta-learning to quickly adapt to new tasks with minimal data. Optimizes the learning rate and initialization parameters. \| symbols: new, update, meta_gradient, reset, num_synapses, forward, num_params, default, test_learned_optimizer_update, test_hypernet_forward, test_meta_method_none, test_reset_clears_state |

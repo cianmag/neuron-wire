@@ -1,8 +1,14 @@
-//! Neuron Wire Protocol v2 — Zero-Copy FlatBuffer over TCP
+//! Neuron Wire Protocol v2 — Zero-Copy FlatBuffer over UDP
+//!
+//! NWP's production transport is UDP, implemented in [`transport`] and driven by
+//! the single-threaded engine in [`engine_loop`]. The [`io`] module contains only
+//! legacy/tooling TCP length-prefix framing helpers for tests and internal
+//! adapters; it is not the runtime transport.
 //!
 //! ## Wire Format
 //! ```text
-//! [4 bytes]  frame_len: u32   (NWP message size, excludes this field)
+//! [16 bytes] TransportHeader  (UDP seq/ack/bitfield/timestamp)
+//! [4 bytes]  frame_len: u32   (NWP frame size, excludes this field)
 //! [16 bytes] MessageHeader    (magic + version + type + flags + body_len + crc)
 //! [N bytes]  Body             (FlatBuffer-encoded body)
 //! ```

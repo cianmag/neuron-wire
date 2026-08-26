@@ -11,6 +11,12 @@
 
 NWP is a binary wire protocol for decentralized neural computation over UDP. It defines how neural state — activations, gradients, spike events, consensus votes — is serialized, routed, acknowledged, and merged across a dynamic P2P network of heterogeneous nodes.
 
+**Transport identity:** UDP is the production transport for NWP. The crate also
+contains legacy/tooling TCP length-prefix helpers in `src/io.rs`, but those
+helpers are not the runtime transport and are not used by the production engine.
+Operational nodes bind UDP sockets through `src/transport.rs` and
+`src/engine_loop.rs`.
+
 A single UDP datagram carries one NWP message:
 
 ```

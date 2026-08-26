@@ -23,7 +23,7 @@ UDP provides none of TCP's guarantees but allows message-level granularity, zero
 
 ## Decision
 
-Use **UDP as the sole transport protocol**, with a custom reliability layer layered on top.
+Use **UDP as the sole production peer transport protocol**, with a custom reliability layer layered on top. Any TCP code in the repository is limited to legacy/tooling stream framing or HTTP-style observability endpoints; it is not part of the production NWP peer transport.
 
 The reliability layer provides three tiers:
 

@@ -1,7 +1,9 @@
-//! I/O for the neuron protocol over TCP (blocking, threads).
+//! Legacy/tooling TCP framing helpers for NWP messages.
 //!
-//! Each connection runs in its own thread. Messages are framed
-//! with a 4-byte length prefix for zero-copy reading.
+//! The production NWP runtime uses UDP (`transport.rs` + `engine_loop.rs`). This
+//! module is intentionally limited to blocking `TcpStream` length-prefix helpers
+//! for tests, local tooling, and adapters that need stream framing. It does not
+//! define the protocol's network transport.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -9,7 +11,7 @@ use std::net::TcpStream;
 use crate::header::{parse_frame, HeaderError, MessageHeader};
 use crate::HEADER_SIZE;
 
-/// Read a complete framed message from a TCP stream.
+/// Read a complete framed message from a legacy/tooling TCP stream.
 /// Returns the raw frame bytes for zero-copy parsing.
 pub fn read_frame(stream: &mut TcpStream, buf: &mut Vec<u8>) -> Result<(), IoError> {
     let mut len_buf = [0u8; 4];
@@ -27,7 +29,7 @@ pub fn read_frame(stream: &mut TcpStream, buf: &mut Vec<u8>) -> Result<(), IoErr
     Ok(())
 }
 
-/// Write a complete framed message to a TCP stream.
+/// Write a complete framed message to a legacy/tooling TCP stream.
 pub fn write_frame(stream: &mut TcpStream, msg: &[u8]) -> Result<(), IoError> {
     let frame_len = msg.len() as u32;
     stream
@@ -56,7 +58,7 @@ fn io_error(kind: std::io::ErrorKind) -> IoError {
     }
 }
 
-/// Errors that can occur during framed I/O on a TCP stream.
+/// Errors that can occur during legacy/tooling framed TCP I/O.
 #[derive(Debug)]
 pub enum IoError {
     /// An I/O error occurred while reading from the stream.

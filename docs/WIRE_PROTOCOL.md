@@ -14,6 +14,10 @@ authenticated messaging, and encrypted gradient exchange in decentralized neural
 networks. It operates on top of UDP with application-layer reliability, identity,
 and encryption.
 
+**Transport identity:** UDP is the production transport. TCP appears only in
+legacy/tooling stream-framing helpers (`src/io.rs`) and HTTP-style observability
+servers; it is not the production NWP peer transport.
+
 ### 1.1 Design Goals
 
 | Goal | Mechanism |
